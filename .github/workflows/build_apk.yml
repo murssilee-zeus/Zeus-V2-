@@ -2,7 +2,7 @@ name: Build Zeus-V2 APK
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:
+  workflow_dispatch: # Permite ejecutarlo manualmente desde la pestaña Actions
 
 jobs:
   build:
