@@ -13,11 +13,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
@@ -70,96 +73,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ComposeRoot() {
-        val viewModel: EqViewModel = viewModel(factory = EqViewModel.Factory)
-
-        LaunchedEffect(Unit) {
-            viewModel.loadSavedIfAny()
-        }
-
-        LaunchedEffect(Unit) {
-            while (true) {
-                audioService?.audioEngine?.let { engine ->
-                    viewModel.spectrum = engine.spectrumData.copyOf()
-                    viewModel.isEngineRunning = engine.isEnabled
-                }
-                delay(50)
-            }
-        }
-
-        LaunchedEffect(audioService) {
-            audioService?.audioEngine?.let { engine ->
-                engine.settings = viewModel.toSettings()
-                engine.applyAll()
-            }
-        }
-
-        LaunchedEffect(viewModel.bands.toList(), viewModel.subBoost) {
-            audioService?.audioEngine?.setBands(viewModel.bands.toList())
-            audioService?.audioEngine?.setSubBoost(viewModel.subBoost)
-        }
-
-        LaunchedEffect(viewModel.preamp) {
-            audioService?.audioEngine?.setPreGain(viewModel.preamp)
-        }
-
-        LaunchedEffect(
-            viewModel.pipelineEnabled,
-            viewModel.lowShelfEnabled,
-            viewModel.peakBandsEnabled,
-            viewModel.highShelfEnabled
-        ) {
-            audioService?.audioEngine?.setPipelineTags(
-                viewModel.pipelineEnabled,
-                viewModel.lowShelfEnabled,
-                viewModel.peakBandsEnabled,
-                viewModel.highShelfEnabled
-            )
-        }
-
-        LaunchedEffect(
-            viewModel.limiterEnabled,
-            viewModel.limiterThreshold,
-            viewModel.limiterAttack,
-            viewModel.limiterRelease,
-            viewModel.limiterRatio,
-            viewModel.limiterPostGain
-        ) {
-            audioService?.audioEngine?.setLimiter(
-                enabled = viewModel.limiterEnabled,
-                threshold = viewModel.limiterThreshold,
-                attack = viewModel.limiterAttack,
-                release = viewModel.limiterRelease,
-                ratio = viewModel.limiterRatio,
-                postGain = viewModel.limiterPostGain
-            )
-        }
-
-        LaunchedEffect(
-            viewModel.compressorMultibandEnabled,
-            viewModel.crossoverFrequencies.toList(),
-            viewModel.compMbThLow, viewModel.compMbThLoMid,
-            viewModel.compMbThHiMid, viewModel.compMbThHigh,
-            viewModel.compMbRatio, viewModel.compMbKnee,
-            viewModel.compMbAttack, viewModel.compMbRelease,
-            viewModel.compMbPostGain
-        ) {
-            audioService?.audioEngine?.setCompressor(
-                enabled = viewModel.compressorMultibandEnabled,
-                cross1 = viewModel.crossoverFrequencies.getOrElse(0) { 180f },
-                cross2 = viewModel.crossoverFrequencies.getOrElse(1) { 1800f },
-                cross3 = viewModel.crossoverFrequencies.getOrElse(2) { 8000f },
-                thLow = viewModel.compMbThLow,
-                thLoMid = viewModel.compMbThLoMid,
-                thHiMid = viewModel.compMbThHiMid,
-                thHigh = viewModel.compMbThHigh,
-                ratio = viewModel.compMbRatio,
-                knee = viewModel.compMbKnee,
-                attack = viewModel.compMbAttack,
-                release = viewModel.compMbRelease,
-                postGain = viewModel.compMbPostGain
-            )
-        }
-
         MaterialTheme(
             colorScheme = darkColorScheme(
                 primary = Color(0xFFFF6B9E),
@@ -175,18 +88,17 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = Color(0xFF0D0D12)
             ) {
-                MainScreen(
-                    viewModel = viewModel,
-                    onToggleEngine = { toggleEngine(viewModel) },
-                    onSave = {
-                        viewModel.saveSettings()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Configuración guardada",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                )
+                // Interfaz temporal muy simple para diagnosticar
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Zeus-V2 cargó correctamente",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
             }
         }
     }
