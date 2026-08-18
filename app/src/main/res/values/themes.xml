@@ -1,1 +1,12 @@
-
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ZeusV2" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#FF6B9E</item>
+        <item name="colorPrimaryVariant">#C44569</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#9B59B6</item>
+        <item name="android:statusBarColor">#0A0A0F</item>
+        <item name="android:navigationBarColor">#0A0A0F</item>
+        <item name="android:windowBackground">#0A0A0F</item>
+    </style>
+</resources>

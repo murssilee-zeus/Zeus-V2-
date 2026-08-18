@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Zeus-V2</string>
+    <string name="eq_tile_label">Zeus EQ</string>
+    <string name="eq_section">Equalizer V2</string>
+    <string name="crossover_section">Crossover Multiband</string>
+    <string name="limiter_section">Limiter</string>
+    <string name="pipeline_section">Audio Effects Pipeline</string>
+    <string name="service_channel">Zeus-V2 Service</string>
+    <string name="service_running">Zeus-V2 activo</string>
+    <string name="notif_channel_name">Zeus EQ</string>
+    <string name="notif_channel_desc">Mantiene el motor de audio de Zeus EQ activo</string>
+    <string name="notif_text_running">Motor de audio activo</string>
+    <string name="permissions_needed">Se necesitan permisos de audio para el procesamiento real</string>
+    <string name="settings_saved">Configuración guardada</string>
+    <string name="engine_started">Zeus EQ Pro18 activado</string>
+</resources>

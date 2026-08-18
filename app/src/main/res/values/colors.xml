@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background_dark">#0A0A0F</color>
+    <color name="surface_dark">#16101C</color>
+    <color name="grid_line">#2E1A35</color>
+    <color name="spectrum_fill">#3A1A4A</color>
+
+    <!-- Nuevos colores base -->
+    <color name="pink_primary">#FF6B9E</color>
+    <color name="pink_dark">#C44569</color>
+    <color name="purple_primary">#9B59B6</color>
+    <color name="purple_dark">#6C3483</color>
+    <color name="black_base">#0A0A0F</color>
+</resources>
