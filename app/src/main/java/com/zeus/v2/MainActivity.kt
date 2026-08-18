@@ -59,7 +59,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         try {
             requestNeededPermissions()
-            setContent { ComposeRoot() }
+            setContent {
+                ComposeRoot()
+            }
         } catch (e: Throwable) {
             android.util.Log.e("ZeusMain", "onCreate fatal: ${android.util.Log.getStackTraceString(e)}")
             android.widget.Toast.makeText(this, "Error: ${e.javaClass.simpleName}", android.widget.Toast.LENGTH_LONG).show()
@@ -68,133 +70,123 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ComposeRoot() {
-        // wrapper to keep original onCreate simple
-        ComposeRootImpl()
-    }
+        val viewModel: EqViewModel = viewModel(factory = EqViewModel.Factory)
 
-    @androidx.compose.runtime.Composable
-    private fun ComposeRootImpl() {
+        LaunchedEffect(Unit) {
+            viewModel.loadSavedIfAny()
+        }
 
-        setContent {
-            val viewModel: EqViewModel = viewModel(factory = EqViewModel.Factory)
-
-            LaunchedEffect(Unit) {
-                viewModel.loadSavedIfAny()
-            }
-
-            LaunchedEffect(Unit) {
-                while (true) {
-                    audioService?.audioEngine?.let { engine ->
-                        viewModel.spectrum = engine.spectrumData.copyOf()
-                        viewModel.isEngineRunning = engine.isEnabled
-                    }
-                    delay(50)
-                }
-            }
-
-            LaunchedEffect(audioService) {
+        LaunchedEffect(Unit) {
+            while (true) {
                 audioService?.audioEngine?.let { engine ->
-                    engine.settings = viewModel.toSettings()
-                    engine.applyAll()
+                    viewModel.spectrum = engine.spectrumData.copyOf()
+                    viewModel.isEngineRunning = engine.isEnabled
                 }
+                delay(50)
             }
+        }
 
-            LaunchedEffect(viewModel.bands.toList(), viewModel.subBoost) {
-                audioService?.audioEngine?.setBands(viewModel.bands.toList())
-                audioService?.audioEngine?.setSubBoost(viewModel.subBoost)
+        LaunchedEffect(audioService) {
+            audioService?.audioEngine?.let { engine ->
+                engine.settings = viewModel.toSettings()
+                engine.applyAll()
             }
+        }
 
-            LaunchedEffect(viewModel.preamp) {
-                audioService?.audioEngine?.setPreGain(viewModel.preamp)
-            }
+        LaunchedEffect(viewModel.bands.toList(), viewModel.subBoost) {
+            audioService?.audioEngine?.setBands(viewModel.bands.toList())
+            audioService?.audioEngine?.setSubBoost(viewModel.subBoost)
+        }
 
-            LaunchedEffect(
+        LaunchedEffect(viewModel.preamp) {
+            audioService?.audioEngine?.setPreGain(viewModel.preamp)
+        }
+
+        LaunchedEffect(
+            viewModel.pipelineEnabled,
+            viewModel.lowShelfEnabled,
+            viewModel.peakBandsEnabled,
+            viewModel.highShelfEnabled
+        ) {
+            audioService?.audioEngine?.setPipelineTags(
                 viewModel.pipelineEnabled,
                 viewModel.lowShelfEnabled,
                 viewModel.peakBandsEnabled,
                 viewModel.highShelfEnabled
-            ) {
-                audioService?.audioEngine?.setPipelineTags(
-                    viewModel.pipelineEnabled,
-                    viewModel.lowShelfEnabled,
-                    viewModel.peakBandsEnabled,
-                    viewModel.highShelfEnabled
-                )
-            }
+            )
+        }
 
-            LaunchedEffect(
-                viewModel.limiterEnabled,
-                viewModel.limiterThreshold,
-                viewModel.limiterAttack,
-                viewModel.limiterRelease,
-                viewModel.limiterRatio,
-                viewModel.limiterPostGain
-            ) {
-                audioService?.audioEngine?.setLimiter(
-                    enabled = viewModel.limiterEnabled,
-                    threshold = viewModel.limiterThreshold,
-                    attack = viewModel.limiterAttack,
-                    release = viewModel.limiterRelease,
-                    ratio = viewModel.limiterRatio,
-                    postGain = viewModel.limiterPostGain
-                )
-            }
+        LaunchedEffect(
+            viewModel.limiterEnabled,
+            viewModel.limiterThreshold,
+            viewModel.limiterAttack,
+            viewModel.limiterRelease,
+            viewModel.limiterRatio,
+            viewModel.limiterPostGain
+        ) {
+            audioService?.audioEngine?.setLimiter(
+                enabled = viewModel.limiterEnabled,
+                threshold = viewModel.limiterThreshold,
+                attack = viewModel.limiterAttack,
+                release = viewModel.limiterRelease,
+                ratio = viewModel.limiterRatio,
+                postGain = viewModel.limiterPostGain
+            )
+        }
 
-            LaunchedEffect(
-                viewModel.compressorMultibandEnabled,
-                viewModel.crossoverFrequencies.toList(),
-                viewModel.compMbThLow, viewModel.compMbThLoMid,
-                viewModel.compMbThHiMid, viewModel.compMbThHigh,
-                viewModel.compMbRatio, viewModel.compMbKnee,
-                viewModel.compMbAttack, viewModel.compMbRelease,
-                viewModel.compMbPostGain
-            ) {
-                audioService?.audioEngine?.setCompressor(
-                    enabled = viewModel.compressorMultibandEnabled,
-                    cross1 = viewModel.crossoverFrequencies.getOrElse(0) { 180f },
-                    cross2 = viewModel.crossoverFrequencies.getOrElse(1) { 1800f },
-                    cross3 = viewModel.crossoverFrequencies.getOrElse(2) { 8000f },
-                    thLow = viewModel.compMbThLow,
-                    thLoMid = viewModel.compMbThLoMid,
-                    thHiMid = viewModel.compMbThHiMid,
-                    thHigh = viewModel.compMbThHigh,
-                    ratio = viewModel.compMbRatio,
-                    knee = viewModel.compMbKnee,
-                    attack = viewModel.compMbAttack,
-                    release = viewModel.compMbRelease,
-                    postGain = viewModel.compMbPostGain
-                )
-            }
+        LaunchedEffect(
+            viewModel.compressorMultibandEnabled,
+            viewModel.crossoverFrequencies.toList(),
+            viewModel.compMbThLow, viewModel.compMbThLoMid,
+            viewModel.compMbThHiMid, viewModel.compMbThHigh,
+            viewModel.compMbRatio, viewModel.compMbKnee,
+            viewModel.compMbAttack, viewModel.compMbRelease,
+            viewModel.compMbPostGain
+        ) {
+            audioService?.audioEngine?.setCompressor(
+                enabled = viewModel.compressorMultibandEnabled,
+                cross1 = viewModel.crossoverFrequencies.getOrElse(0) { 180f },
+                cross2 = viewModel.crossoverFrequencies.getOrElse(1) { 1800f },
+                cross3 = viewModel.crossoverFrequencies.getOrElse(2) { 8000f },
+                thLow = viewModel.compMbThLow,
+                thLoMid = viewModel.compMbThLoMid,
+                thHiMid = viewModel.compMbThHiMid,
+                thHigh = viewModel.compMbThHigh,
+                ratio = viewModel.compMbRatio,
+                knee = viewModel.compMbKnee,
+                attack = viewModel.compMbAttack,
+                release = viewModel.compMbRelease,
+                postGain = viewModel.compMbPostGain
+            )
+        }
 
-            // MaterialTheme es obligatorio para los componentes de material3
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = Color(0xFFFF6B9E),
-                    secondary = Color(0xFF9B59B6),
-                    background = Color(0xFF0D0D12),
-                    surface = Color(0xFF0D0D12),
-                    onPrimary = Color.White,
-                    onBackground = Color(0xFFECECEE),
-                    onSurface = Color(0xFFECECEE)
-                )
+        MaterialTheme(
+            colorScheme = darkColorScheme(
+                primary = Color(0xFFFF6B9E),
+                secondary = Color(0xFF9B59B6),
+                background = Color(0xFF0D0D12),
+                surface = Color(0xFF0D0D12),
+                onPrimary = Color.White,
+                onBackground = Color(0xFFECECEE),
+                onSurface = Color(0xFFECECEE)
+            )
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color(0xFF0D0D12)
             ) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF0D0D12)
-                ) {
-                    MainScreen(
-                        viewModel = viewModel,
-                        onToggleEngine = { toggleEngine(viewModel) },
-                        onSave = {
-                            viewModel.saveSettings()
-                            Toast.makeText(
-                                this@MainActivity,
-                                "Configuración guardada",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-                }
+                MainScreen(
+                    viewModel = viewModel,
+                    onToggleEngine = { toggleEngine(viewModel) },
+                    onSave = {
+                        viewModel.saveSettings()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Configuración guardada",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
             }
         }
     }
