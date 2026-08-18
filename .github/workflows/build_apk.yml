@@ -1,0 +1,53 @@
+name: Build Zeus-V2 APK
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: '34'
+          build-tools-version: '34.0.0'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: 'false'
+
+      - name: Generate Gradle Wrapper if missing
+        run: |
+          if [ ! -f "./gradlew" ]; then
+            echo "Generando Gradle Wrapper..."
+            gradle wrapper --gradle-version 8.7 || true
+          fi
+          chmod +x ./gradlew 2>/dev/null || true
+
+      - name: Build Debug APK
+        run: |
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug --stacktrace --no-daemon
+          else
+            gradle assembleDebug --stacktrace --no-daemon
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zeus-V2-debug
+          path: app/build/outputs/apk/debug/*.apk
