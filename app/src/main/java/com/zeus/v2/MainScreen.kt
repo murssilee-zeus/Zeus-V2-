@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -275,71 +278,38 @@ private fun BandControlsCard(viewModel: EqViewModel, band: EqBand) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Frecuencia
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Freq", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(50.dp))
-            Slider(
-                value = band.frequency,
-                onValueChange = { viewModel.updateSelectedBand(frequency = it) },
-                valueRange = 20f..20000f,
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = PINK_ACCENT,
-                    activeTrackColor = PINK_ACCENT
-                )
-            )
-            Text(
-                text = if (band.frequency >= 1000f)
-                    String.format("%.1fk", band.frequency / 1000f)
-                else
-                    String.format("%.0f", band.frequency),
-                color = TXT_PRIMARY,
-                fontSize = 13.sp,
-                modifier = Modifier.width(55.dp)
-            )
-        }
+        // ===== FRECUENCIA (1 Hz – 30000 Hz) =====
+        EditableValueRow(
+            label = "Freq",
+            value = band.frequency,
+            valueRange = 1f..30000f,
+            unit = "Hz",
+            format = { v ->
+                if (v >= 1000f) String.format("%.2fk", v / 1000f)
+                else String.format("%.1f", v)
+            },
+            onValueChange = { viewModel.updateSelectedBand(frequency = it) }
+        )
 
-        // Gain (±30 dB)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Gain", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(50.dp))
-            Slider(
-                value = band.gain,
-                onValueChange = { viewModel.updateSelectedBand(gain = it) },
-                valueRange = -30f..30f,
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = PINK_ACCENT,
-                    activeTrackColor = PINK_ACCENT
-                )
-            )
-            Text(
-                text = String.format("%+.1f", band.gain),
-                color = TXT_PRIMARY,
-                fontSize = 13.sp,
-                modifier = Modifier.width(55.dp)
-            )
-        }
+        // ===== GAIN (±30 dB) =====
+        EditableValueRow(
+            label = "Gain",
+            value = band.gain,
+            valueRange = -30f..30f,
+            unit = "dB",
+            format = { v -> String.format("%+.1f", v) },
+            onValueChange = { viewModel.updateSelectedBand(gain = it) }
+        )
 
-        // Q (0.1 – 20)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Q", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(50.dp))
-            Slider(
-                value = band.q,
-                onValueChange = { viewModel.updateSelectedBand(q = it) },
-                valueRange = 0.1f..20f,
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = PINK_ACCENT,
-                    activeTrackColor = PINK_ACCENT
-                )
-            )
-            Text(
-                text = String.format("%.2f", band.q),
-                color = TXT_PRIMARY,
-                fontSize = 13.sp,
-                modifier = Modifier.width(55.dp)
-            )
-        }
+        // ===== Q (0.1 – 40) =====
+        EditableValueRow(
+            label = "Q",
+            value = band.q,
+            valueRange = 0.1f..40f,
+            unit = "",
+            format = { v -> String.format("%.2f", v) },
+            onValueChange = { viewModel.updateSelectedBand(q = it) }
+        )
     }
 }
 
@@ -566,5 +536,89 @@ private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean
                 checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
             )
         )
+    }
+}
+
+@Composable
+private fun EditableValueRow(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    unit: String,
+    format: (Float) -> String,
+    onValueChange: (Float) -> Unit
+) {
+    var isEditing by remember { mutableStateOf(false) }
+    var textValue by remember(value) { mutableStateOf(format(value)) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = label,
+            color = TXT_MUTED,
+            fontSize = 13.sp,
+            modifier = Modifier.width(50.dp)
+        )
+
+        Slider(
+            value = value.coerceIn(valueRange.start, valueRange.endInclusive),
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            modifier = Modifier.weight(1f),
+            colors = SliderDefaults.colors(
+                thumbColor = PINK_ACCENT,
+                activeTrackColor = PINK_ACCENT
+            )
+        )
+
+        if (isEditing) {
+            // Campo de texto para escribir el valor manualmente
+            OutlinedTextField(
+                value = textValue,
+                onValueChange = { textValue = it },
+                singleLine = true,
+                modifier = Modifier.width(80.dp),
+                textStyle = LocalTextStyle.current.copy(
+                    color = TXT_PRIMARY,
+                    fontSize = 13.sp
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PINK_ACCENT,
+                    unfocusedBorderColor = CARD_BORDER,
+                    focusedTextColor = TXT_PRIMARY,
+                    unfocusedTextColor = TXT_PRIMARY,
+                    cursorColor = PINK_ACCENT
+                ),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        textValue.toFloatOrNull()?.let { parsed ->
+                            val coerced = parsed.coerceIn(valueRange.start, valueRange.endInclusive)
+                            onValueChange(coerced)
+                        }
+                        isEditing = false
+                    }
+                )
+            )
+        } else {
+            // Valor clickeable para editar
+            Text(
+                text = format(value) + if (unit.isNotEmpty()) " $unit" else "",
+                color = PINK_ACCENT,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .width(80.dp)
+                    .clickable {
+                        textValue = format(value)
+                        isEditing = true
+                    }
+                    .padding(4.dp)
+            )
+        }
     }
 }
