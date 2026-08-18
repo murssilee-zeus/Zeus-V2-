@@ -4,26 +4,38 @@ import android.content.Context
 import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Visualizer
 import android.util.Log
-import kotlin.math.sqrt
+import kotlin.math.*
 
 /**
- * Zeus EQ Pro18 - Motor de audio v18.1 "Extreme Sub".
+ * Zeus EQ — Motor de audio mejorado (v19 "Curve Mapper").
  *
  * Pipeline nativo (DynamicsProcessing, API 28+):
- *   1) PreEq   : hasta 18 bandas paramétricas + subBoost en graves
+ *   1) PreEq   : hasta 64/128 bandas Peak internas que aproximan
+ *                la curva real calculada con biquads (LPF/HPF/Shelf/Peak)
  *   2) MBC     : compresor multibanda 4 bandas / 3 cortes + knee
  *   3) PostEq  : refuerzo subgrave
  *   4) Limiter : hard-knee final
+ *
+ * El usuario sigue editando pocas bandas paramétricas. El motor calcula
+ * la respuesta combinada real y la distribuye en muchas bandas Peak
+ * de DynamicsProcessing para obtener LPF/HPF/Shelves mucho más precisos.
  */
 class AudioEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "ZeusAudioEngine"
-        const val MAX_BANDS = 18
+
+        // Intentamos 64 bandas primero. Si el dispositivo no lo soporta bajamos.
+        private const val TARGET_PRE_EQ_BANDS = 64
+        private const val FALLBACK_PRE_EQ_BANDS = 32
+        private const val MIN_PRE_EQ_BANDS = 16
+
         private const val CHANNEL_COUNT = 2
         private const val MBC_BANDS = 4
         private const val POSTEQ_BANDS = 4
         private const val MAX_FREQ = 20000f
+        private const val MIN_FREQ = 20f
+        private const val SAMPLE_RATE = 48000f
     }
 
     var settings = EqSettings()
@@ -32,11 +44,15 @@ class AudioEngine(private val context: Context) {
     private var visualizer: Visualizer? = null
     private var audioSessionId: Int = 0
     private var mbcBandCount = MBC_BANDS
+    private var preEqBandCount = TARGET_PRE_EQ_BANDS
 
     private var pipelineEnabled = true
     private var lowShelfTag = true
     private var peakTag = true
     private var highShelfTag = true
+
+    // Frecuencias logarítmicas de las bandas internas de DynamicsProcessing
+    private var internalFreqs: FloatArray = FloatArray(0)
 
     @Volatile
     var spectrumData: FloatArray = FloatArray(128) { 0f }
@@ -54,38 +70,62 @@ class AudioEngine(private val context: Context) {
     fun initialize(sessionId: Int = 0): Boolean {
         release()
         audioSessionId = sessionId
-        var mbcCount = MBC_BANDS
-        var mbcUse = true
-        while (true) {
-            try {
-                val config = DynamicsProcessing.Config.Builder(
-                    DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
-                    CHANNEL_COUNT,
-                    true, MAX_BANDS,
-                    mbcUse, mbcCount,
-                    true, POSTEQ_BANDS,
-                    true
-                ).build()
 
-                val dp = DynamicsProcessing(0, sessionId, config)
-                dynamicsProcessing = dp
-                mbcBandCount = if (mbcUse) mbcCount else 0
-                applyAll()
-                startVisualizer()
-                dp.enabled = true
-                isEnabled = true
-                if (mbcCount < MBC_BANDS) {
-                    Log.w(TAG, "MBC limitado a $mbcCount banda(s) por el dispositivo")
+        // Intentamos de más bandas a menos
+        val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 18)
+        var lastError: Exception? = null
+
+        for (bands in candidates) {
+            var mbcCount = MBC_BANDS
+            var mbcUse = true
+            while (true) {
+                try {
+                    val config = DynamicsProcessing.Config.Builder(
+                        DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                        CHANNEL_COUNT,
+                        true, bands,          // preEq
+                        mbcUse, mbcCount,     // mbc
+                        true, POSTEQ_BANDS,   // postEq
+                        true                  // limiter
+                    ).build()
+
+                    val dp = DynamicsProcessing(0, sessionId, config)
+                    dynamicsProcessing = dp
+                    preEqBandCount = bands
+                    mbcBandCount = if (mbcUse) mbcCount else 0
+                    buildInternalFrequencies(bands)
+                    applyAll()
+                    startVisualizer()
+                    dp.enabled = true
+                    isEnabled = true
+                    Log.i(TAG, "Engine ON → PreEq=$bands bands, MBC=$mbcCount, session=$sessionId")
+                    return true
+                } catch (e: Exception) {
+                    lastError = e
+                    if (mbcUse && mbcCount > 1) {
+                        mbcCount -= 1
+                        continue
+                    }
+                    if (mbcUse) {
+                        mbcUse = false
+                        mbcCount = 1
+                        continue
+                    }
+                    break // probar siguiente cantidad de bandas PreEq
                 }
-                Log.i(TAG, "Engine ON (session=$sessionId, mbc=$mbcCount)")
-                return true
-            } catch (e: Exception) {
-                if (mbcUse && mbcCount > 1) { mbcCount -= 1; continue }
-                if (mbcUse) { mbcUse = false; mbcCount = 1; continue }
-                Log.e(TAG, "Fallo al inicializar: ${e.message}")
-                release()
-                return false
             }
+        }
+
+        Log.e(TAG, "Fallo al inicializar: ${lastError?.message}")
+        release()
+        return false
+    }
+
+    private fun buildInternalFrequencies(count: Int) {
+        // Distribución logarítmica de 20 Hz a 20 kHz
+        internalFreqs = FloatArray(count) { i ->
+            val t = i.toFloat() / (count - 1).coerceAtLeast(1)
+            (MIN_FREQ * (MAX_FREQ / MIN_FREQ).toDouble().pow(t.toDouble())).toFloat()
         }
     }
 
@@ -111,11 +151,21 @@ class AudioEngine(private val context: Context) {
         }
     }
 
-    fun setPreGain(v: Float) { settings.preGain = v; applyInputGain() }
+    fun setPreGain(v: Float) {
+        settings.preGain = v
+        applyInputGain()
+    }
 
-    fun setSubBoost(v: Float) { settings.subBoost = v; applyEq(); applyPostEq() }
+    fun setSubBoost(v: Float) {
+        settings.subBoost = v
+        applyEq()
+        applyPostEq()
+    }
 
-    fun setBands(list: List<EqBand>) { settings.bands = list; applyEq() }
+    fun setBands(list: List<EqBand>) {
+        settings.bands = list
+        applyEq()
+    }
 
     fun setPipelineTags(pipeline: Boolean, lowShelf: Boolean, peak: Boolean, highShelf: Boolean) {
         pipelineEnabled = pipeline
@@ -155,35 +205,82 @@ class AudioEngine(private val context: Context) {
     }
 
     fun applyAll() {
-        applyInputGain(); applyEq(); applyMbc(); applyPostEq(); applyLimiter()
+        applyInputGain()
+        applyEq()
+        applyMbc()
+        applyPostEq()
+        applyLimiter()
     }
 
     private fun applyInputGain() {
         val dp = dynamicsProcessing ?: return
         try {
             dp.setInputGainAllChannelsTo(settings.preGain.coerceIn(-30f, 30f))
-        } catch (e: Exception) { Log.e(TAG, "inputGain: ${e.message}") }
+        } catch (e: Exception) {
+            Log.e(TAG, "inputGain: ${e.message}")
+        }
     }
 
+    /**
+     * Núcleo mejorado:
+     * 1. Calcula la respuesta en dB de todos los filtros paramétricos del usuario
+     *    usando biquads reales.
+     * 2. Muestrea esa curva en las frecuencias internas de DynamicsProcessing.
+     * 3. Aplica esas ganancias a las bandas Peak de PreEq.
+     */
     private fun applyEq() {
         val dp = dynamicsProcessing ?: return
+        if (internalFreqs.isEmpty()) return
+
         try {
             val s = settings
-            for (i in 0 until MAX_BANDS) {
-                val b = s.bands.getOrNull(i) ?: continue
-                val active = pipelineEnabled && tagAllowed(b) &&
-                        b.enabled && b.filterType != EqBand.FilterType.BYPASS
-                var gain = if (active) effectiveGainForFilter(b) else 0f
-                if (active && i < 4) gain += s.subBoost
-                val freq = mapFilterFrequency(b)
-                val band = DynamicsProcessing.EqBand(
-                    active,
-                    freq.coerceIn(20f, MAX_FREQ),
-                    gain.coerceIn(-30f, 30f)
+            val activeFilters = mutableListOf<BiquadFilter>()
+
+            // Construir biquads solo de las bandas activas y permitidas por tags
+            for (b in s.bands) {
+                if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
+                if (!tagAllowed(b)) continue
+
+                val gain = when (b.filterType) {
+                    // Para LPF/HPF el gain del usuario casi no se usa;
+                    // el filtro en sí ya corta. Le damos un pequeño ajuste.
+                    EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
+                    else -> b.gain
+                }
+
+                activeFilters += BiquadFilter(
+                    frequency = b.frequency,
+                    gainDb = gain,
+                    q = b.q,
+                    type = b.filterType,
+                    sampleRate = SAMPLE_RATE
                 )
+            }
+
+            // Sub-boost extra en las frecuencias más bajas (opcional)
+            val subBoost = s.subBoost.coerceIn(0f, 12f)
+
+            for (i in internalFreqs.indices) {
+                val freq = internalFreqs[i]
+                var totalDb = 0f
+
+                for (filter in activeFilters) {
+                    totalDb += filter.responseDb(freq)
+                }
+
+                // Refuerzo de subgrave solo en la zona muy baja
+                if (freq < 80f && subBoost > 0f) {
+                    val amount = subBoost * (1f - (freq / 80f)).coerceIn(0f, 1f)
+                    totalDb += amount
+                }
+
+                val gain = totalDb.coerceIn(-30f, 30f)
+                val band = DynamicsProcessing.EqBand(true, freq, gain)
                 dp.setPreEqBandAllChannelsTo(i, band)
             }
-        } catch (e: Exception) { Log.e(TAG, "eq: ${e.message}") }
+        } catch (e: Exception) {
+            Log.e(TAG, "eq: ${e.message}")
+        }
     }
 
     private fun tagAllowed(b: EqBand): Boolean = when (b.filterType) {
@@ -191,22 +288,6 @@ class AudioEngine(private val context: Context) {
         EqBand.FilterType.HIGH_SHELF, EqBand.FilterType.HIGH_PASS -> highShelfTag
         EqBand.FilterType.PEAK, EqBand.FilterType.NOTCH, EqBand.FilterType.BAND_PASS -> peakTag
         EqBand.FilterType.BYPASS -> false
-    }
-
-    private fun effectiveGainForFilter(b: EqBand): Float = when (b.filterType) {
-        EqBand.FilterType.LOW_PASS -> (b.gain - 20f).coerceAtMost(-20f)
-        EqBand.FilterType.HIGH_PASS -> (b.gain - 20f).coerceAtMost(-20f)
-        EqBand.FilterType.NOTCH -> -30f
-        EqBand.FilterType.BAND_PASS -> kotlin.math.abs(b.gain).coerceAtLeast(4f)
-        else -> b.gain
-    }
-
-    private fun mapFilterFrequency(b: EqBand): Float = when (b.filterType) {
-        EqBand.FilterType.LOW_SHELF -> b.frequency * 0.8f
-        EqBand.FilterType.HIGH_SHELF -> b.frequency * 1.15f
-        EqBand.FilterType.LOW_PASS -> b.frequency * 1.4f
-        EqBand.FilterType.HIGH_PASS -> b.frequency * 0.7f
-        else -> b.frequency
     }
 
     private fun applyMbc() {
@@ -224,6 +305,7 @@ class AudioEngine(private val context: Context) {
             val rel = s.compRelease.coerceIn(10f, 1000f)
             val ratio = s.compRatio.coerceIn(1f, 24f)
             val knee = s.compKnee.coerceIn(0f, 20f)
+
             for (i in 0 until mbcBandCount) {
                 val band = DynamicsProcessing.MbcBand(
                     active,
@@ -239,7 +321,9 @@ class AudioEngine(private val context: Context) {
                 )
                 dp.setMbcBandAllChannelsTo(i, band)
             }
-        } catch (e: Exception) { Log.e(TAG, "mbc: ${e.message}") }
+        } catch (e: Exception) {
+            Log.e(TAG, "mbc: ${e.message}")
+        }
     }
 
     private fun applyPostEq() {
@@ -250,7 +334,9 @@ class AudioEngine(private val context: Context) {
             dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(sub > 0f, 63f, sub * 0.5f))
             dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(false, 250f, 0f))
             dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(false, 1000f, 0f))
-        } catch (e: Exception) { Log.e(TAG, "postEq: ${e.message}") }
+        } catch (e: Exception) {
+            Log.e(TAG, "postEq: ${e.message}")
+        }
     }
 
     private fun applyLimiter() {
@@ -268,7 +354,9 @@ class AudioEngine(private val context: Context) {
                 s.limiterPostGain.coerceIn(-12f, 12f)
             )
             dp.setLimiterAllChannelsTo(lim)
-        } catch (e: Exception) { Log.e(TAG, "limiter: ${e.message}") }
+        } catch (e: Exception) {
+            Log.e(TAG, "limiter: ${e.message}")
+        }
     }
 
     private fun startVisualizer() {
@@ -280,6 +368,7 @@ class AudioEngine(private val context: Context) {
                     override fun onWaveFormDataCapture(
                         v: Visualizer?, waveform: ByteArray?, samplingRate: Int
                     ) {}
+
                     override fun onFftDataCapture(
                         v: Visualizer?, fft: ByteArray?, samplingRate: Int
                     ) {
