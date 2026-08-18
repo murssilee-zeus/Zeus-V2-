@@ -1,0 +1,3 @@
+-keep class com.zeus.v2.** { *; }
+-keep class android.media.audiofx.** { *; }
+-keepclassmembers class * { @androidx.compose.runtime.Composable <methods>; }
