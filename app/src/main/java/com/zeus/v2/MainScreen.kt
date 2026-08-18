@@ -3,8 +3,8 @@ package com.zeus.v2
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -59,7 +59,6 @@ fun MainScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Navegación de secciones
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -97,7 +96,6 @@ fun MainScreen(
                 }
             }
 
-            // Botones Guardar + Power
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -155,6 +153,8 @@ fun MainScreen(
 // ============================================================
 @Composable
 private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
+    val band = viewModel.selectedBand()
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -167,13 +167,18 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 .weight(1f)
         )
 
-        // Controles de filtro
+        // Tipos de filtro
         FilterTypeRow(viewModel)
+
+        // Controles de la banda seleccionada
+        if (band != null) {
+            BandControlsCard(viewModel, band)
+        }
 
         // Preamp
         PreampRow(viewModel)
 
-        // Bandas (selector)
+        // Selector de bandas + botón agregar
         BandSelectorRow(viewModel)
     }
 }
@@ -191,7 +196,7 @@ private fun SpectrumCard(spectrum: FloatArray, modifier: Modifier = Modifier) {
             val w = size.width
             val h = size.height
 
-            // Grid horizontal
+            // Grid
             for (i in 0..5) {
                 val y = h * i / 5f
                 drawLine(GRID, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
@@ -260,6 +265,85 @@ private fun FilterTypeRow(viewModel: EqViewModel) {
 }
 
 @Composable
+private fun BandControlsCard(viewModel: EqViewModel, band: EqBand) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(SURFACE)
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Frecuencia
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Freq", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(50.dp))
+            Slider(
+                value = band.frequency,
+                onValueChange = { viewModel.updateSelectedBand(frequency = it) },
+                valueRange = 20f..20000f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = PINK_ACCENT,
+                    activeTrackColor = PINK_ACCENT
+                )
+            )
+            Text(
+                text = if (band.frequency >= 1000f)
+                    String.format("%.1fk", band.frequency / 1000f)
+                else
+                    String.format("%.0f", band.frequency),
+                color = TXT_PRIMARY,
+                fontSize = 13.sp,
+                modifier = Modifier.width(55.dp)
+            )
+        }
+
+        // Gain (±30 dB)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Gain", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(50.dp))
+            Slider(
+                value = band.gain,
+                onValueChange = { viewModel.updateSelectedBand(gain = it) },
+                valueRange = -30f..30f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = PINK_ACCENT,
+                    activeTrackColor = PINK_ACCENT
+                )
+            )
+            Text(
+                text = String.format("%+.1f", band.gain),
+                color = TXT_PRIMARY,
+                fontSize = 13.sp,
+                modifier = Modifier.width(55.dp)
+            )
+        }
+
+        // Q (0.1 – 20)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Q", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(50.dp))
+            Slider(
+                value = band.q,
+                onValueChange = { viewModel.updateSelectedBand(q = it) },
+                valueRange = 0.1f..20f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = PINK_ACCENT,
+                    activeTrackColor = PINK_ACCENT
+                )
+            )
+            Text(
+                text = String.format("%.2f", band.q),
+                color = TXT_PRIMARY,
+                fontSize = 13.sp,
+                modifier = Modifier.width(55.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun PreampRow(viewModel: EqViewModel) {
     Row(
         modifier = Modifier
@@ -296,13 +380,14 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         viewModel.bands.forEachIndexed { index, band ->
             val selected = index == viewModel.selectedBandIndex
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (selected) band.color else SURFACE)
                     .border(1.dp, if (selected) band.color else CARD_BORDER, RoundedCornerShape(8.dp))
@@ -316,6 +401,24 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
                     fontWeight = FontWeight.Bold
                 )
             }
+        }
+
+        // Botón agregar banda
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF1A3A2A))
+                .border(1.dp, Color(0xFF2ECC71), RoundedCornerShape(8.dp))
+                .clickable { viewModel.addBand() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "+",
+                color = Color(0xFF2ECC71),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -333,17 +436,18 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
     ) {
         Text("Compresor Multibanda", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
-        // Enable
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Activado", color = TXT_MUTED, modifier = Modifier.weight(1f))
             Switch(
                 checked = viewModel.compressorMultibandEnabled,
                 onCheckedChange = { viewModel.compressorMultibandEnabled = it },
-                colors = SwitchDefaults.colors(checkedThumbColor = PINK_ACCENT, checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f))
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = PINK_ACCENT,
+                    checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
+                )
             )
         }
 
-        // Crossovers
         SliderRow("Cross 1", viewModel.crossoverFrequencies[0], 40f..1000f, "Hz") {
             viewModel.crossoverFrequencies[0] = it
         }
@@ -387,7 +491,10 @@ private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier)
             Switch(
                 checked = viewModel.limiterEnabled,
                 onCheckedChange = { viewModel.limiterEnabled = it },
-                colors = SwitchDefaults.colors(checkedThumbColor = PINK_ACCENT, checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f))
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = PINK_ACCENT,
+                    checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
+                )
             )
         }
 
@@ -435,7 +542,8 @@ private fun SliderRow(
             )
         )
         Text(
-            text = if (unit.isEmpty()) String.format("%.1f", value) else String.format("%.1f %s", value, unit),
+            text = if (unit.isEmpty()) String.format("%.1f", value)
+            else String.format("%.1f %s", value, unit),
             color = TXT_PRIMARY,
             fontSize = 12.sp,
             modifier = Modifier.width(70.dp)
