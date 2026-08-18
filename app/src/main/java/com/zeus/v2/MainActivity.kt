@@ -264,4 +264,4 @@ class MainActivity : ComponentActivity() {
             bound = false
         }
     }
-} o
+}
