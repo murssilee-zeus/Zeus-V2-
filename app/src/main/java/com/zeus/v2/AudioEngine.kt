@@ -7,25 +7,19 @@ import android.util.Log
 import kotlin.math.*
 
 /**
- * Zeus EQ — Motor de audio mejorado (v19 "Curve Mapper").
+ * Zeus EQ — Motor de audio (v19 "Curve Mapper" + MBC por banda).
  *
  * Pipeline nativo (DynamicsProcessing, API 28+):
- *   1) PreEq   : hasta 128 bandas Peak internas que aproximan
- *                la curva real calculada con biquads (LPF/HPF/Shelf/Peak)
- *   2) MBC     : compresor multibanda 4 bandas / 3 cortes + knee
+ *   1) PreEq   : hasta 128 bandas Peak que aproximan la curva real (biquads)
+ *   2) MBC     : compresor multibanda 4 bandas con parámetros independientes
  *   3) PostEq  : refuerzo subgrave
- *   4) Limiter : hard-knee final
- *
- * El usuario sigue editando pocas bandas paramétricas. El motor calcula
- * la respuesta combinada real y la distribuye en muchas bandas Peak
- * de DynamicsProcessing para obtener LPF/HPF/Shelves mucho más precisos.
+ *   4) Limiter : hard-knee final (ratio hasta 50)
  */
 class AudioEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "ZeusAudioEngine"
 
-        // Intentamos 128 bandas primero (máximo de la API). Si el dispositivo no lo soporta bajamos.
         private const val TARGET_PRE_EQ_BANDS = 128
         private const val FALLBACK_PRE_EQ_BANDS = 64
         private const val MIN_PRE_EQ_BANDS = 32
@@ -51,7 +45,6 @@ class AudioEngine(private val context: Context) {
     private var peakTag = true
     private var highShelfTag = true
 
-    // Frecuencias logarítmicas de las bandas internas de DynamicsProcessing
     private var internalFreqs: FloatArray = FloatArray(0)
 
     @Volatile
@@ -71,7 +64,6 @@ class AudioEngine(private val context: Context) {
         release()
         audioSessionId = sessionId
 
-        // Intentamos de más bandas a menos
         val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 18)
         var lastError: Exception? = null
 
@@ -83,10 +75,10 @@ class AudioEngine(private val context: Context) {
                     val config = DynamicsProcessing.Config.Builder(
                         DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
                         CHANNEL_COUNT,
-                        true, bands,          // preEq
-                        mbcUse, mbcCount,     // mbc
-                        true, POSTEQ_BANDS,   // postEq
-                        true                  // limiter
+                        true, bands,
+                        mbcUse, mbcCount,
+                        true, POSTEQ_BANDS,
+                        true
                     ).build()
 
                     val dp = DynamicsProcessing(0, sessionId, config)
@@ -111,7 +103,7 @@ class AudioEngine(private val context: Context) {
                         mbcCount = 1
                         continue
                     }
-                    break // probar siguiente cantidad de bandas PreEq
+                    break
                 }
             }
         }
@@ -122,7 +114,6 @@ class AudioEngine(private val context: Context) {
     }
 
     private fun buildInternalFrequencies(count: Int) {
-        // Distribución logarítmica de 20 Hz a 20 kHz
         internalFreqs = FloatArray(count) { i ->
             val t = i.toFloat() / (count - 1).coerceAtLeast(1)
             (MIN_FREQ * (MAX_FREQ / MIN_FREQ).toDouble().pow(t.toDouble())).toFloat()
@@ -189,78 +180,63 @@ class AudioEngine(private val context: Context) {
     }
 
     fun setCompressor(
-    enabled: Boolean,
-    cross1: Float, cross2: Float, cross3: Float,
-    thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float,
-    ratioLow: Float, ratioLoMid: Float, ratioHiMid: Float, ratioHigh: Float,
-    kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float,
-    attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float,
-    releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float,
-    postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float
-) {
-    settings.compEnabled = enabled
-    settings.cross1 = cross1; settings.cross2 = cross2; settings.cross3 = cross3
-    settings.compThLow = thLow; settings.compThLoMid = thLoMid
-    settings.compThHiMid = thHiMid; settings.compThHigh = thHigh
-    settings.compRatioLow = ratioLow; settings.compRatioLoMid = ratioLoMid
-    settings.compRatioHiMid = ratioHiMid; settings.compRatioHigh = ratioHigh
-    settings.compKneeLow = kneeLow; settings.compKneeLoMid = kneeLoMid
-    settings.compKneeHiMid = kneeHiMid; settings.compKneeHigh = kneeHigh
-    settings.compAttackLow = attackLow; settings.compAttackLoMid = attackLoMid
-    settings.compAttackHiMid = attackHiMid; settings.compAttackHigh = attackHigh
-    settings.compReleaseLow = releaseLow; settings.compReleaseLoMid = releaseLoMid
-    settings.compReleaseHiMid = releaseHiMid; settings.compReleaseHigh = releaseHigh
-    settings.compPostGainLow = postGainLow; settings.compPostGainLoMid = postGainLoMid
-    settings.compPostGainHiMid = postGainHiMid; settings.compPostGainHigh = postGainHigh
-    applyMbc()
-}
-
-    private fun applyMbc() {
-    val dp = dynamicsProcessing ?: return
-    if (mbcBandCount == 0) return
-    try {
-        val s = settings
-        val active = s.compEnabled && pipelineEnabled
-        val c1 = s.cross1.coerceIn(40f, 1000f)
-        val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
-        val c3 = s.cross3.coerceIn(c2 + 50f, 19500f)
-        val cuts = listOf(c1, c2, c3, MAX_FREQ)
-
-        val thresholds = listOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
-        val ratios = listOf(s.compRatioLow, s.compRatioLoMid, s.compRatioHiMid, s.compRatioHigh)
-        val knees = listOf(s.compKneeLow, s.compKneeLoMid, s.compKneeHiMid, s.compKneeHigh)
-        val attacks = listOf(s.compAttackLow, s.compAttackLoMid, s.compAttackHiMid, s.compAttackHigh)
-        val releases = listOf(s.compReleaseLow, s.compReleaseLoMid, s.compReleaseHiMid, s.compReleaseHigh)
-        val postGains = listOf(s.compPostGainLow, s.compPostGainLoMid, s.compPostGainHiMid, s.compPostGainHigh)
-
-        for (i in 0 until mbcBandCount) {
-            val band = DynamicsProcessing.MbcBand(
-                active,
-                cuts[i],
-                attacks[i].coerceIn(1f, 200f),
-                releases[i].coerceIn(10f, 1000f),
-                ratios[i].coerceIn(1f, 24f),
-                thresholds[i].coerceIn(-60f, 0f),
-                knees[i].coerceIn(0f, 20f),
-                -80f,
-                1f,
-                0f,
-                postGains[i].coerceIn(-12f, 12f)
-            )
-            dp.setMbcBandAllChannelsTo(i, band)
-        }
-    } catch (e: Exception) {
-        Log.e(TAG, "mbc: ${e.message}")
+        enabled: Boolean,
+        cross1: Float, cross2: Float, cross3: Float,
+        thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float,
+        ratioLow: Float, ratioLoMid: Float, ratioHiMid: Float, ratioHigh: Float,
+        kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float,
+        attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float,
+        releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float,
+        postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float
+    ) {
+        settings.compEnabled = enabled
+        settings.cross1 = cross1
+        settings.cross2 = cross2
+        settings.cross3 = cross3
+        settings.compThLow = thLow
+        settings.compThLoMid = thLoMid
+        settings.compThHiMid = thHiMid
+        settings.compThHigh = thHigh
+        settings.compRatioLow = ratioLow
+        settings.compRatioLoMid = ratioLoMid
+        settings.compRatioHiMid = ratioHiMid
+        settings.compRatioHigh = ratioHigh
+        settings.compKneeLow = kneeLow
+        settings.compKneeLoMid = kneeLoMid
+        settings.compKneeHiMid = kneeHiMid
+        settings.compKneeHigh = kneeHigh
+        settings.compAttackLow = attackLow
+        settings.compAttackLoMid = attackLoMid
+        settings.compAttackHiMid = attackHiMid
+        settings.compAttackHigh = attackHigh
+        settings.compReleaseLow = releaseLow
+        settings.compReleaseLoMid = releaseLoMid
+        settings.compReleaseHiMid = releaseHiMid
+        settings.compReleaseHigh = releaseHigh
+        settings.compPostGainLow = postGainLow
+        settings.compPostGainLoMid = postGainLoMid
+        settings.compPostGainHiMid = postGainHiMid
+        settings.compPostGainHigh = postGainHigh
+        applyMbc()
     }
-}
-    
-    /**
-     * Núcleo mejorado:
-     * 1. Calcula la respuesta en dB de todos los filtros paramétricos del usuario
-     *    usando biquads reales.
-     * 2. Muestrea esa curva en las frecuencias internas de DynamicsProcessing.
-     * 3. Aplica esas ganancias a las bandas Peak de PreEq.
-     */
+
+    fun applyAll() {
+        applyInputGain()
+        applyEq()
+        applyMbc()
+        applyPostEq()
+        applyLimiter()
+    }
+
+    private fun applyInputGain() {
+        val dp = dynamicsProcessing ?: return
+        try {
+            dp.setInputGainAllChannelsTo(settings.preGain.coerceIn(-30f, 30f))
+        } catch (e: Exception) {
+            Log.e(TAG, "inputGain: ${e.message}")
+        }
+    }
+
     private fun applyEq() {
         val dp = dynamicsProcessing ?: return
         if (internalFreqs.isEmpty()) return
@@ -269,14 +245,11 @@ class AudioEngine(private val context: Context) {
             val s = settings
             val activeFilters = mutableListOf<BiquadFilter>()
 
-            // Construir biquads solo de las bandas activas y permitidas por tags
             for (b in s.bands) {
                 if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
                 if (!tagAllowed(b)) continue
 
                 val gain = when (b.filterType) {
-                    // Para LPF/HPF el gain del usuario casi no se usa;
-                    // el filtro en sí ya corta. Le damos un pequeño ajuste.
                     EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
                     else -> b.gain
                 }
@@ -290,7 +263,6 @@ class AudioEngine(private val context: Context) {
                 )
             }
 
-            // Sub-boost extra en las frecuencias más bajas (opcional)
             val subBoost = s.subBoost.coerceIn(0f, 12f)
 
             for (i in internalFreqs.indices) {
@@ -301,7 +273,6 @@ class AudioEngine(private val context: Context) {
                     totalDb += filter.responseDb(freq)
                 }
 
-                // Refuerzo de subgrave solo en la zona muy baja
                 if (freq < 80f && subBoost > 0f) {
                     val amount = subBoost * (1f - (freq / 80f)).coerceIn(0f, 1f)
                     totalDb += amount
@@ -329,28 +300,32 @@ class AudioEngine(private val context: Context) {
         try {
             val s = settings
             val active = s.compEnabled && pipelineEnabled
+
             val c1 = s.cross1.coerceIn(40f, 1000f)
             val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
             val c3 = s.cross3.coerceIn(c2 + 50f, 19500f)
             val cuts = listOf(c1, c2, c3, MAX_FREQ)
-            val ths = listOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
-            val atk = s.compAttack.coerceIn(1f, 200f)
-            val rel = s.compRelease.coerceIn(10f, 1000f)
-            val ratio = s.compRatio.coerceIn(1f, 24f)
-            val knee = s.compKnee.coerceIn(0f, 20f)
+
+            val thresholds = listOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
+            val ratios = listOf(s.compRatioLow, s.compRatioLoMid, s.compRatioHiMid, s.compRatioHigh)
+            val knees = listOf(s.compKneeLow, s.compKneeLoMid, s.compKneeHiMid, s.compKneeHigh)
+            val attacks = listOf(s.compAttackLow, s.compAttackLoMid, s.compAttackHiMid, s.compAttackHigh)
+            val releases = listOf(s.compReleaseLow, s.compReleaseLoMid, s.compReleaseHiMid, s.compReleaseHigh)
+            val postGains = listOf(s.compPostGainLow, s.compPostGainLoMid, s.compPostGainHiMid, s.compPostGainHigh)
 
             for (i in 0 until mbcBandCount) {
                 val band = DynamicsProcessing.MbcBand(
                     active,
                     cuts[i],
-                    atk, rel,
-                    ratio,
-                    ths[i].coerceIn(-60f, 0f),
-                    knee,
+                    attacks[i].coerceIn(1f, 200f),
+                    releases[i].coerceIn(10f, 1000f),
+                    ratios[i].coerceIn(1f, 24f),
+                    thresholds[i].coerceIn(-60f, 0f),
+                    knees[i].coerceIn(0f, 20f),
                     -80f,
                     1f,
                     0f,
-                    s.compPostGain.coerceIn(-12f, 12f)
+                    postGains[i].coerceIn(-12f, 12f)
                 )
                 dp.setMbcBandAllChannelsTo(i, band)
             }
@@ -382,7 +357,7 @@ class AudioEngine(private val context: Context) {
                 0,
                 s.limiterAttack.coerceIn(0.5f, 80f),
                 s.limiterRelease.coerceIn(20f, 1000f),
-                s.limiterRatio.coerceIn(1f, 50f),   // ← máximo 50
+                s.limiterRatio.coerceIn(1f, 50f),
                 s.limiterThreshold.coerceIn(-30f, 0f),
                 s.limiterPostGain.coerceIn(-12f, 12f)
             )
