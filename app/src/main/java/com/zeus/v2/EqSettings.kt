@@ -5,10 +5,6 @@ import androidx.compose.ui.graphics.Color
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Configuración completa del ecualizador, serializable a JSON y persistida
- * en SharedPreferences mediante el botón "Guardar".
- */
 data class EqSettings(
     var preGain: Float = -6f,
     var subBoost: Float = 0f,
@@ -23,15 +19,36 @@ data class EqSettings(
     var cross1: Float = 180f,
     var cross2: Float = 1800f,
     var cross3: Float = 8000f,
+    // Threshold por banda
     var compThLow: Float = -18f,
     var compThLoMid: Float = -14f,
     var compThHiMid: Float = -12f,
     var compThHigh: Float = -14f,
-    var compRatio: Float = 5f,
-    var compKnee: Float = 6f,
-    var compAttack: Float = 4f,
-    var compRelease: Float = 90f,
-    var compPostGain: Float = 0f,
+    // Ratio por banda
+    var compRatioLow: Float = 4f,
+    var compRatioLoMid: Float = 3f,
+    var compRatioHiMid: Float = 2.5f,
+    var compRatioHigh: Float = 3.5f,
+    // Knee por banda
+    var compKneeLow: Float = 6f,
+    var compKneeLoMid: Float = 6f,
+    var compKneeHiMid: Float = 6f,
+    var compKneeHigh: Float = 6f,
+    // Attack por banda (ms)
+    var compAttackLow: Float = 15f,
+    var compAttackLoMid: Float = 12f,
+    var compAttackHiMid: Float = 8f,
+    var compAttackHigh: Float = 5f,
+    // Release por banda (ms)
+    var compReleaseLow: Float = 180f,
+    var compReleaseLoMid: Float = 120f,
+    var compReleaseHiMid: Float = 90f,
+    var compReleaseHigh: Float = 60f,
+    // Post Gain por banda
+    var compPostGainLow: Float = 0f,
+    var compPostGainLoMid: Float = 0f,
+    var compPostGainHiMid: Float = 0f,
+    var compPostGainHigh: Float = 0f,
     var pipelineEnabled: Boolean = true,
     var lowShelfEnabled: Boolean = true,
     var peakEnabled: Boolean = true,
@@ -41,7 +58,7 @@ data class EqSettings(
 ) {
     fun toJson(): String {
         val o = JSONObject()
-        o.put("version", 1)
+        o.put("version", 2)
         o.put("preGain", preGain.toDouble())
         o.put("subBoost", subBoost.toDouble())
         val bArr = JSONArray()
@@ -69,11 +86,26 @@ data class EqSettings(
         o.put("compThLoMid", compThLoMid.toDouble())
         o.put("compThHiMid", compThHiMid.toDouble())
         o.put("compThHigh", compThHigh.toDouble())
-        o.put("compRatio", compRatio.toDouble())
-        o.put("compKnee", compKnee.toDouble())
-        o.put("compAttack", compAttack.toDouble())
-        o.put("compRelease", compRelease.toDouble())
-        o.put("compPostGain", compPostGain.toDouble())
+        o.put("compRatioLow", compRatioLow.toDouble())
+        o.put("compRatioLoMid", compRatioLoMid.toDouble())
+        o.put("compRatioHiMid", compRatioHiMid.toDouble())
+        o.put("compRatioHigh", compRatioHigh.toDouble())
+        o.put("compKneeLow", compKneeLow.toDouble())
+        o.put("compKneeLoMid", compKneeLoMid.toDouble())
+        o.put("compKneeHiMid", compKneeHiMid.toDouble())
+        o.put("compKneeHigh", compKneeHigh.toDouble())
+        o.put("compAttackLow", compAttackLow.toDouble())
+        o.put("compAttackLoMid", compAttackLoMid.toDouble())
+        o.put("compAttackHiMid", compAttackHiMid.toDouble())
+        o.put("compAttackHigh", compAttackHigh.toDouble())
+        o.put("compReleaseLow", compReleaseLow.toDouble())
+        o.put("compReleaseLoMid", compReleaseLoMid.toDouble())
+        o.put("compReleaseHiMid", compReleaseHiMid.toDouble())
+        o.put("compReleaseHigh", compReleaseHigh.toDouble())
+        o.put("compPostGainLow", compPostGainLow.toDouble())
+        o.put("compPostGainLoMid", compPostGainLoMid.toDouble())
+        o.put("compPostGainHiMid", compPostGainHiMid.toDouble())
+        o.put("compPostGainHigh", compPostGainHigh.toDouble())
         o.put("pipelineEnabled", pipelineEnabled)
         o.put("lowShelfEnabled", lowShelfEnabled)
         o.put("peakEnabled", peakEnabled)
@@ -84,14 +116,13 @@ data class EqSettings(
     }
 
     companion object {
-        fun fromJson(raw: String): EqSettings {
-            val o = JSONObject(raw)
+        fun fromJson(json: String): EqSettings {
+            val o = JSONObject(json)
             val s = EqSettings()
             s.preGain = o.optDouble("preGain", -6.0).toFloat()
             s.subBoost = o.optDouble("subBoost", 0.0).toFloat()
-
             val bArr = o.optJSONArray("bands")
-            if (bArr != null && bArr.length() > 0) {
+            if (bArr != null) {
                 val list = mutableListOf<EqBand>()
                 for (i in 0 until bArr.length()) {
                     val jo = bArr.getJSONObject(i)
@@ -102,16 +133,13 @@ data class EqSettings(
                             gain = jo.optDouble("g", 0.0).toFloat(),
                             q = jo.optDouble("q", 1.0).toFloat(),
                             enabled = jo.optBoolean("e", true),
-                            filterType = EqBand.FilterType.entries.getOrElse(jo.optInt("t", 2)) {
-                                EqBand.FilterType.PEAK
-                            },
+                            filterType = EqBand.FilterType.values().getOrElse(jo.optInt("t", 2)) { EqBand.FilterType.PEAK },
                             color = bandColor(i)
                         )
                     )
                 }
                 s.bands = list
             }
-
             s.limiterEnabled = o.optBoolean("limiterEnabled", true)
             s.limiterThreshold = o.optDouble("limiterThreshold", -2.5).toFloat()
             s.limiterAttack = o.optDouble("limiterAttack", 0.5).toFloat()
@@ -126,20 +154,32 @@ data class EqSettings(
             s.compThLoMid = o.optDouble("compThLoMid", -14.0).toFloat()
             s.compThHiMid = o.optDouble("compThHiMid", -12.0).toFloat()
             s.compThHigh = o.optDouble("compThHigh", -14.0).toFloat()
-            s.compRatio = o.optDouble("compRatio", 5.0).toFloat()
-            s.compKnee = o.optDouble("compKnee", 6.0).toFloat()
-            s.compAttack = o.optDouble("compAttack", 4.0).toFloat()
-            s.compRelease = o.optDouble("compRelease", 90.0).toFloat()
-            s.compPostGain = o.optDouble("compPostGain", 0.0).toFloat()
+            s.compRatioLow = o.optDouble("compRatioLow", 4.0).toFloat()
+            s.compRatioLoMid = o.optDouble("compRatioLoMid", 3.0).toFloat()
+            s.compRatioHiMid = o.optDouble("compRatioHiMid", 2.5).toFloat()
+            s.compRatioHigh = o.optDouble("compRatioHigh", 3.5).toFloat()
+            s.compKneeLow = o.optDouble("compKneeLow", 6.0).toFloat()
+            s.compKneeLoMid = o.optDouble("compKneeLoMid", 6.0).toFloat()
+            s.compKneeHiMid = o.optDouble("compKneeHiMid", 6.0).toFloat()
+            s.compKneeHigh = o.optDouble("compKneeHigh", 6.0).toFloat()
+            s.compAttackLow = o.optDouble("compAttackLow", 15.0).toFloat()
+            s.compAttackLoMid = o.optDouble("compAttackLoMid", 12.0).toFloat()
+            s.compAttackHiMid = o.optDouble("compAttackHiMid", 8.0).toFloat()
+            s.compAttackHigh = o.optDouble("compAttackHigh", 5.0).toFloat()
+            s.compReleaseLow = o.optDouble("compReleaseLow", 180.0).toFloat()
+            s.compReleaseLoMid = o.optDouble("compReleaseLoMid", 120.0).toFloat()
+            s.compReleaseHiMid = o.optDouble("compReleaseHiMid", 90.0).toFloat()
+            s.compReleaseHigh = o.optDouble("compReleaseHigh", 60.0).toFloat()
+            s.compPostGainLow = o.optDouble("compPostGainLow", 0.0).toFloat()
+            s.compPostGainLoMid = o.optDouble("compPostGainLoMid", 0.0).toFloat()
+            s.compPostGainHiMid = o.optDouble("compPostGainHiMid", 0.0).toFloat()
+            s.compPostGainHigh = o.optDouble("compPostGainHigh", 0.0).toFloat()
             s.pipelineEnabled = o.optBoolean("pipelineEnabled", true)
             s.lowShelfEnabled = o.optBoolean("lowShelfEnabled", true)
             s.peakEnabled = o.optBoolean("peakEnabled", true)
             s.highShelfEnabled = o.optBoolean("highShelfEnabled", true)
             s.audioSessionEnabled = o.optBoolean("audioSessionEnabled", false)
-            s.selectedAudioSession = o.optString(
-                "selectedAudioSession",
-                "0: LOAD - Audio TX Output (Float)"
-            )
+            s.selectedAudioSession = o.optString("selectedAudioSession", "0: LOAD - Audio TX Output (Float)")
             return s
         }
 
