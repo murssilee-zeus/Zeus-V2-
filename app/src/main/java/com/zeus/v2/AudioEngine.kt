@@ -349,7 +349,7 @@ class AudioEngine(private val context: Context) {
                 0,
                 s.limiterAttack.coerceIn(0.5f, 80f),
                 s.limiterRelease.coerceIn(20f, 1000f),
-                s.limiterRatio.coerceIn(1f, 32f),
+                s.limiterRatio.coerceIn(1f, 50f),   // ← máximo 50
                 s.limiterThreshold.coerceIn(-30f, 0f),
                 s.limiterPostGain.coerceIn(-12f, 12f)
             )
