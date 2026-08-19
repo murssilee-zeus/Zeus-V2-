@@ -189,38 +189,71 @@ class AudioEngine(private val context: Context) {
     }
 
     fun setCompressor(
-        enabled: Boolean,
-        cross1: Float, cross2: Float, cross3: Float,
-        thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float,
-        ratio: Float, knee: Float, attack: Float, release: Float, postGain: Float
-    ) {
-        settings.compEnabled = enabled
-        settings.cross1 = cross1; settings.cross2 = cross2; settings.cross3 = cross3
-        settings.compThLow = thLow; settings.compThLoMid = thLoMid
-        settings.compThHiMid = thHiMid; settings.compThHigh = thHigh
-        settings.compRatio = ratio; settings.compKnee = knee
-        settings.compAttack = attack; settings.compRelease = release
-        settings.compPostGain = postGain
-        applyMbc()
-    }
+    enabled: Boolean,
+    cross1: Float, cross2: Float, cross3: Float,
+    thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float,
+    ratioLow: Float, ratioLoMid: Float, ratioHiMid: Float, ratioHigh: Float,
+    kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float,
+    attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float,
+    releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float,
+    postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float
+) {
+    settings.compEnabled = enabled
+    settings.cross1 = cross1; settings.cross2 = cross2; settings.cross3 = cross3
+    settings.compThLow = thLow; settings.compThLoMid = thLoMid
+    settings.compThHiMid = thHiMid; settings.compThHigh = thHigh
+    settings.compRatioLow = ratioLow; settings.compRatioLoMid = ratioLoMid
+    settings.compRatioHiMid = ratioHiMid; settings.compRatioHigh = ratioHigh
+    settings.compKneeLow = kneeLow; settings.compKneeLoMid = kneeLoMid
+    settings.compKneeHiMid = kneeHiMid; settings.compKneeHigh = kneeHigh
+    settings.compAttackLow = attackLow; settings.compAttackLoMid = attackLoMid
+    settings.compAttackHiMid = attackHiMid; settings.compAttackHigh = attackHigh
+    settings.compReleaseLow = releaseLow; settings.compReleaseLoMid = releaseLoMid
+    settings.compReleaseHiMid = releaseHiMid; settings.compReleaseHigh = releaseHigh
+    settings.compPostGainLow = postGainLow; settings.compPostGainLoMid = postGainLoMid
+    settings.compPostGainHiMid = postGainHiMid; settings.compPostGainHigh = postGainHigh
+    applyMbc()
+}
 
-    fun applyAll() {
-        applyInputGain()
-        applyEq()
-        applyMbc()
-        applyPostEq()
-        applyLimiter()
-    }
+    private fun applyMbc() {
+    val dp = dynamicsProcessing ?: return
+    if (mbcBandCount == 0) return
+    try {
+        val s = settings
+        val active = s.compEnabled && pipelineEnabled
+        val c1 = s.cross1.coerceIn(40f, 1000f)
+        val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
+        val c3 = s.cross3.coerceIn(c2 + 50f, 19500f)
+        val cuts = listOf(c1, c2, c3, MAX_FREQ)
 
-    private fun applyInputGain() {
-        val dp = dynamicsProcessing ?: return
-        try {
-            dp.setInputGainAllChannelsTo(settings.preGain.coerceIn(-30f, 30f))
-        } catch (e: Exception) {
-            Log.e(TAG, "inputGain: ${e.message}")
+        val thresholds = listOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
+        val ratios = listOf(s.compRatioLow, s.compRatioLoMid, s.compRatioHiMid, s.compRatioHigh)
+        val knees = listOf(s.compKneeLow, s.compKneeLoMid, s.compKneeHiMid, s.compKneeHigh)
+        val attacks = listOf(s.compAttackLow, s.compAttackLoMid, s.compAttackHiMid, s.compAttackHigh)
+        val releases = listOf(s.compReleaseLow, s.compReleaseLoMid, s.compReleaseHiMid, s.compReleaseHigh)
+        val postGains = listOf(s.compPostGainLow, s.compPostGainLoMid, s.compPostGainHiMid, s.compPostGainHigh)
+
+        for (i in 0 until mbcBandCount) {
+            val band = DynamicsProcessing.MbcBand(
+                active,
+                cuts[i],
+                attacks[i].coerceIn(1f, 200f),
+                releases[i].coerceIn(10f, 1000f),
+                ratios[i].coerceIn(1f, 24f),
+                thresholds[i].coerceIn(-60f, 0f),
+                knees[i].coerceIn(0f, 20f),
+                -80f,
+                1f,
+                0f,
+                postGains[i].coerceIn(-12f, 12f)
+            )
+            dp.setMbcBandAllChannelsTo(i, band)
         }
+    } catch (e: Exception) {
+        Log.e(TAG, "mbc: ${e.message}")
     }
-
+}
+    
     /**
      * Núcleo mejorado:
      * 1. Calcula la respuesta en dB de todos los filtros paramétricos del usuario
