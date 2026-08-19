@@ -139,9 +139,16 @@ class MainActivity : ComponentActivity() {
             viewModel.crossoverFrequencies.toList(),
             viewModel.compMbThLow, viewModel.compMbThLoMid,
             viewModel.compMbThHiMid, viewModel.compMbThHigh,
-            viewModel.compMbRatio, viewModel.compMbKnee,
-            viewModel.compMbAttack, viewModel.compMbRelease,
-            viewModel.compMbPostGain
+            viewModel.compMbRatioLow, viewModel.compMbRatioLoMid,
+            viewModel.compMbRatioHiMid, viewModel.compMbRatioHigh,
+            viewModel.compMbKneeLow, viewModel.compMbKneeLoMid,
+            viewModel.compMbKneeHiMid, viewModel.compMbKneeHigh,
+            viewModel.compMbAttackLow, viewModel.compMbAttackLoMid,
+            viewModel.compMbAttackHiMid, viewModel.compMbAttackHigh,
+            viewModel.compMbReleaseLow, viewModel.compMbReleaseLoMid,
+            viewModel.compMbReleaseHiMid, viewModel.compMbReleaseHigh,
+            viewModel.compMbPostGainLow, viewModel.compMbPostGainLoMid,
+            viewModel.compMbPostGainHiMid, viewModel.compMbPostGainHigh
         ) {
             audioService?.audioEngine?.setCompressor(
                 enabled = viewModel.compressorMultibandEnabled,
@@ -152,11 +159,26 @@ class MainActivity : ComponentActivity() {
                 thLoMid = viewModel.compMbThLoMid,
                 thHiMid = viewModel.compMbThHiMid,
                 thHigh = viewModel.compMbThHigh,
-                ratio = viewModel.compMbRatio,
-                knee = viewModel.compMbKnee,
-                attack = viewModel.compMbAttack,
-                release = viewModel.compMbRelease,
-                postGain = viewModel.compMbPostGain
+                ratioLow = viewModel.compMbRatioLow,
+                ratioLoMid = viewModel.compMbRatioLoMid,
+                ratioHiMid = viewModel.compMbRatioHiMid,
+                ratioHigh = viewModel.compMbRatioHigh,
+                kneeLow = viewModel.compMbKneeLow,
+                kneeLoMid = viewModel.compMbKneeLoMid,
+                kneeHiMid = viewModel.compMbKneeHiMid,
+                kneeHigh = viewModel.compMbKneeHigh,
+                attackLow = viewModel.compMbAttackLow,
+                attackLoMid = viewModel.compMbAttackLoMid,
+                attackHiMid = viewModel.compMbAttackHiMid,
+                attackHigh = viewModel.compMbAttackHigh,
+                releaseLow = viewModel.compMbReleaseLow,
+                releaseLoMid = viewModel.compMbReleaseLoMid,
+                releaseHiMid = viewModel.compMbReleaseHiMid,
+                releaseHigh = viewModel.compMbReleaseHigh,
+                postGainLow = viewModel.compMbPostGainLow,
+                postGainLoMid = viewModel.compMbPostGainLoMid,
+                postGainHiMid = viewModel.compMbPostGainHiMid,
+                postGainHigh = viewModel.compMbPostGainHigh
             )
         }
 
