@@ -29,7 +29,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ====== BANDAS (18, con subgrave 20-40 Hz potenciado) ======
+    // ====== BANDAS ======
     val bands = mutableStateListOf<EqBand>().apply { addAll(createDefaultBands()) }
 
     var selectedBandIndex by mutableIntStateOf(2)
@@ -42,7 +42,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var preamp by mutableFloatStateOf(-6.0f)
     var subBoost by mutableFloatStateOf(0f)
 
-    // ====== LIMITER (protección) ======
+    // ====== LIMITER ======
     var limiterEnabled by mutableStateOf(true)
     var limiterThreshold by mutableFloatStateOf(-2.5f)
     var limiterAttack by mutableFloatStateOf(0.5f)
@@ -59,18 +59,44 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var compressorMultibandEnabled by mutableStateOf(true)
     var selectedAudioSession by mutableStateOf("0: LOAD - Audio TX Output (Float)")
 
-    // ====== COMPRESOR MULTIBANDA: 3 CORTES / 4 BANDAS + KNEE(dB) ======
+    // ====== COMPRESOR MULTIBANDA – 4 BANDAS INDEPENDIENTES ======
     var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)
 
+    // Threshold
     var compMbThLow by mutableFloatStateOf(-18f)
     var compMbThLoMid by mutableFloatStateOf(-14f)
     var compMbThHiMid by mutableFloatStateOf(-12f)
     var compMbThHigh by mutableFloatStateOf(-14f)
-    var compMbRatio by mutableFloatStateOf(5f)
-    var compMbKnee by mutableFloatStateOf(6f)
-    var compMbAttack by mutableFloatStateOf(4f)
-    var compMbRelease by mutableFloatStateOf(90f)
-    var compMbPostGain by mutableFloatStateOf(0f)
+
+    // Ratio
+    var compMbRatioLow by mutableFloatStateOf(4f)
+    var compMbRatioLoMid by mutableFloatStateOf(3f)
+    var compMbRatioHiMid by mutableFloatStateOf(2.5f)
+    var compMbRatioHigh by mutableFloatStateOf(3.5f)
+
+    // Knee
+    var compMbKneeLow by mutableFloatStateOf(6f)
+    var compMbKneeLoMid by mutableFloatStateOf(6f)
+    var compMbKneeHiMid by mutableFloatStateOf(6f)
+    var compMbKneeHigh by mutableFloatStateOf(6f)
+
+    // Attack (ms)
+    var compMbAttackLow by mutableFloatStateOf(15f)
+    var compMbAttackLoMid by mutableFloatStateOf(12f)
+    var compMbAttackHiMid by mutableFloatStateOf(8f)
+    var compMbAttackHigh by mutableFloatStateOf(5f)
+
+    // Release (ms)
+    var compMbReleaseLow by mutableFloatStateOf(180f)
+    var compMbReleaseLoMid by mutableFloatStateOf(120f)
+    var compMbReleaseHiMid by mutableFloatStateOf(90f)
+    var compMbReleaseHigh by mutableFloatStateOf(60f)
+
+    // Post Gain
+    var compMbPostGainLow by mutableFloatStateOf(0f)
+    var compMbPostGainLoMid by mutableFloatStateOf(0f)
+    var compMbPostGainHiMid by mutableFloatStateOf(0f)
+    var compMbPostGainHigh by mutableFloatStateOf(0f)
 
     var isEngineRunning by mutableStateOf(false)
     var spectrum by mutableStateOf(FloatArray(128) { 0f })
@@ -94,11 +120,26 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compThLoMid = compMbThLoMid,
         compThHiMid = compMbThHiMid,
         compThHigh = compMbThHigh,
-        compRatio = compMbRatio,
-        compKnee = compMbKnee,
-        compAttack = compMbAttack,
-        compRelease = compMbRelease,
-        compPostGain = compMbPostGain,
+        compRatioLow = compMbRatioLow,
+        compRatioLoMid = compMbRatioLoMid,
+        compRatioHiMid = compMbRatioHiMid,
+        compRatioHigh = compMbRatioHigh,
+        compKneeLow = compMbKneeLow,
+        compKneeLoMid = compMbKneeLoMid,
+        compKneeHiMid = compMbKneeHiMid,
+        compKneeHigh = compMbKneeHigh,
+        compAttackLow = compMbAttackLow,
+        compAttackLoMid = compMbAttackLoMid,
+        compAttackHiMid = compMbAttackHiMid,
+        compAttackHigh = compMbAttackHigh,
+        compReleaseLow = compMbReleaseLow,
+        compReleaseLoMid = compMbReleaseLoMid,
+        compReleaseHiMid = compMbReleaseHiMid,
+        compReleaseHigh = compMbReleaseHigh,
+        compPostGainLow = compMbPostGainLow,
+        compPostGainLoMid = compMbPostGainLoMid,
+        compPostGainHiMid = compMbPostGainHiMid,
+        compPostGainHigh = compMbPostGainHigh,
         pipelineEnabled = pipelineEnabled,
         lowShelfEnabled = lowShelfEnabled,
         peakEnabled = peakBandsEnabled,
@@ -126,11 +167,26 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compMbThLoMid = s.compThLoMid
         compMbThHiMid = s.compThHiMid
         compMbThHigh = s.compThHigh
-        compMbRatio = s.compRatio
-        compMbKnee = s.compKnee
-        compMbAttack = s.compAttack
-        compMbRelease = s.compRelease
-        compMbPostGain = s.compPostGain
+        compMbRatioLow = s.compRatioLow
+        compMbRatioLoMid = s.compRatioLoMid
+        compMbRatioHiMid = s.compRatioHiMid
+        compMbRatioHigh = s.compRatioHigh
+        compMbKneeLow = s.compKneeLow
+        compMbKneeLoMid = s.compKneeLoMid
+        compMbKneeHiMid = s.compKneeHiMid
+        compMbKneeHigh = s.compKneeHigh
+        compMbAttackLow = s.compAttackLow
+        compMbAttackLoMid = s.compAttackLoMid
+        compMbAttackHiMid = s.compAttackHiMid
+        compMbAttackHigh = s.compAttackHigh
+        compMbReleaseLow = s.compReleaseLow
+        compMbReleaseLoMid = s.compReleaseLoMid
+        compMbReleaseHiMid = s.compReleaseHiMid
+        compMbReleaseHigh = s.compReleaseHigh
+        compMbPostGainLow = s.compPostGainLow
+        compMbPostGainLoMid = s.compPostGainLoMid
+        compMbPostGainHiMid = s.compPostGainHiMid
+        compMbPostGainHigh = s.compPostGainHigh
         pipelineEnabled = s.pipelineEnabled
         lowShelfEnabled = s.lowShelfEnabled
         peakBandsEnabled = s.peakEnabled
