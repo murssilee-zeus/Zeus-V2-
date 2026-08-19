@@ -162,7 +162,6 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Spectrum
         SpectrumCard(
             spectrum = viewModel.spectrum,
             modifier = Modifier
@@ -170,18 +169,14 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 .weight(1f)
         )
 
-        // Tipos de filtro
         FilterTypeRow(viewModel)
 
-        // Controles de la banda seleccionada
         if (band != null) {
             BandControlsCard(viewModel, band)
         }
 
-        // Preamp
         PreampRow(viewModel)
 
-        // Selector de bandas + botón agregar
         BandSelectorRow(viewModel)
     }
 }
@@ -199,13 +194,11 @@ private fun SpectrumCard(spectrum: FloatArray, modifier: Modifier = Modifier) {
             val w = size.width
             val h = size.height
 
-            // Grid
             for (i in 0..5) {
                 val y = h * i / 5f
                 drawLine(GRID, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
             }
 
-            // Spectrum
             if (spectrum.isNotEmpty()) {
                 val path = Path()
                 val n = (spectrum.size - 1).coerceAtLeast(1)
@@ -278,7 +271,6 @@ private fun BandControlsCard(viewModel: EqViewModel, band: EqBand) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ===== FRECUENCIA (1 Hz – 30000 Hz) =====
         EditableValueRow(
             label = "Freq",
             value = band.frequency,
@@ -291,7 +283,6 @@ private fun BandControlsCard(viewModel: EqViewModel, band: EqBand) {
             onValueChange = { viewModel.updateSelectedBand(frequency = it) }
         )
 
-        // ===== GAIN (±30 dB) =====
         EditableValueRow(
             label = "Gain",
             value = band.gain,
@@ -301,7 +292,6 @@ private fun BandControlsCard(viewModel: EqViewModel, band: EqBand) {
             onValueChange = { viewModel.updateSelectedBand(gain = it) }
         )
 
-        // ===== Q (0.1 – 40) =====
         EditableValueRow(
             label = "Q",
             value = band.q,
@@ -373,7 +363,6 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
             }
         }
 
-        // Botón agregar banda
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -418,33 +407,111 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             )
         }
 
-        SliderRow("Cross 1", viewModel.crossoverFrequencies[0], 40f..1000f, "Hz") {
-            viewModel.crossoverFrequencies[0] = it
-        }
-        SliderRow("Cross 2", viewModel.crossoverFrequencies[1], 200f..8000f, "Hz") {
-            viewModel.crossoverFrequencies[1] = it
-        }
-        SliderRow("Cross 3", viewModel.crossoverFrequencies[2], 1000f..18000f, "Hz") {
-            viewModel.crossoverFrequencies[2] = it
-        }
+        EditableValueRow(
+            label = "Cross 1",
+            value = viewModel.crossoverFrequencies[0],
+            valueRange = 40f..1000f,
+            unit = "Hz",
+            format = { String.format("%.0f", it) },
+            onValueChange = { viewModel.crossoverFrequencies[0] = it }
+        )
+        EditableValueRow(
+            label = "Cross 2",
+            value = viewModel.crossoverFrequencies[1],
+            valueRange = 200f..8000f,
+            unit = "Hz",
+            format = { String.format("%.0f", it) },
+            onValueChange = { viewModel.crossoverFrequencies[1] = it }
+        )
+        EditableValueRow(
+            label = "Cross 3",
+            value = viewModel.crossoverFrequencies[2],
+            valueRange = 1000f..18000f,
+            unit = "Hz",
+            format = { String.format("%.0f", it) },
+            onValueChange = { viewModel.crossoverFrequencies[2] = it }
+        )
 
         Divider(color = CARD_BORDER)
 
-        SliderRow("Th Low", viewModel.compMbThLow, -40f..0f, "dB") { viewModel.compMbThLow = it }
-        SliderRow("Th LoMid", viewModel.compMbThLoMid, -40f..0f, "dB") { viewModel.compMbThLoMid = it }
-        SliderRow("Th HiMid", viewModel.compMbThHiMid, -40f..0f, "dB") { viewModel.compMbThHiMid = it }
-        SliderRow("Th High", viewModel.compMbThHigh, -40f..0f, "dB") { viewModel.compMbThHigh = it }
+        EditableValueRow(
+            label = "Th Low",
+            value = viewModel.compMbThLow,
+            valueRange = -40f..0f,
+            unit = "dB",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbThLow = it }
+        )
+        EditableValueRow(
+            label = "Th LoMid",
+            value = viewModel.compMbThLoMid,
+            valueRange = -40f..0f,
+            unit = "dB",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbThLoMid = it }
+        )
+        EditableValueRow(
+            label = "Th HiMid",
+            value = viewModel.compMbThHiMid,
+            valueRange = -40f..0f,
+            unit = "dB",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbThHiMid = it }
+        )
+        EditableValueRow(
+            label = "Th High",
+            value = viewModel.compMbThHigh,
+            valueRange = -40f..0f,
+            unit = "dB",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbThHigh = it }
+        )
 
-        SliderRow("Ratio", viewModel.compMbRatio, 1f..20f, "") { viewModel.compMbRatio = it }
-        SliderRow("Knee", viewModel.compMbKnee, 0f..20f, "dB") { viewModel.compMbKnee = it }
-        SliderRow("Attack", viewModel.compMbAttack, 1f..100f, "ms") { viewModel.compMbAttack = it }
-        SliderRow("Release", viewModel.compMbRelease, 10f..500f, "ms") { viewModel.compMbRelease = it }
-        SliderRow("Post Gain", viewModel.compMbPostGain, -12f..12f, "dB") { viewModel.compMbPostGain = it }
+        EditableValueRow(
+            label = "Ratio",
+            value = viewModel.compMbRatio,
+            valueRange = 1f..20f,
+            unit = "",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbRatio = it }
+        )
+        EditableValueRow(
+            label = "Knee",
+            value = viewModel.compMbKnee,
+            valueRange = 0f..20f,
+            unit = "dB",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbKnee = it }
+        )
+        EditableValueRow(
+            label = "Attack",
+            value = viewModel.compMbAttack,
+            valueRange = 1f..100f,
+            unit = "ms",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.compMbAttack = it }
+        )
+        EditableValueRow(
+            label = "Release",
+            value = viewModel.compMbRelease,
+            valueRange = 10f..500f,
+            unit = "ms",
+            format = { String.format("%.0f", it) },
+            onValueChange = { viewModel.compMbRelease = it }
+        )
+        EditableValueRow(
+            label = "Post Gain",
+            value = viewModel.compMbPostGain,
+            valueRange = -12f..12f,
+            unit = "dB",
+            format = { String.format("%+.1f", it) },
+            onValueChange = { viewModel.compMbPostGain = it }
+        )
     }
 }
 
 // ============================================================
-// PANTALLA 3: LIMITER + PIPELINE
+// PANTALLA 3: LIMITER + FILTROS ACTIVOS
 // ============================================================
 @Composable
 private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
@@ -468,15 +535,50 @@ private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier)
             )
         }
 
-        SliderRow("Threshold", viewModel.limiterThreshold, -20f..0f, "dB") { viewModel.limiterThreshold = it }
-        SliderRow("Attack", viewModel.limiterAttack, 0.5f..50f, "ms") { viewModel.limiterAttack = it }
-        SliderRow("Release", viewModel.limiterRelease, 20f..500f, "ms") { viewModel.limiterRelease = it }
-        SliderRow("Ratio", viewModel.limiterRatio, 1f..30f, "") { viewModel.limiterRatio = it }
-        SliderRow("Post Gain", viewModel.limiterPostGain, -12f..12f, "dB") { viewModel.limiterPostGain = it }
+        EditableValueRow(
+            label = "Threshold",
+            value = viewModel.limiterThreshold,
+            valueRange = -20f..0f,
+            unit = "dB",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.limiterThreshold = it }
+        )
+        EditableValueRow(
+            label = "Attack",
+            value = viewModel.limiterAttack,
+            valueRange = 0.5f..50f,
+            unit = "ms",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.limiterAttack = it }
+        )
+        EditableValueRow(
+            label = "Release",
+            value = viewModel.limiterRelease,
+            valueRange = 20f..500f,
+            unit = "ms",
+            format = { String.format("%.0f", it) },
+            onValueChange = { viewModel.limiterRelease = it }
+        )
+        EditableValueRow(
+            label = "Ratio",
+            value = viewModel.limiterRatio,
+            valueRange = 1f..50f,
+            unit = "",
+            format = { String.format("%.1f", it) },
+            onValueChange = { viewModel.limiterRatio = it }
+        )
+        EditableValueRow(
+            label = "Post Gain",
+            value = viewModel.limiterPostGain,
+            valueRange = -12f..12f,
+            unit = "dB",
+            format = { String.format("%+.1f", it) },
+            onValueChange = { viewModel.limiterPostGain = it }
+        )
 
         Divider(color = CARD_BORDER, modifier = Modifier.padding(vertical = 8.dp))
 
-        Text("Audio Effects Pipeline", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("Filtros activos", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
         SwitchRow("Pipeline", viewModel.pipelineEnabled) { viewModel.pipelineEnabled = it }
         SwitchRow("Low Shelf", viewModel.lowShelfEnabled) { viewModel.lowShelfEnabled = it }
@@ -488,39 +590,6 @@ private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier)
 // ============================================================
 // COMPONENTES REUTILIZABLES
 // ============================================================
-@Composable
-private fun SliderRow(
-    label: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    unit: String,
-    onValueChange: (Float) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(80.dp))
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = range,
-            modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = PINK_ACCENT,
-                activeTrackColor = PINK_ACCENT
-            )
-        )
-        Text(
-            text = if (unit.isEmpty()) String.format("%.1f", value)
-            else String.format("%.1f %s", value, unit),
-            color = TXT_PRIMARY,
-            fontSize = 12.sp,
-            modifier = Modifier.width(70.dp)
-        )
-    }
-}
-
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
@@ -559,7 +628,7 @@ private fun EditableValueRow(
             text = label,
             color = TXT_MUTED,
             fontSize = 13.sp,
-            modifier = Modifier.width(50.dp)
+            modifier = Modifier.width(80.dp)
         )
 
         Slider(
@@ -574,7 +643,6 @@ private fun EditableValueRow(
         )
 
         if (isEditing) {
-            // Campo de texto para escribir el valor manualmente
             OutlinedTextField(
                 value = textValue,
                 onValueChange = { textValue = it },
@@ -605,7 +673,6 @@ private fun EditableValueRow(
                 )
             )
         } else {
-            // Valor clickeable para editar
             Text(
                 text = format(value) + if (unit.isNotEmpty()) " $unit" else "",
                 color = PINK_ACCENT,
