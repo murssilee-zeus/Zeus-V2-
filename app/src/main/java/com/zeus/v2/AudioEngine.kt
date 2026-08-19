@@ -10,7 +10,7 @@ import kotlin.math.*
  * Zeus EQ — Motor de audio mejorado (v19 "Curve Mapper").
  *
  * Pipeline nativo (DynamicsProcessing, API 28+):
- *   1) PreEq   : hasta 64/128 bandas Peak internas que aproximan
+ *   1) PreEq   : hasta 128 bandas Peak internas que aproximan
  *                la curva real calculada con biquads (LPF/HPF/Shelf/Peak)
  *   2) MBC     : compresor multibanda 4 bandas / 3 cortes + knee
  *   3) PostEq  : refuerzo subgrave
@@ -25,10 +25,10 @@ class AudioEngine(private val context: Context) {
     companion object {
         private const val TAG = "ZeusAudioEngine"
 
-        // Intentamos 64 bandas primero. Si el dispositivo no lo soporta bajamos.
-        private const val TARGET_PRE_EQ_BANDS = 64
-        private const val FALLBACK_PRE_EQ_BANDS = 32
-        private const val MIN_PRE_EQ_BANDS = 16
+        // Intentamos 128 bandas primero (máximo de la API). Si el dispositivo no lo soporta bajamos.
+        private const val TARGET_PRE_EQ_BANDS = 128
+        private const val FALLBACK_PRE_EQ_BANDS = 64
+        private const val MIN_PRE_EQ_BANDS = 32
 
         private const val CHANNEL_COUNT = 2
         private const val MBC_BANDS = 4
