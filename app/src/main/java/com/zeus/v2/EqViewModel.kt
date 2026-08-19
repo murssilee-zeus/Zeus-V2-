@@ -35,7 +35,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var selectedBandIndex by mutableIntStateOf(2)
         private set
 
-    var currentSection by mutableStateOf(EqSection.PIPELINE)
+    var currentSection by mutableStateOf(EqSection.EQUALIZER)
         private set
 
     // ====== PREAMP + SUB BOOST ======
@@ -191,27 +191,27 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     fun nextSection() {
         currentSection = when (currentSection) {
-            EqSection.PIPELINE -> EqSection.EQUALIZER
             EqSection.EQUALIZER -> EqSection.CROSSOVER
             EqSection.CROSSOVER -> EqSection.LIMITER
-            EqSection.LIMITER -> EqSection.PIPELINE
+            EqSection.LIMITER -> EqSection.EQUALIZER
+            EqSection.PIPELINE -> EqSection.EQUALIZER
         }
     }
 
     fun previousSection() {
         currentSection = when (currentSection) {
-            EqSection.PIPELINE -> EqSection.LIMITER
-            EqSection.EQUALIZER -> EqSection.PIPELINE
+            EqSection.EQUALIZER -> EqSection.LIMITER
             EqSection.CROSSOVER -> EqSection.EQUALIZER
             EqSection.LIMITER -> EqSection.CROSSOVER
+            EqSection.PIPELINE -> EqSection.LIMITER
         }
     }
 
     fun sectionTitle(): String = when (currentSection) {
-        EqSection.EQUALIZER -> "Equalizer Pro18"
-        EqSection.CROSSOVER -> "Crossover Multiband"
+        EqSection.EQUALIZER -> "Equalizer"
+        EqSection.CROSSOVER -> "Compresor Multibanda"
         EqSection.LIMITER -> "Limiter"
-        EqSection.PIPELINE -> "Audio Effects Pipeline"
+        EqSection.PIPELINE -> "Equalizer"
     }
 
     fun selectedBand(): EqBand? = bands.getOrNull(selectedBandIndex)
