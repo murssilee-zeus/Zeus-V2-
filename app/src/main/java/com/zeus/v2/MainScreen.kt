@@ -41,6 +41,12 @@ private val PINK_ACCENT = Color(0xFFFF6B9E)
 private val TXT_PRIMARY = Color(0xFFECECEE)
 private val TXT_MUTED = Color(0xFF888892)
 
+// Colores para las secciones del compresor
+private val LOW_COLOR = Color(0xFF4FC3F7)
+private val LOMID_COLOR = Color(0xFF66BB6A)
+private val HIMID_COLOR = Color(0xFFFFCA28)
+private val HIGH_COLOR = Color(0xFFAB47BC)
+
 @Composable
 fun MainScreen(
     viewModel: EqViewModel,
@@ -58,7 +64,7 @@ fun MainScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
+                .padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -383,7 +389,7 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
 }
 
 // ============================================================
-// PANTALLA 2: CROSSOVER / COMPRESSOR
+// PANTALLA 2: COMPRESOR MULTIBANDA (estilo Tri-Band - Landscape)
 // ============================================================
 @Composable
 private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
@@ -391,122 +397,208 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Compresor Multibanda", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Activado", color = TXT_MUTED, modifier = Modifier.weight(1f))
-            Switch(
-                checked = viewModel.compressorMultibandEnabled,
-                onCheckedChange = { viewModel.compressorMultibandEnabled = it },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = PINK_ACCENT,
-                    checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
+        // Header + Switch
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Compresor Multibanda",
+                color = TXT_PRIMARY,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Activado", color = TXT_MUTED, fontSize = 13.sp)
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = viewModel.compressorMultibandEnabled,
+                    onCheckedChange = { viewModel.compressorMultibandEnabled = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = PINK_ACCENT,
+                        checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
+                    )
                 )
+            }
+        }
+
+        // Crossovers
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SURFACE),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Crossovers", color = TXT_MUTED, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                EditableValueRow(
+                    label = "Cross 1",
+                    value = viewModel.crossoverFrequencies[0],
+                    valueRange = 40f..1000f,
+                    unit = "Hz",
+                    format = { String.format("%.0f", it) },
+                    onValueChange = { viewModel.crossoverFrequencies[0] = it }
+                )
+                EditableValueRow(
+                    label = "Cross 2",
+                    value = viewModel.crossoverFrequencies[1],
+                    valueRange = 200f..8000f,
+                    unit = "Hz",
+                    format = { String.format("%.0f", it) },
+                    onValueChange = { viewModel.crossoverFrequencies[1] = it }
+                )
+                EditableValueRow(
+                    label = "Cross 3",
+                    value = viewModel.crossoverFrequencies[2],
+                    valueRange = 1000f..18000f,
+                    unit = "Hz",
+                    format = { String.format("%.0f", it) },
+                    onValueChange = { viewModel.crossoverFrequencies[2] = it }
+                )
+            }
+        }
+
+        // 4 Bandas en fila (ideal para landscape)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            BandColumn(
+                title = "LOW",
+                color = LOW_COLOR,
+                threshold = viewModel.compMbThLow,
+                onThresholdChange = { viewModel.compMbThLow = it },
+                modifier = Modifier.weight(1f)
+            )
+            BandColumn(
+                title = "LO-MID",
+                color = LOMID_COLOR,
+                threshold = viewModel.compMbThLoMid,
+                onThresholdChange = { viewModel.compMbThLoMid = it },
+                modifier = Modifier.weight(1f)
+            )
+            BandColumn(
+                title = "HI-MID",
+                color = HIMID_COLOR,
+                threshold = viewModel.compMbThHiMid,
+                onThresholdChange = { viewModel.compMbThHiMid = it },
+                modifier = Modifier.weight(1f)
+            )
+            BandColumn(
+                title = "HIGH",
+                color = HIGH_COLOR,
+                threshold = viewModel.compMbThHigh,
+                onThresholdChange = { viewModel.compMbThHigh = it },
+                modifier = Modifier.weight(1f)
             )
         }
 
-        EditableValueRow(
-            label = "Cross 1",
-            value = viewModel.crossoverFrequencies[0],
-            valueRange = 40f..1000f,
-            unit = "Hz",
-            format = { String.format("%.0f", it) },
-            onValueChange = { viewModel.crossoverFrequencies[0] = it }
-        )
-        EditableValueRow(
-            label = "Cross 2",
-            value = viewModel.crossoverFrequencies[1],
-            valueRange = 200f..8000f,
-            unit = "Hz",
-            format = { String.format("%.0f", it) },
-            onValueChange = { viewModel.crossoverFrequencies[1] = it }
-        )
-        EditableValueRow(
-            label = "Cross 3",
-            value = viewModel.crossoverFrequencies[2],
-            valueRange = 1000f..18000f,
-            unit = "Hz",
-            format = { String.format("%.0f", it) },
-            onValueChange = { viewModel.crossoverFrequencies[2] = it }
-        )
+        // Controles globales del compresor
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SURFACE),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Global", color = TXT_MUTED, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
 
-        Divider(color = CARD_BORDER)
+                EditableValueRow(
+                    label = "Ratio",
+                    value = viewModel.compMbRatio,
+                    valueRange = 1f..20f,
+                    unit = "",
+                    format = { String.format("%.1f", it) },
+                    onValueChange = { viewModel.compMbRatio = it }
+                )
+                EditableValueRow(
+                    label = "Knee",
+                    value = viewModel.compMbKnee,
+                    valueRange = 0f..20f,
+                    unit = "dB",
+                    format = { String.format("%.1f", it) },
+                    onValueChange = { viewModel.compMbKnee = it }
+                )
+                EditableValueRow(
+                    label = "Attack",
+                    value = viewModel.compMbAttack,
+                    valueRange = 1f..100f,
+                    unit = "ms",
+                    format = { String.format("%.1f", it) },
+                    onValueChange = { viewModel.compMbAttack = it }
+                )
+                EditableValueRow(
+                    label = "Release",
+                    value = viewModel.compMbRelease,
+                    valueRange = 10f..500f,
+                    unit = "ms",
+                    format = { String.format("%.0f", it) },
+                    onValueChange = { viewModel.compMbRelease = it }
+                )
+                EditableValueRow(
+                    label = "Post Gain",
+                    value = viewModel.compMbPostGain,
+                    valueRange = -12f..12f,
+                    unit = "dB",
+                    format = { String.format("%+.1f", it) },
+                    onValueChange = { viewModel.compMbPostGain = it }
+                )
+            }
+        }
+    }
+}
 
-        EditableValueRow(
-            label = "Th Low",
-            value = viewModel.compMbThLow,
-            valueRange = -40f..0f,
-            unit = "dB",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbThLow = it }
-        )
-        EditableValueRow(
-            label = "Th LoMid",
-            value = viewModel.compMbThLoMid,
-            valueRange = -40f..0f,
-            unit = "dB",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbThLoMid = it }
-        )
-        EditableValueRow(
-            label = "Th HiMid",
-            value = viewModel.compMbThHiMid,
-            valueRange = -40f..0f,
-            unit = "dB",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbThHiMid = it }
-        )
-        EditableValueRow(
-            label = "Th High",
-            value = viewModel.compMbThHigh,
-            valueRange = -40f..0f,
-            unit = "dB",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbThHigh = it }
-        )
+@Composable
+private fun BandColumn(
+    title: String,
+    color: Color,
+    threshold: Float,
+    onThresholdChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = SURFACE),
+        shape = RoundedCornerShape(10.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                color = color,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-        EditableValueRow(
-            label = "Ratio",
-            value = viewModel.compMbRatio,
-            valueRange = 1f..20f,
-            unit = "",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbRatio = it }
-        )
-        EditableValueRow(
-            label = "Knee",
-            value = viewModel.compMbKnee,
-            valueRange = 0f..20f,
-            unit = "dB",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbKnee = it }
-        )
-        EditableValueRow(
-            label = "Attack",
-            value = viewModel.compMbAttack,
-            valueRange = 1f..100f,
-            unit = "ms",
-            format = { String.format("%.1f", it) },
-            onValueChange = { viewModel.compMbAttack = it }
-        )
-        EditableValueRow(
-            label = "Release",
-            value = viewModel.compMbRelease,
-            valueRange = 10f..500f,
-            unit = "ms",
-            format = { String.format("%.0f", it) },
-            onValueChange = { viewModel.compMbRelease = it }
-        )
-        EditableValueRow(
-            label = "Post Gain",
-            value = viewModel.compMbPostGain,
-            valueRange = -12f..12f,
-            unit = "dB",
-            format = { String.format("%+.1f", it) },
-            onValueChange = { viewModel.compMbPostGain = it }
-        )
+            Text(
+                text = String.format("%.1f dB", threshold),
+                color = TXT_PRIMARY,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clickable { /* se edita con el slider */ }
+            )
+
+            Slider(
+                value = threshold,
+                onValueChange = onThresholdChange,
+                valueRange = -40f..0f,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = color,
+                    activeTrackColor = color,
+                    inactiveTrackColor = color.copy(alpha = 0.25f)
+                )
+            )
+
+            Text("Thresh", color = TXT_MUTED, fontSize = 11.sp)
+        }
     }
 }
 
