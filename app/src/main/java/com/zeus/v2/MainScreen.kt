@@ -143,11 +143,20 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             modifier = Modifier.weight(1.15f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SpectrumCard(
+            EqGraph(
+                bands = viewModel.bands,
+                selectedIndex = viewModel.selectedBandIndex,
                 spectrum = viewModel.spectrum,
+                onBandSelected = { viewModel.selectBand(it) },
+                onBandMoved = { idx, freq, gain ->
+                    viewModel.selectBand(idx)
+                    viewModel.updateSelectedBand(frequency = freq, gain = gain)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
             )
             BandSelectorRow(viewModel)
         }
@@ -349,31 +358,22 @@ private fun BandControlsCard(
 
 @Composable
 private fun PreampRow(viewModel: EqViewModel) {
-    Row(
+    // Reutiliza EditableValueRow para poder editar el valor con un clic
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
             .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text("Preamp", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(60.dp))
-        Slider(
+        EditableValueRow(
+            label = "Preamp",
             value = viewModel.preamp,
-            onValueChange = { viewModel.preamp = it },
             valueRange = -30f..12f,
-            modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = PINK_ACCENT,
-                activeTrackColor = PINK_ACCENT
-            )
-        )
-        Text(
-            text = String.format("%.1f dB", viewModel.preamp),
-            color = TXT_PRIMARY,
-            fontSize = 13.sp,
-            modifier = Modifier.width(64.dp)
+            unit = "dB",
+            format = { v -> String.format("%.1f", v) },
+            onValueChange = { viewModel.preamp = it }
         )
     }
 }
@@ -691,7 +691,11 @@ private fun EditableValueRow(
             onValueChange = onValueChange,
             valueRange = valueRange,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
+            colors = SliderDefaults.colors(
+                thumbColor = Color(0xFFD0D0D8),          // gris claro
+                activeTrackColor = Color(0xFFA8A8B0),   // gris medio-claro
+                inactiveTrackColor = Color(0xFF3A3A42)
+            )
         )
         if (isEditing) {
             OutlinedTextField(
