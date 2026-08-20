@@ -1,7 +1,5 @@
 package com.zeus.v2
 
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -18,61 +16,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.*
 
 /**
- * Cálculo de la respuesta de un EQ paramétrico (aproximación visual).
- * Usado en el gráfico y en el Spectrum de MainScreen.
+ * Respuesta visual aproximada de una banda.
  */
 fun calculateBandResponse(freq: Float, band: EqBand): Float {
     val f0 = band.frequency.coerceAtLeast(1f)
     val w = freq / f0
     val gainDb = band.gain
-    val q = band.q.coerceAtLeast(0.1f)
     return when (band.filterType) {
         EqBand.FilterType.PEAK -> {
-            // Suave y visualmente agradable (aprox. gaussiana en escala log)
-            val x = ln(w)
-            val sigma = 0.55f / q
-            gainDb * exp(-(x * x) / (2f * sigma * sigma))
+            val bw = 1f / band.q.coerceAtLeast(0.1f)
+            gainDb * (1f - ((ln(w)).pow(2) / (2f * bw * bw))).coerceIn(0f, 1f * sign(gainDb))
         }
         EqBand.FilterType.LOW_SHELF -> {
-            val t = (freq / f0).coerceIn(0.01f, 100f)
-            if (freq <= f0) {
-                gainDb * (1f - 0.5f * (t * t).coerceIn(0f, 1f))
-            } else {
-                gainDb * 0.12f * (f0 / freq).coerceIn(0f, 1f)
-            }
+            if (freq < f0) gainDb * (1f - (freq / f0).pow(2)).coerceIn(0f, 1f) + gainDb * 0.1f
+            else gainDb * 0.15f
         }
         EqBand.FilterType.HIGH_SHELF -> {
-            val t = (f0 / freq).coerceIn(0.01f, 100f)
-            if (freq >= f0) {
-                gainDb * (1f - 0.5f * (t * t).coerceIn(0f, 1f))
-            } else {
-                gainDb * 0.12f * (freq / f0).coerceIn(0f, 1f)
-            }
+            if (freq > f0) gainDb * (1f - (f0 / freq).pow(2)).coerceIn(0f, 1f)
+            else gainDb * 0.15f
         }
         EqBand.FilterType.LOW_PASS -> {
-            val order = (q * 2).coerceIn(1f, 8f)
+            val order = (band.q * 2).coerceIn(1f, 8f)
             -20f * log10(1f + (freq / f0).pow(order))
         }
         EqBand.FilterType.HIGH_PASS -> {
-            val order = (q * 2).coerceIn(1f, 8f)
+            val order = (band.q * 2).coerceIn(1f, 8f)
             -20f * log10(1f + (f0 / freq).pow(order))
         }
         EqBand.FilterType.NOTCH -> {
-            val x = ln(w)
-            -abs(gainDb).coerceAtLeast(12f) * exp(-(x * x) * q * 1.2f) - 4f
+            gainDb * exp(-((ln(w)).pow(2)) * band.q).coerceAtMost(0f) - 30f
         }
         EqBand.FilterType.BAND_PASS -> {
-            val x = ln(w)
-            gainDb * exp(-(x * x) * q * 0.6f)
+            gainDb * exp(-((ln(w)).pow(2)) * band.q * 0.5f)
         }
         EqBand.FilterType.BYPASS -> 0f
     }.coerceIn(-30f, 30f)
+}
+
+/** Color arcoíris según posición 0..1 en el eje de frecuencia */
+private fun spectrumColor(t: Float): Color {
+    val x = t.coerceIn(0f, 1f)
+    return when {
+        x < 0.2f -> Color.lerp(Color(0xFF7B2CBF), Color(0xFF4361EE), x / 0.2f)
+        x < 0.4f -> Color.lerp(Color(0xFF4361EE), Color(0xFF4CC9F0), (x - 0.2f) / 0.2f)
+        x < 0.55f -> Color.lerp(Color(0xFF4CC9F0), Color(0xFF2EC4B6), (x - 0.4f) / 0.15f)
+        x < 0.7f -> Color.lerp(Color(0xFF2EC4B6), Color(0xFF90BE6D), (x - 0.55f) / 0.15f)
+        x < 0.85f -> Color.lerp(Color(0xFF90BE6D), Color(0xFFF9C74F), (x - 0.7f) / 0.15f)
+        else -> Color.lerp(Color(0xFFF9C74F), Color(0xFFF94144), (x - 0.85f) / 0.15f)
+    }
 }
 
 @Composable
@@ -85,41 +81,54 @@ fun EqGraph(
     modifier: Modifier = Modifier
 ) {
     val minFreq = 20f
-    val maxFreq = 22000f
+    val maxFreq = 20000f
     val minGain = -30f
     val maxGain = 30f
 
     fun freqToX(freq: Float, width: Float): Float {
-        val logMin = ln(minFreq); val logMax = ln(maxFreq)
+        val logMin = ln(minFreq)
+        val logMax = ln(maxFreq)
         val logF = ln(freq.coerceIn(minFreq, maxFreq))
         return ((logF - logMin) / (logMax - logMin)) * width
     }
+
     fun xToFreq(x: Float, width: Float): Float {
-        val logMin = ln(minFreq); val logMax = ln(maxFreq)
+        val logMin = ln(minFreq)
+        val logMax = ln(maxFreq)
         val ratio = (x / width).coerceIn(0f, 1f)
         return exp(logMin + ratio * (logMax - logMin))
     }
 
+    // Curva de respuesta del EQ
     val responsePoints = remember(bands) {
-        val points = 400
+        val points = 320
         FloatArray(points) { i ->
-            val freq = exp(ln(minFreq) + (i.toFloat() / (points - 1)) * (ln(maxFreq) - ln(minFreq)))
+            val t = i.toFloat() / (points - 1)
+            val freq = exp(ln(minFreq) + t * (ln(maxFreq) - ln(minFreq)))
             var total = 0f
             bands.filter { it.enabled }.forEach { total += calculateBandResponse(freq, it) }
             total.coerceIn(minGain, maxGain)
         }
     }
 
-    // Rainbow colors for the response curve (low → high freq)
-    val rainbowColors = listOf(
-        Color(0xFF9B59B6), // purple
-        Color(0xFF3498DB), // blue
-        Color(0xFF1ABC9C), // teal
-        Color(0xFF2ECC71), // green
-        Color(0xFFF1C40F), // yellow
-        Color(0xFFE67E22), // orange
-        Color(0xFFE74C3C)  // red
-    )
+    // Spectrum amplificado y suavizado para que se vea más
+    val displaySpectrum = remember(spectrum) {
+        if (spectrum.isEmpty()) return@remember FloatArray(0)
+        // Amplificar: raíz + ganancia para que niveles bajos se noten
+        val boosted = FloatArray(spectrum.size) { i ->
+            val v = spectrum[i].coerceIn(0f, 1f)
+            sqrt(v) * 1.65f   // más sensible
+        }
+        // Suavizado simple
+        val smooth = FloatArray(boosted.size)
+        for (i in boosted.indices) {
+            val a = boosted.getOrElse(i - 1) { boosted[i] }
+            val b = boosted[i]
+            val c = boosted.getOrElse(i + 1) { boosted[i] }
+            smooth[i] = (a * 0.25f + b * 0.5f + c * 0.25f).coerceIn(0f, 1f)
+        }
+        smooth
+    }
 
     Box(modifier = modifier.background(Color(0xFF0B0B0C)).padding(4.dp)) {
         Canvas(
@@ -132,7 +141,10 @@ fun EqGraph(
                         bands.forEachIndexed { idx, band ->
                             val bx = freqToX(band.frequency, size.width.toFloat())
                             val d = abs(bx - off.x)
-                            if (d < md) { md = d; closest = idx }
+                            if (d < md) {
+                                md = d
+                                closest = idx
+                            }
                         }
                         if (closest >= 0) onBandSelected(closest)
                     }
@@ -145,131 +157,108 @@ fun EqGraph(
                             bands.forEachIndexed { idx, band ->
                                 val bx = freqToX(band.frequency, size.width.toFloat())
                                 val d = abs(bx - off.x)
-                                if (d < md) { md = d; closest = idx }
+                                if (d < md) {
+                                    md = d
+                                    closest = idx
+                                }
                             }
                             if (closest >= 0) onBandSelected(closest)
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val idx = selectedIndex
+                            if (idx in bands.indices) {
+                                val w = size.width.toFloat()
+                                val h = size.height.toFloat()
+                                val f = xToFreq(change.position.x, w).coerceIn(20f, 20000f)
+                                val g = (maxGain - (change.position.y / h) * (maxGain - minGain))
+                                    .coerceIn(minGain, maxGain)
+                                onBandMoved(idx, f, g)
+                            }
                         }
-                    ) { change, _ ->
-                        val idx = selectedIndex
-                        if (idx in bands.indices) {
-                            val w = size.width.toFloat()
-                            val h = size.height.toFloat()
-                            val f = xToFreq(change.position.x, w).coerceIn(20f, 22000f)
-                            val g = (maxGain - (change.position.y / h) * (maxGain - minGain))
-                                .coerceIn(minGain, maxGain)
-                            onBandMoved(idx, f, g)
-                        }
-                    }
+                    )
                 }
         ) {
             val w = size.width
             val h = size.height
-            val labelH = 18f // space reserved at bottom for labels
 
-            // Grid vertical
-            for (i in 0..8) {
-                drawLine(Color(0xFF1F1A26), Offset(w * i / 8f, 0f), Offset(w * i / 8f, h - labelH), 1f)
-            }
-            // Grid horizontal + center line
+            // Grid
             for (i in 0..6) {
-                val y = (h - labelH) * i / 6f
-                val color = if (i == 3) Color(0xFF4A3A6A) else Color(0xFF1A1520)
-                drawLine(color, Offset(0f, y), Offset(w, y), 1f)
+                drawLine(Color(0xFF1F1A26), Offset(w * i / 6f, 0f), Offset(w * i / 6f, h), 1f)
             }
+            for (i in 0..4) {
+                drawLine(Color(0xFF1A1520), Offset(0f, h * i / 4f), Offset(w, h * i / 4f), 1f)
+            }
+            // Línea 0 dB
+            drawLine(Color(0xFF33294A), Offset(0f, h / 2), Offset(w, h / 2), 1.2f)
 
-            // Subtle live spectrum (background, low opacity)
-            if (spectrum.isNotEmpty()) {
+            // ===== SPECTRUM (fondo, más sensible) =====
+            if (displaySpectrum.isNotEmpty()) {
                 val fillPath = Path()
                 val linePath = Path()
-                val n = (spectrum.size - 1).coerceAtLeast(1)
-                spectrum.forEachIndexed { i, v ->
-                    val x = w * i.toFloat() / n
-                    val y = (h - labelH) * (1f - v.coerceIn(0f, 1f))
+                val n = (displaySpectrum.size - 1).coerceAtLeast(1)
+                displaySpectrum.forEachIndexed { i, v ->
+                    val x = w * i / n.toFloat()
+                    val y = h * (1f - v.coerceIn(0f, 1f) * 0.85f) // no tapa toda la curva
                     if (i == 0) {
                         linePath.moveTo(x, y)
-                        fillPath.moveTo(x, h - labelH)
+                        fillPath.moveTo(x, h)
                         fillPath.lineTo(x, y)
                     } else {
                         linePath.lineTo(x, y)
                         fillPath.lineTo(x, y)
                     }
                 }
-                fillPath.lineTo(w, h - labelH)
+                fillPath.lineTo(w, h)
                 fillPath.close()
+
                 drawPath(
                     fillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color(0x22A040E0), Color(0x00000000)),
-                        startY = 0f, endY = h - labelH
+                        colors = listOf(Color(0x44A040E0), Color(0x00000000)),
+                        startY = 0f,
+                        endY = h
                     )
                 )
-                drawPath(linePath, Color(0x55C160FF), style = Stroke(width = 1.2f, cap = StrokeCap.Round))
+                drawPath(
+                    linePath,
+                    color = Color(0xAAC160FF),
+                    style = Stroke(width = 1.4f, cap = StrokeCap.Round)
+                )
             }
 
-            // EQ Response curve – rainbow gradient stroke
-            val respPath = Path()
-            val graphH = h - labelH
-            for (i in responsePoints.indices) {
-                val x = w * i.toFloat() / (responsePoints.size - 1).coerceAtLeast(1)
-                val y = (1f - ((responsePoints[i] - minGain) / (maxGain - minGain))) * graphH
-                if (i == 0) respPath.moveTo(x, y) else respPath.lineTo(x, y)
-            }
-
-            // Soft glow under the curve
-            drawPath(
-                respPath,
-                color = Color(0x3374B9FF),
-                style = Stroke(width = 8f, cap = StrokeCap.Round)
-            )
-
-            // Main rainbow stroke
-            drawPath(
-                respPath,
-                brush = Brush.horizontalGradient(colors = rainbowColors),
-                style = Stroke(width = 3.2f, cap = StrokeCap.Round)
-            )
-
-            // Band points (colored circles)
-            bands.forEachIndexed { idx, b ->
-                if (!b.enabled) return@forEachIndexed
-                val x = freqToX(b.frequency, w)
-                val y = (1f - ((b.gain - minGain) / (maxGain - minGain))) * graphH
-                val radius = if (idx == selectedIndex) 8f else 5f
-                // outer ring
-                drawCircle(Color.White.copy(alpha = 0.35f), radius = radius + 2f, center = Offset(x, y))
-                drawCircle(b.color, radius = radius, center = Offset(x, y))
-                if (idx == selectedIndex) {
-                    drawCircle(Color.White, radius = 2.5f, center = Offset(x, y))
+            // ===== CURVA EQ MULTICOLOR =====
+            if (responsePoints.isNotEmpty()) {
+                val n = responsePoints.size - 1
+                for (i in 0 until n) {
+                    val t0 = i.toFloat() / n
+                    val t1 = (i + 1).toFloat() / n
+                    val x0 = w * t0
+                    val x1 = w * t1
+                    val y0 = (1f - ((responsePoints[i] - minGain) / (maxGain - minGain))) * h
+                    val y1 = (1f - ((responsePoints[i + 1] - minGain) / (maxGain - minGain))) * h
+                    val col = spectrumColor((t0 + t1) / 2f)
+                    drawLine(
+                        color = col,
+                        start = Offset(x0, y0),
+                        end = Offset(x1, y1),
+                        strokeWidth = 2.8f,
+                        cap = StrokeCap.Round
+                    )
                 }
             }
 
-            // Frequency labels at bottom
-            val labelPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#888892")
-                textSize = 11f * density
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                isAntiAlias = true
-                textAlign = Paint.Align.CENTER
-            }
-            val freqLabels = listOf(
-                31f to "31Hz",
-                50f to "50Hz",
-                80f to "80Hz",
-                125f to "125Hz",
-                250f to "250Hz",
-                500f to "500Hz",
-                1_000f to "1kHz",
-                2_000f to "2kHz",
-                4_000f to "4kHz",
-                8_000f to "8kHz",
-                16_000f to "16kHz"
-            )
-            drawContext.canvas.nativeCanvas.apply {
-                freqLabels.forEach { (freq, label) ->
-                    val x = freqToX(freq, w)
-                    if (x in 12f..(w - 12f)) {
-                        drawText(label, x, h - 4f, labelPaint)
-                    }
+            // ===== PUNTOS DE BANDAS =====
+            bands.forEachIndexed { idx, b ->
+                if (!b.enabled) return@forEachIndexed
+                val x = freqToX(b.frequency, w)
+                val y = (1f - ((b.gain - minGain) / (maxGain - minGain))) * h
+                val r = if (idx == selectedIndex) 8f else 5f
+                // halo
+                drawCircle(b.color.copy(alpha = 0.25f), radius = r + 4f, center = Offset(x, y))
+                drawCircle(b.color, radius = r, center = Offset(x, y))
+                if (idx == selectedIndex) {
+                    drawCircle(Color.White, radius = 2.2f, center = Offset(x, y))
                 }
             }
         }
