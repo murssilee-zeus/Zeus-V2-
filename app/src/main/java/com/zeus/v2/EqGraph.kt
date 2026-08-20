@@ -115,12 +115,10 @@ fun EqGraph(
     // Spectrum amplificado y suavizado para que se vea más
     val displaySpectrum = remember(spectrum) {
         if (spectrum.isEmpty()) return@remember FloatArray(0)
-        // Amplificar: raíz + ganancia para que niveles bajos se noten
         val boosted = FloatArray(spectrum.size) { i ->
             val v = spectrum[i].coerceIn(0f, 1f)
-            sqrt(v) * 1.65f   // más sensible
+            sqrt(v) * 1.65f
         }
-        // Suavizado simple
         val smooth = FloatArray(boosted.size)
         for (i in boosted.indices) {
             val a = boosted.getOrElse(i - 1) { boosted[i] }
@@ -193,14 +191,14 @@ fun EqGraph(
             // Línea 0 dB
             drawLine(Color(0xFF33294A), Offset(0f, h / 2), Offset(w, h / 2), 1.2f)
 
-            // ===== SPECTRUM (fondo, más sensible) =====
+            // ===== SPECTRUM (fondo) =====
             if (displaySpectrum.isNotEmpty()) {
                 val fillPath = Path()
                 val linePath = Path()
                 val n = (displaySpectrum.size - 1).coerceAtLeast(1)
                 displaySpectrum.forEachIndexed { i, v ->
                     val x = w * i / n.toFloat()
-                    val y = h * (1f - v.coerceIn(0f, 1f) * 0.85f) // no tapa toda la curva
+                    val y = h * (1f - v.coerceIn(0f, 1f) * 0.85f)
                     if (i == 0) {
                         linePath.moveTo(x, y)
                         fillPath.moveTo(x, h)
@@ -255,7 +253,6 @@ fun EqGraph(
                 val x = freqToX(b.frequency, w)
                 val y = (1f - ((b.gain - minGain) / (maxGain - minGain))) * h
                 val r = if (idx == selectedIndex) 8f else 5f
-                // halo
                 drawCircle(b.color.copy(alpha = 0.25f), radius = r + 4f, center = Offset(x, y))
                 drawCircle(b.color, radius = r, center = Offset(x, y))
                 if (idx == selectedIndex) {
