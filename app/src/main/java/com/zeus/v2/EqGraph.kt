@@ -112,7 +112,7 @@ fun EqGraph(
         }
     }
 
-    // Spectrum amplificado y suavizado para que se vea más
+    // Spectrum amplificado y suavizado
     val displaySpectrum = remember(spectrum) {
         if (spectrum.isEmpty()) return@remember FloatArray(0)
         val boosted = FloatArray(spectrum.size) { i ->
@@ -191,7 +191,7 @@ fun EqGraph(
             // Línea 0 dB
             drawLine(Color(0xFF33294A), Offset(0f, h / 2), Offset(w, h / 2), 1.2f)
 
-            // ===== SPECTRUM (fondo) =====
+            // ===== SPECTRUM (fondo, más sensible) =====
             if (displaySpectrum.isNotEmpty()) {
                 val fillPath = Path()
                 val linePath = Path()
