@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -127,17 +128,57 @@ fun MainScreen(
 }
 
 // ============================================================
-// EQUALIZER
+// EQUALIZER – pantalla principal mejorada
 // ============================================================
 @Composable
 private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
     val band = viewModel.selectedBand()
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SpectrumCard(viewModel.spectrum, Modifier.fillMaxWidth().weight(1f))
-        FilterTypeRow(viewModel)
-        if (band != null) BandControlsCard(viewModel, band)
-        PreampRow(viewModel)
-        BandSelectorRow(viewModel)
+
+    Row(
+        modifier = modifier.fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Columna izquierda: gráfico + selector de bandas
+        Column(
+            modifier = Modifier.weight(1.15f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SpectrumCard(
+                spectrum = viewModel.spectrum,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+            BandSelectorRow(viewModel)
+        }
+
+        // Columna derecha: tipo de filtro + controles de la banda
+        Column(
+            modifier = Modifier
+                .weight(0.85f)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterTypeRow(viewModel)
+
+            if (band != null) {
+                BandControlsCard(viewModel, band, Modifier.weight(1f))
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(SURFACE)
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Selecciona una banda", color = TXT_MUTED, fontSize = 13.sp)
+                }
+            }
+
+            PreampRow(viewModel)
+        }
     }
 }
 
@@ -145,27 +186,59 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
 private fun SpectrumCard(spectrum: FloatArray, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
-            .border(1.dp, CARD_BORDER, RoundedCornerShape(8.dp))
-            .padding(6.dp)
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
+            .padding(8.dp)
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            for (i in 0..5) {
-                val y = h * i / 5f
+
+            // Grid horizontal
+            for (i in 0..6) {
+                val y = h * i / 6f
                 drawLine(GRID, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
             }
+            // Grid vertical suave
+            for (i in 1..8) {
+                val x = w * i / 9f
+                drawLine(GRID.copy(alpha = 0.4f), Offset(x, 0f), Offset(x, h), strokeWidth = 1f)
+            }
+
             if (spectrum.isNotEmpty()) {
                 val path = Path()
+                val fillPath = Path()
                 val n = (spectrum.size - 1).coerceAtLeast(1)
+
                 spectrum.forEachIndexed { i, v ->
                     val x = w * i / n.toFloat()
                     val y = h * (1f - v.coerceIn(0f, 1f))
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    if (i == 0) {
+                        path.moveTo(x, y)
+                        fillPath.moveTo(x, h)
+                        fillPath.lineTo(x, y)
+                    } else {
+                        path.lineTo(x, y)
+                        fillPath.lineTo(x, y)
+                    }
                 }
-                drawPath(path, SPECTRUM, style = Stroke(width = 2f, cap = StrokeCap.Round))
+                fillPath.lineTo(w, h)
+                fillPath.close()
+
+                // Relleno suave
+                drawPath(
+                    fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(SPECTRUM.copy(alpha = 0.35f), Color.Transparent)
+                    )
+                )
+                // Línea
+                drawPath(
+                    path,
+                    color = SPECTRUM,
+                    style = Stroke(width = 2.5f, cap = StrokeCap.Round)
+                )
             }
         }
     }
@@ -182,53 +255,95 @@ private fun FilterTypeRow(viewModel: EqViewModel) {
         EqBand.FilterType.HIGH_PASS to "HPF",
         EqBand.FilterType.BYPASS to "BYPASS"
     )
-    Row(
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
-            .border(1.dp, CARD_BORDER, RoundedCornerShape(8.dp))
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
+            .padding(8.dp)
     ) {
-        types.forEach { (type, name) ->
-            val active = band?.filterType == type
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (active) PINK_ACCENT else Color(0xFF1A1A20))
-                    .clickable { viewModel.updateSelectedBand(filterType = type) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(name, color = if (active) Color.Black else TXT_PRIMARY, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("Filter Type", color = TXT_MUTED, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            types.forEach { (type, name) ->
+                val active = band?.filterType == type
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (active) PINK_ACCENT else Color(0xFF1A1A20))
+                        .clickable { viewModel.updateSelectedBand(filterType = type) }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = name,
+                        color = if (active) Color.Black else TXT_PRIMARY,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun BandControlsCard(viewModel: EqViewModel, band: EqBand) {
+private fun BandControlsCard(
+    viewModel: EqViewModel,
+    band: EqBand,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
-            .border(1.dp, CARD_BORDER, RoundedCornerShape(8.dp))
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        EditableValueRow("Freq", band.frequency, 1f..30000f, "Hz",
-            { if (it >= 1000f) String.format("%.2fk", it / 1000f) else String.format("%.1f", it) }) {
-            viewModel.updateSelectedBand(frequency = it)
-        }
-        EditableValueRow("Gain", band.gain, -30f..30f, "dB", { String.format("%+.1f", it) }) {
-            viewModel.updateSelectedBand(gain = it)
-        }
-        EditableValueRow("Q", band.q, 0.1f..40f, "", { String.format("%.2f", it) }) {
-            viewModel.updateSelectedBand(q = it)
-        }
+        Text(
+            text = "Banda ${viewModel.selectedBandIndex + 1}",
+            color = band.color,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        EditableValueRow(
+            label = "Freq",
+            value = band.frequency,
+            valueRange = 1f..30000f,
+            unit = "Hz",
+            format = { v ->
+                if (v >= 1000f) String.format("%.2fk", v / 1000f)
+                else String.format("%.1f", v)
+            },
+            onValueChange = { viewModel.updateSelectedBand(frequency = it) }
+        )
+
+        EditableValueRow(
+            label = "Gain",
+            value = band.gain,
+            valueRange = -30f..30f,
+            unit = "dB",
+            format = { v -> String.format("%+.1f", v) },
+            onValueChange = { viewModel.updateSelectedBand(gain = it) }
+        )
+
+        EditableValueRow(
+            label = "Q",
+            value = band.q,
+            valueRange = 0.1f..40f,
+            unit = "",
+            format = { v -> String.format("%.2f", v) },
+            onValueChange = { viewModel.updateSelectedBand(q = it) }
+        )
     }
 }
 
@@ -237,28 +352,38 @@ private fun PreampRow(viewModel: EqViewModel) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
-            .border(1.dp, CARD_BORDER, RoundedCornerShape(8.dp))
-            .padding(12.dp),
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Preamp", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(70.dp))
+        Text("Preamp", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(60.dp))
         Slider(
             value = viewModel.preamp,
             onValueChange = { viewModel.preamp = it },
             valueRange = -30f..12f,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
+            colors = SliderDefaults.colors(
+                thumbColor = PINK_ACCENT,
+                activeTrackColor = PINK_ACCENT
+            )
         )
-        Text(String.format("%.1f dB", viewModel.preamp), color = TXT_PRIMARY, fontSize = 13.sp, modifier = Modifier.width(70.dp))
+        Text(
+            text = String.format("%.1f dB", viewModel.preamp),
+            color = TXT_PRIMARY,
+            fontSize = 13.sp,
+            modifier = Modifier.width(64.dp)
+        )
     }
 }
 
 @Composable
 private fun BandSelectorRow(viewModel: EqViewModel) {
     Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -266,32 +391,38 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
             val selected = index == viewModel.selectedBandIndex
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(38.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (selected) band.color else SURFACE)
                     .border(1.dp, if (selected) band.color else CARD_BORDER, RoundedCornerShape(8.dp))
                     .clickable { viewModel.selectBand(index) },
                 contentAlignment = Alignment.Center
             ) {
-                Text("${index + 1}", color = if (selected) Color.Black else TXT_PRIMARY, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "${index + 1}",
+                    color = if (selected) Color.Black else TXT_PRIMARY,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
+
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(38.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF1A3A2A))
                 .border(1.dp, Color(0xFF2ECC71), RoundedCornerShape(8.dp))
                 .clickable { viewModel.addBand() },
             contentAlignment = Alignment.Center
         ) {
-            Text("+", color = Color(0xFF2ECC71), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("+", color = Color(0xFF2ECC71), fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
 // ============================================================
-// COMPRESOR MULTIBANDA – 4 columnas independientes
+// COMPRESOR MULTIBANDA
 // ============================================================
 @Composable
 private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
@@ -299,7 +430,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Header + switch
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -320,7 +450,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
         }
 
-        // Crossovers
         Card(
             colors = CardDefaults.cardColors(containerColor = SURFACE),
             shape = RoundedCornerShape(10.dp),
@@ -337,17 +466,12 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
         }
 
-        // 4 columnas
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CompBandColumn(
-                title = "LOW",
-                color = LOW_COLOR,
-                threshold = viewModel.compMbThLow,
-                ratio = viewModel.compMbRatioLow,
-                knee = viewModel.compMbKneeLow,
-                attack = viewModel.compMbAttackLow,
-                release = viewModel.compMbReleaseLow,
-                postGain = viewModel.compMbPostGainLow,
+                title = "LOW", color = LOW_COLOR,
+                threshold = viewModel.compMbThLow, ratio = viewModel.compMbRatioLow,
+                knee = viewModel.compMbKneeLow, attack = viewModel.compMbAttackLow,
+                release = viewModel.compMbReleaseLow, postGain = viewModel.compMbPostGainLow,
                 onThreshold = { viewModel.compMbThLow = it },
                 onRatio = { viewModel.compMbRatioLow = it },
                 onKnee = { viewModel.compMbKneeLow = it },
@@ -357,14 +481,10 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 modifier = Modifier.weight(1f)
             )
             CompBandColumn(
-                title = "LO-MID",
-                color = LOMID_COLOR,
-                threshold = viewModel.compMbThLoMid,
-                ratio = viewModel.compMbRatioLoMid,
-                knee = viewModel.compMbKneeLoMid,
-                attack = viewModel.compMbAttackLoMid,
-                release = viewModel.compMbReleaseLoMid,
-                postGain = viewModel.compMbPostGainLoMid,
+                title = "LO-MID", color = LOMID_COLOR,
+                threshold = viewModel.compMbThLoMid, ratio = viewModel.compMbRatioLoMid,
+                knee = viewModel.compMbKneeLoMid, attack = viewModel.compMbAttackLoMid,
+                release = viewModel.compMbReleaseLoMid, postGain = viewModel.compMbPostGainLoMid,
                 onThreshold = { viewModel.compMbThLoMid = it },
                 onRatio = { viewModel.compMbRatioLoMid = it },
                 onKnee = { viewModel.compMbKneeLoMid = it },
@@ -374,14 +494,10 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 modifier = Modifier.weight(1f)
             )
             CompBandColumn(
-                title = "HI-MID",
-                color = HIMID_COLOR,
-                threshold = viewModel.compMbThHiMid,
-                ratio = viewModel.compMbRatioHiMid,
-                knee = viewModel.compMbKneeHiMid,
-                attack = viewModel.compMbAttackHiMid,
-                release = viewModel.compMbReleaseHiMid,
-                postGain = viewModel.compMbPostGainHiMid,
+                title = "HI-MID", color = HIMID_COLOR,
+                threshold = viewModel.compMbThHiMid, ratio = viewModel.compMbRatioHiMid,
+                knee = viewModel.compMbKneeHiMid, attack = viewModel.compMbAttackHiMid,
+                release = viewModel.compMbReleaseHiMid, postGain = viewModel.compMbPostGainHiMid,
                 onThreshold = { viewModel.compMbThHiMid = it },
                 onRatio = { viewModel.compMbRatioHiMid = it },
                 onKnee = { viewModel.compMbKneeHiMid = it },
@@ -391,14 +507,10 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 modifier = Modifier.weight(1f)
             )
             CompBandColumn(
-                title = "HIGH",
-                color = HIGH_COLOR,
-                threshold = viewModel.compMbThHigh,
-                ratio = viewModel.compMbRatioHigh,
-                knee = viewModel.compMbKneeHigh,
-                attack = viewModel.compMbAttackHigh,
-                release = viewModel.compMbReleaseHigh,
-                postGain = viewModel.compMbPostGainHigh,
+                title = "HIGH", color = HIGH_COLOR,
+                threshold = viewModel.compMbThHigh, ratio = viewModel.compMbRatioHigh,
+                knee = viewModel.compMbKneeHigh, attack = viewModel.compMbAttackHigh,
+                release = viewModel.compMbReleaseHigh, postGain = viewModel.compMbPostGainHigh,
                 onThreshold = { viewModel.compMbThHigh = it },
                 onRatio = { viewModel.compMbRatioHigh = it },
                 onKnee = { viewModel.compMbKneeHigh = it },
@@ -440,7 +552,6 @@ private fun CompBandColumn(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(title, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-
             ValueBox("Thresh", String.format("%.1f", threshold), "dB", -40f..0f, threshold, onThreshold, color)
             ValueBox("Ratio", String.format("%.1f", ratio), "", 1f..20f, ratio, onRatio, color)
             ValueBox("Knee", String.format("%.1f", knee), "dB", 0f..20f, knee, onKnee, color)
@@ -574,7 +685,7 @@ private fun EditableValueRow(
     var textValue by remember(value) { mutableStateOf(format(value)) }
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(label, color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(80.dp))
+        Text(label, color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(70.dp))
         Slider(
             value = value.coerceIn(valueRange.start, valueRange.endInclusive),
             onValueChange = onValueChange,
@@ -610,10 +721,13 @@ private fun EditableValueRow(
                 color = PINK_ACCENT,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.width(80.dp).clickable {
-                    textValue = format(value)
-                    isEditing = true
-                }.padding(4.dp)
+                modifier = Modifier
+                    .width(80.dp)
+                    .clickable {
+                        textValue = format(value)
+                        isEditing = true
+                    }
+                    .padding(4.dp)
             )
         }
     }
