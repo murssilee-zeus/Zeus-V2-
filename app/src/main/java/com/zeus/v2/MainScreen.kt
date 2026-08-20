@@ -21,12 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -34,10 +29,7 @@ import androidx.compose.ui.unit.sp
 
 private val BG = Color(0xFF0B0B0C)
 private val SURFACE = Color(0xFF131316)
-private val CARD = Color(0xFF16161B)
 private val CARD_BORDER = Color(0xFF26262A)
-private val GRID = Color(0xFF2A2236)
-private val SPECTRUM = Color(0xFFC160FF)
 private val PINK_ACCENT = Color(0xFFFF6B9E)
 private val TXT_PRIMARY = Color(0xFFECECEE)
 private val TXT_MUTED = Color(0xFF888892)
@@ -128,7 +120,7 @@ fun MainScreen(
 }
 
 // ============================================================
-// EQUALIZER – pantalla principal mejorada
+// EQUALIZER
 // ============================================================
 @Composable
 private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
@@ -155,13 +147,11 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
             )
             BandSelectorRow(viewModel)
         }
 
-        // Columna derecha: tipo de filtro + controles de la banda
+        // Columna derecha: tipo de filtro + controles + preamp
         Column(
             modifier = Modifier
                 .weight(0.85f)
@@ -187,68 +177,6 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
 
             PreampRow(viewModel)
-        }
-    }
-}
-
-@Composable
-private fun SpectrumCard(spectrum: FloatArray, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(SURFACE)
-            .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
-            .padding(8.dp)
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-
-            // Grid horizontal
-            for (i in 0..6) {
-                val y = h * i / 6f
-                drawLine(GRID, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
-            }
-            // Grid vertical suave
-            for (i in 1..8) {
-                val x = w * i / 9f
-                drawLine(GRID.copy(alpha = 0.4f), Offset(x, 0f), Offset(x, h), strokeWidth = 1f)
-            }
-
-            if (spectrum.isNotEmpty()) {
-                val path = Path()
-                val fillPath = Path()
-                val n = (spectrum.size - 1).coerceAtLeast(1)
-
-                spectrum.forEachIndexed { i, v ->
-                    val x = w * i / n.toFloat()
-                    val y = h * (1f - v.coerceIn(0f, 1f))
-                    if (i == 0) {
-                        path.moveTo(x, y)
-                        fillPath.moveTo(x, h)
-                        fillPath.lineTo(x, y)
-                    } else {
-                        path.lineTo(x, y)
-                        fillPath.lineTo(x, y)
-                    }
-                }
-                fillPath.lineTo(w, h)
-                fillPath.close()
-
-                // Relleno suave
-                drawPath(
-                    fillPath,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(SPECTRUM.copy(alpha = 0.35f), Color.Transparent)
-                    )
-                )
-                // Línea
-                drawPath(
-                    path,
-                    color = SPECTRUM,
-                    style = Stroke(width = 2.5f, cap = StrokeCap.Round)
-                )
-            }
         }
     }
 }
@@ -358,22 +286,31 @@ private fun BandControlsCard(
 
 @Composable
 private fun PreampRow(viewModel: EqViewModel) {
-    // Reutiliza EditableValueRow para poder editar el valor con un clic
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
             .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        EditableValueRow(
-            label = "Preamp",
+        Text("Preamp", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(60.dp))
+        Slider(
             value = viewModel.preamp,
+            onValueChange = { viewModel.preamp = it },
             valueRange = -30f..12f,
-            unit = "dB",
-            format = { v -> String.format("%.1f", v) },
-            onValueChange = { viewModel.preamp = it }
+            modifier = Modifier.weight(1f),
+            colors = SliderDefaults.colors(
+                thumbColor = PINK_ACCENT,
+                activeTrackColor = PINK_ACCENT
+            )
+        )
+        Text(
+            text = String.format("%.1f dB", viewModel.preamp),
+            color = TXT_PRIMARY,
+            fontSize = 13.sp,
+            modifier = Modifier.width(64.dp)
         )
     }
 }
@@ -691,11 +628,7 @@ private fun EditableValueRow(
             onValueChange = onValueChange,
             valueRange = valueRange,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = Color(0xFFD0D0D8),          // gris claro
-                activeTrackColor = Color(0xFFA8A8B0),   // gris medio-claro
-                inactiveTrackColor = Color(0xFF3A3A42)
-            )
+            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
         )
         if (isEditing) {
             OutlinedTextField(
