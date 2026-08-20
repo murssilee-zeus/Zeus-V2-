@@ -21,11 +21,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.ln
 
 private val BG = Color(0xFF0B0B0C)
 private val SURFACE = Color(0xFF131316)
@@ -52,7 +59,6 @@ fun MainScreen(
             .background(BG)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        // ========== TOP BAR ==========
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -130,7 +136,6 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         modifier = modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Columna izquierda: gráfico + selector de bandas
         Column(
             modifier = Modifier.weight(1.15f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -144,22 +149,16 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     viewModel.selectBand(idx)
                     viewModel.updateSelectedBand(frequency = freq, gain = gain)
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+                modifier = Modifier.fillMaxWidth().weight(1f)
             )
             BandSelectorRow(viewModel)
         }
 
-        // Columna derecha: tipo de filtro + controles + preamp
         Column(
-            modifier = Modifier
-                .weight(0.85f)
-                .fillMaxHeight(),
+            modifier = Modifier.weight(0.85f).fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FilterTypeRow(viewModel)
-
             if (band != null) {
                 BandControlsCard(viewModel, band, Modifier.weight(1f))
             } else {
@@ -175,7 +174,6 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     Text("Selecciona una banda", color = TXT_MUTED, fontSize = 13.sp)
                 }
             }
-
             PreampRow(viewModel)
         }
     }
@@ -192,7 +190,6 @@ private fun FilterTypeRow(viewModel: EqViewModel) {
         EqBand.FilterType.HIGH_PASS to "HPF",
         EqBand.FilterType.BYPASS to "BYPASS"
     )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -203,10 +200,7 @@ private fun FilterTypeRow(viewModel: EqViewModel) {
     ) {
         Text("Filter Type", color = TXT_MUTED, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        Row(Modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             types.forEach { (type, name) ->
                 val active = band?.filterType == type
                 Box(
@@ -218,12 +212,7 @@ private fun FilterTypeRow(viewModel: EqViewModel) {
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = name,
-                        color = if (active) Color.Black else TXT_PRIMARY,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text(name, color = if (active) Color.Black else TXT_PRIMARY, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -231,11 +220,7 @@ private fun FilterTypeRow(viewModel: EqViewModel) {
 }
 
 @Composable
-private fun BandControlsCard(
-    viewModel: EqViewModel,
-    band: EqBand,
-    modifier: Modifier = Modifier
-) {
+private fun BandControlsCard(viewModel: EqViewModel, band: EqBand, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -245,42 +230,17 @@ private fun BandControlsCard(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Banda ${viewModel.selectedBandIndex + 1}",
-            color = band.color,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        EditableValueRow(
-            label = "Freq",
-            value = band.frequency,
-            valueRange = 1f..30000f,
-            unit = "Hz",
-            format = { v ->
-                if (v >= 1000f) String.format("%.2fk", v / 1000f)
-                else String.format("%.1f", v)
-            },
-            onValueChange = { viewModel.updateSelectedBand(frequency = it) }
-        )
-
-        EditableValueRow(
-            label = "Gain",
-            value = band.gain,
-            valueRange = -30f..30f,
-            unit = "dB",
-            format = { v -> String.format("%+.1f", v) },
-            onValueChange = { viewModel.updateSelectedBand(gain = it) }
-        )
-
-        EditableValueRow(
-            label = "Q",
-            value = band.q,
-            valueRange = 0.1f..40f,
-            unit = "",
-            format = { v -> String.format("%.2f", v) },
-            onValueChange = { viewModel.updateSelectedBand(q = it) }
-        )
+        Text("Banda ${viewModel.selectedBandIndex + 1}", color = band.color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        EditableValueRow("Freq", band.frequency, 1f..30000f, "Hz",
+            { if (it >= 1000f) String.format("%.2fk", it / 1000f) else String.format("%.1f", it) }) {
+            viewModel.updateSelectedBand(frequency = it)
+        }
+        EditableValueRow("Gain", band.gain, -30f..30f, "dB", { String.format("%+.1f", it) }) {
+            viewModel.updateSelectedBand(gain = it)
+        }
+        EditableValueRow("Q", band.q, 0.1f..40f, "", { String.format("%.2f", it) }) {
+            viewModel.updateSelectedBand(q = it)
+        }
     }
 }
 
@@ -301,26 +261,16 @@ private fun PreampRow(viewModel: EqViewModel) {
             onValueChange = { viewModel.preamp = it },
             valueRange = -30f..12f,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = PINK_ACCENT,
-                activeTrackColor = PINK_ACCENT
-            )
+            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
         )
-        Text(
-            text = String.format("%.1f dB", viewModel.preamp),
-            color = TXT_PRIMARY,
-            fontSize = 13.sp,
-            modifier = Modifier.width(64.dp)
-        )
+        Text(String.format("%.1f dB", viewModel.preamp), color = TXT_PRIMARY, fontSize = 13.sp, modifier = Modifier.width(64.dp))
     }
 }
 
 @Composable
 private fun BandSelectorRow(viewModel: EqViewModel) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -335,15 +285,9 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
                     .clickable { viewModel.selectBand(index) },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "${index + 1}",
-                    color = if (selected) Color.Black else TXT_PRIMARY,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("${index + 1}", color = if (selected) Color.Black else TXT_PRIMARY, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
-
         Box(
             modifier = Modifier
                 .size(38.dp)
@@ -359,23 +303,58 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
 }
 
 // ============================================================
-// COMPRESOR MULTIBANDA
+// COMPRESOR – diseño nuevo
 // ============================================================
 @Composable
 private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+    var selectedCompBand by remember { mutableIntStateOf(0) } // 0 LOW, 1 LO-MID, 2 HI-MID, 3 HIGH
+
+    val colors = listOf(LOW_COLOR, LOMID_COLOR, HIMID_COLOR, HIGH_COLOR)
+    val titles = listOf("LOW", "LO-MID", "HI-MID", "HIGH")
+
+    val thresholds = listOf(
+        viewModel.compMbThLow, viewModel.compMbThLoMid,
+        viewModel.compMbThHiMid, viewModel.compMbThHigh
+    )
+    val ratios = listOf(
+        viewModel.compMbRatioLow, viewModel.compMbRatioLoMid,
+        viewModel.compMbRatioHiMid, viewModel.compMbRatioHigh
+    )
+    val knees = listOf(
+        viewModel.compMbKneeLow, viewModel.compMbKneeLoMid,
+        viewModel.compMbKneeHiMid, viewModel.compMbKneeHigh
+    )
+    val attacks = listOf(
+        viewModel.compMbAttackLow, viewModel.compMbAttackLoMid,
+        viewModel.compMbAttackHiMid, viewModel.compMbAttackHigh
+    )
+    val releases = listOf(
+        viewModel.compMbReleaseLow, viewModel.compMbReleaseLoMid,
+        viewModel.compMbReleaseHiMid, viewModel.compMbReleaseHigh
+    )
+    val posts = listOf(
+        viewModel.compMbPostGainLow, viewModel.compMbPostGainLoMid,
+        viewModel.compMbPostGainHiMid, viewModel.compMbPostGainHigh
+    )
+    // Preamp por banda (si aún no existen en ViewModel, usa 0f temporal)
+    val preamps = listOf(
+        runCatching { viewModel.compMbPreGainLow }.getOrDefault(0f),
+        runCatching { viewModel.compMbPreGainLoMid }.getOrDefault(0f),
+        runCatching { viewModel.compMbPreGainHiMid }.getOrDefault(0f),
+        runCatching { viewModel.compMbPreGainHigh }.getOrDefault(0f)
+    )
+
+    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Header + switch
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Compresor Multibanda", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Compresor Multibanda", color = TXT_PRIMARY, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Activado", color = TXT_MUTED, fontSize = 13.sp)
-                Spacer(Modifier.width(8.dp))
+                Text("Activado", color = TXT_MUTED, fontSize = 12.sp)
+                Spacer(Modifier.width(6.dp))
                 Switch(
                     checked = viewModel.compressorMultibandEnabled,
                     onCheckedChange = { viewModel.compressorMultibandEnabled = it },
@@ -387,170 +366,283 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
         }
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = SURFACE),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Crossovers", color = TXT_MUTED, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                EditableValueRow("Cross 1", viewModel.crossoverFrequencies[0], 40f..1000f, "Hz",
-                    { String.format("%.0f", it) }) { viewModel.crossoverFrequencies[0] = it }
-                EditableValueRow("Cross 2", viewModel.crossoverFrequencies[1], 200f..8000f, "Hz",
-                    { String.format("%.0f", it) }) { viewModel.crossoverFrequencies[1] = it }
-                EditableValueRow("Cross 3", viewModel.crossoverFrequencies[2], 1000f..18000f, "Hz",
-                    { String.format("%.0f", it) }) { viewModel.crossoverFrequencies[2] = it }
+        // Tabs de banda
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            titles.forEachIndexed { i, title ->
+                val sel = selectedCompBand == i
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (sel) colors[i].copy(alpha = 0.25f) else SURFACE)
+                        .border(1.dp, if (sel) colors[i] else CARD_BORDER, RoundedCornerShape(8.dp))
+                        .clickable { selectedCompBand = i }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(title, color = if (sel) colors[i] else TXT_MUTED, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CompBandColumn(
-                title = "LOW", color = LOW_COLOR,
-                threshold = viewModel.compMbThLow, ratio = viewModel.compMbRatioLow,
-                knee = viewModel.compMbKneeLow, attack = viewModel.compMbAttackLow,
-                release = viewModel.compMbReleaseLow, postGain = viewModel.compMbPostGainLow,
-                onThreshold = { viewModel.compMbThLow = it },
-                onRatio = { viewModel.compMbRatioLow = it },
-                onKnee = { viewModel.compMbKneeLow = it },
-                onAttack = { viewModel.compMbAttackLow = it },
-                onRelease = { viewModel.compMbReleaseLow = it },
-                onPostGain = { viewModel.compMbPostGainLow = it },
-                modifier = Modifier.weight(1f)
+        // Cuerpo: controles izq + 4 columnas
+        Row(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Panel izquierdo – banda seleccionada
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SURFACE),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.width(150.dp).fillMaxHeight()
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(titles[selectedCompBand], color = colors[selectedCompBand], fontSize = 13.sp, fontWeight = FontWeight.Bold)
+
+                    CompValueEdit("Thresh", thresholds[selectedCompBand], "dB", -40f..0f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> viewModel.compMbThLow = it
+                            1 -> viewModel.compMbThLoMid = it
+                            2 -> viewModel.compMbThHiMid = it
+                            3 -> viewModel.compMbThHigh = it
+                        }
+                    }
+                    CompValueEdit("Ratio", ratios[selectedCompBand], "", 1f..20f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> viewModel.compMbRatioLow = it
+                            1 -> viewModel.compMbRatioLoMid = it
+                            2 -> viewModel.compMbRatioHiMid = it
+                            3 -> viewModel.compMbRatioHigh = it
+                        }
+                    }
+                    CompValueEdit("Knee", knees[selectedCompBand], "dB", 0f..20f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> viewModel.compMbKneeLow = it
+                            1 -> viewModel.compMbKneeLoMid = it
+                            2 -> viewModel.compMbKneeHiMid = it
+                            3 -> viewModel.compMbKneeHigh = it
+                        }
+                    }
+                    CompValueEdit("Attack", attacks[selectedCompBand], "ms", 1f..200f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> viewModel.compMbAttackLow = it
+                            1 -> viewModel.compMbAttackLoMid = it
+                            2 -> viewModel.compMbAttackHiMid = it
+                            3 -> viewModel.compMbAttackHigh = it
+                        }
+                    }
+                    CompValueEdit("Release", releases[selectedCompBand], "ms", 10f..500f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> viewModel.compMbReleaseLow = it
+                            1 -> viewModel.compMbReleaseLoMid = it
+                            2 -> viewModel.compMbReleaseHiMid = it
+                            3 -> viewModel.compMbReleaseHigh = it
+                        }
+                    }
+                    CompValueEdit("Post", posts[selectedCompBand], "dB", -12f..12f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> viewModel.compMbPostGainLow = it
+                            1 -> viewModel.compMbPostGainLoMid = it
+                            2 -> viewModel.compMbPostGainHiMid = it
+                            3 -> viewModel.compMbPostGainHigh = it
+                        }
+                    }
+                    // Preamp por banda (requiere variables en ViewModel)
+                    CompValueEdit("Preamp", preamps[selectedCompBand], "dB", -12f..12f, colors[selectedCompBand]) {
+                        when (selectedCompBand) {
+                            0 -> runCatching { viewModel.compMbPreGainLow = it }
+                            1 -> runCatching { viewModel.compMbPreGainLoMid = it }
+                            2 -> runCatching { viewModel.compMbPreGainHiMid = it }
+                            3 -> runCatching { viewModel.compMbPreGainHigh = it }
+                        }
+                    }
+                }
+            }
+
+            // 4 columnas con Threshold vertical
+            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (i in 0..3) {
+                    CompFaderColumn(
+                        title = titles[i],
+                        color = colors[i],
+                        selected = selectedCompBand == i,
+                        threshold = thresholds[i],
+                        crossLabel = when (i) {
+                            0 -> String.format("%.0f Hz", viewModel.crossoverFrequencies[0])
+                            1 -> String.format("%.0f Hz", viewModel.crossoverFrequencies[1])
+                            2 -> String.format("%.0f Hz", viewModel.crossoverFrequencies[2])
+                            else -> "20 kHz"
+                        },
+                        onSelect = { selectedCompBand = i },
+                        onThreshold = {
+                            when (i) {
+                                0 -> viewModel.compMbThLow = it
+                                1 -> viewModel.compMbThLoMid = it
+                                2 -> viewModel.compMbThHiMid = it
+                                3 -> viewModel.compMbThHigh = it
+                            }
+                        },
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                }
+            }
+        }
+
+        // Gráfico pequeño de cortes
+        CrossoverBandsGraph(
+            cross1 = viewModel.crossoverFrequencies[0],
+            cross2 = viewModel.crossoverFrequencies[1],
+            cross3 = viewModel.crossoverFrequencies[2],
+            colors = colors,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(SURFACE)
+                .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
+        )
+    }
+}
+
+@Composable
+private fun CompValueEdit(
+    label: String,
+    value: Float,
+    unit: String,
+    range: ClosedFloatingPointRange<Float>,
+    color: Color,
+    onValueChange: (Float) -> Unit
+) {
+    var editing by remember { mutableStateOf(false) }
+    var text by remember(value) { mutableStateOf(String.format("%.1f", value)) }
+
+    Column {
+        Text(label, color = TXT_MUTED, fontSize = 10.sp)
+        if (editing) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                textStyle = LocalTextStyle.current.copy(color = TXT_PRIMARY, fontSize = 12.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = color,
+                    unfocusedBorderColor = CARD_BORDER,
+                    focusedTextColor = TXT_PRIMARY,
+                    unfocusedTextColor = TXT_PRIMARY,
+                    cursorColor = color
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                keyboardActions = KeyboardActions(onDone = {
+                    text.toFloatOrNull()?.let { onValueChange(it.coerceIn(range.start, range.endInclusive)) }
+                    editing = false
+                })
             )
-            CompBandColumn(
-                title = "LO-MID", color = LOMID_COLOR,
-                threshold = viewModel.compMbThLoMid, ratio = viewModel.compMbRatioLoMid,
-                knee = viewModel.compMbKneeLoMid, attack = viewModel.compMbAttackLoMid,
-                release = viewModel.compMbReleaseLoMid, postGain = viewModel.compMbPostGainLoMid,
-                onThreshold = { viewModel.compMbThLoMid = it },
-                onRatio = { viewModel.compMbRatioLoMid = it },
-                onKnee = { viewModel.compMbKneeLoMid = it },
-                onAttack = { viewModel.compMbAttackLoMid = it },
-                onRelease = { viewModel.compMbReleaseLoMid = it },
-                onPostGain = { viewModel.compMbPostGainLoMid = it },
-                modifier = Modifier.weight(1f)
-            )
-            CompBandColumn(
-                title = "HI-MID", color = HIMID_COLOR,
-                threshold = viewModel.compMbThHiMid, ratio = viewModel.compMbRatioHiMid,
-                knee = viewModel.compMbKneeHiMid, attack = viewModel.compMbAttackHiMid,
-                release = viewModel.compMbReleaseHiMid, postGain = viewModel.compMbPostGainHiMid,
-                onThreshold = { viewModel.compMbThHiMid = it },
-                onRatio = { viewModel.compMbRatioHiMid = it },
-                onKnee = { viewModel.compMbKneeHiMid = it },
-                onAttack = { viewModel.compMbAttackHiMid = it },
-                onRelease = { viewModel.compMbReleaseHiMid = it },
-                onPostGain = { viewModel.compMbPostGainHiMid = it },
-                modifier = Modifier.weight(1f)
-            )
-            CompBandColumn(
-                title = "HIGH", color = HIGH_COLOR,
-                threshold = viewModel.compMbThHigh, ratio = viewModel.compMbRatioHigh,
-                knee = viewModel.compMbKneeHigh, attack = viewModel.compMbAttackHigh,
-                release = viewModel.compMbReleaseHigh, postGain = viewModel.compMbPostGainHigh,
-                onThreshold = { viewModel.compMbThHigh = it },
-                onRatio = { viewModel.compMbRatioHigh = it },
-                onKnee = { viewModel.compMbKneeHigh = it },
-                onAttack = { viewModel.compMbAttackHigh = it },
-                onRelease = { viewModel.compMbReleaseHigh = it },
-                onPostGain = { viewModel.compMbPostGainHigh = it },
-                modifier = Modifier.weight(1f)
+        } else {
+            Text(
+                text = if (unit.isEmpty()) String.format("%.1f", value) else String.format("%.1f %s", value, unit),
+                color = color,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF1A1A20))
+                    .clickable {
+                        text = String.format("%.1f", value)
+                        editing = true
+                    }
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             )
         }
     }
 }
 
 @Composable
-private fun CompBandColumn(
+private fun CompFaderColumn(
     title: String,
     color: Color,
+    selected: Boolean,
     threshold: Float,
-    ratio: Float,
-    knee: Float,
-    attack: Float,
-    release: Float,
-    postGain: Float,
+    crossLabel: String,
+    onSelect: () -> Unit,
     onThreshold: (Float) -> Unit,
-    onRatio: (Float) -> Unit,
-    onKnee: (Float) -> Unit,
-    onAttack: (Float) -> Unit,
-    onRelease: (Float) -> Unit,
-    onPostGain: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = SURFACE),
         shape = RoundedCornerShape(10.dp),
-        modifier = modifier
+        modifier = modifier.clickable { onSelect() }
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(8.dp).fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(title, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            ValueBox("Thresh", String.format("%.1f", threshold), "dB", -40f..0f, threshold, onThreshold, color)
-            ValueBox("Ratio", String.format("%.1f", ratio), "", 1f..20f, ratio, onRatio, color)
-            ValueBox("Knee", String.format("%.1f", knee), "dB", 0f..20f, knee, onKnee, color)
-            ValueBox("Attack", String.format("%.0f", attack), "ms", 1f..200f, attack, onAttack, color)
-            ValueBox("Release", String.format("%.0f", release), "ms", 10f..500f, release, onRelease, color)
-            ValueBox("Post", String.format("%+.1f", postGain), "dB", -12f..12f, postGain, onPostGain, color)
+            Text(title, color = if (selected) color else TXT_MUTED, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(String.format("%.1f dB", threshold), color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+            Slider(
+                value = threshold,
+                onValueChange = onThreshold,
+                valueRange = -40f..0f,
+                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = color,
+                    activeTrackColor = color,
+                    inactiveTrackColor = color.copy(alpha = 0.2f)
+                )
+            )
+
+            Text(crossLabel, color = TXT_MUTED, fontSize = 10.sp)
         }
     }
 }
 
 @Composable
-private fun ValueBox(
-    label: String,
-    display: String,
-    unit: String,
-    range: ClosedFloatingPointRange<Float>,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    accent: Color
+private fun CrossoverBandsGraph(
+    cross1: Float,
+    cross2: Float,
+    cross3: Float,
+    colors: List<Color>,
+    modifier: Modifier = Modifier
 ) {
-    var isEditing by remember { mutableStateOf(false) }
-    var textValue by remember(value) { mutableStateOf(display) }
+    val minF = 20f
+    val maxF = 20000f
+    fun xOf(f: Float, w: Float): Float {
+        val t = ((ln(f.coerceIn(minF, maxF)) - ln(minF)) / (ln(maxF) - ln(minF)))
+        return t * w
+    }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = TXT_MUTED, fontSize = 10.sp)
-        if (isEditing) {
-            OutlinedTextField(
-                value = textValue,
-                onValueChange = { textValue = it },
-                singleLine = true,
-                modifier = Modifier.width(70.dp).height(40.dp),
-                textStyle = LocalTextStyle.current.copy(color = TXT_PRIMARY, fontSize = 12.sp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = accent,
-                    unfocusedBorderColor = CARD_BORDER,
-                    focusedTextColor = TXT_PRIMARY,
-                    unfocusedTextColor = TXT_PRIMARY,
-                    cursorColor = accent
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                keyboardActions = KeyboardActions(onDone = {
-                    textValue.toFloatOrNull()?.let {
-                        onValueChange(it.coerceIn(range.start, range.endInclusive))
-                    }
-                    isEditing = false
-                })
+    Canvas(modifier = modifier.padding(8.dp)) {
+        val w = size.width
+        val h = size.height
+        val cuts = listOf(minF, cross1, cross2, cross3, maxF)
+        val bandColors = colors
+
+        for (i in 0 until 4) {
+            val x0 = xOf(cuts[i], w)
+            val x1 = xOf(cuts[i + 1], w)
+            drawRect(
+                color = bandColors[i].copy(alpha = 0.35f),
+                topLeft = Offset(x0, h * 0.25f),
+                size = Size((x1 - x0).coerceAtLeast(1f), h * 0.5f)
             )
-        } else {
-            Text(
-                text = if (unit.isEmpty()) display else "$display $unit",
-                color = accent,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF1A1A20))
-                    .clickable {
-                        textValue = display
-                        isEditing = true
-                    }
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            )
+            // pequeña “onda” decorativa
+            val mid = (x0 + x1) / 2f
+            val path = Path()
+            path.moveTo(x0, h * 0.5f)
+            path.quadraticBezierTo(mid, h * 0.15f, x1, h * 0.5f)
+            drawPath(path, bandColors[i], style = Stroke(width = 2f, cap = StrokeCap.Round))
+        }
+
+        // líneas de corte
+        listOf(cross1, cross2, cross3).forEach { c ->
+            val x = xOf(c, w)
+            drawLine(Color.White.copy(alpha = 0.5f), Offset(x, 0f), Offset(x, h), strokeWidth = 1.2f)
         }
     }
 }
@@ -592,7 +684,7 @@ private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier)
 }
 
 // ============================================================
-// COMPONENTES REUTILIZABLES
+// REUTILIZABLES
 // ============================================================
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
@@ -658,13 +750,10 @@ private fun EditableValueRow(
                 color = PINK_ACCENT,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .width(80.dp)
-                    .clickable {
-                        textValue = format(value)
-                        isEditing = true
-                    }
-                    .padding(4.dp)
+                modifier = Modifier.width(80.dp).clickable {
+                    textValue = format(value)
+                    isEditing = true
+                }.padding(4.dp)
             )
         }
     }
