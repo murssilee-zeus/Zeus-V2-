@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.*
@@ -62,12 +63,12 @@ fun calculateBandResponse(freq: Float, band: EqBand): Float {
 private fun spectrumColor(t: Float): Color {
     val x = t.coerceIn(0f, 1f)
     return when {
-        x < 0.2f -> Color.lerp(Color(0xFF7B2CBF), Color(0xFF4361EE), x / 0.2f)
-        x < 0.4f -> Color.lerp(Color(0xFF4361EE), Color(0xFF4CC9F0), (x - 0.2f) / 0.2f)
-        x < 0.55f -> Color.lerp(Color(0xFF4CC9F0), Color(0xFF2EC4B6), (x - 0.4f) / 0.15f)
-        x < 0.7f -> Color.lerp(Color(0xFF2EC4B6), Color(0xFF90BE6D), (x - 0.55f) / 0.15f)
-        x < 0.85f -> Color.lerp(Color(0xFF90BE6D), Color(0xFFF9C74F), (x - 0.7f) / 0.15f)
-        else -> Color.lerp(Color(0xFFF9C74F), Color(0xFFF94144), (x - 0.85f) / 0.15f)
+        x < 0.2f -> lerp(Color(0xFF7B2CBF), Color(0xFF4361EE), x / 0.2f)
+        x < 0.4f -> lerp(Color(0xFF4361EE), Color(0xFF4CC9F0), (x - 0.2f) / 0.2f)
+        x < 0.55f -> lerp(Color(0xFF4CC9F0), Color(0xFF2EC4B6), (x - 0.4f) / 0.15f)
+        x < 0.7f -> lerp(Color(0xFF2EC4B6), Color(0xFF90BE6D), (x - 0.55f) / 0.15f)
+        x < 0.85f -> lerp(Color(0xFF90BE6D), Color(0xFFF9C74F), (x - 0.7f) / 0.15f)
+        else -> lerp(Color(0xFFF9C74F), Color(0xFFF94144), (x - 0.85f) / 0.15f)
     }
 }
 
