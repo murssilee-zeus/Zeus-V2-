@@ -1,5 +1,11 @@
 package com.zeus.v2
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -8,7 +14,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -18,6 +28,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlin.math.*
 
 fun calculateBandResponse(freq: Float, band: EqBand): Float {
@@ -28,7 +39,7 @@ fun calculateBandResponse(freq: Float, band: EqBand): Float {
         EqBand.FilterType.PEAK -> {
             val bw = 1f / band.q.coerceAtLeast(0.1f)
             val x = (ln(w)).pow(2) / (2f * bw * bw)
-            gainDb * (1f - x).coerceIn(0f, 1f) * if (gainDb >= 0f) 1f else 1f
+            gainDb * (1f - x).coerceIn(0f, 1f)
         }
         EqBand.FilterType.LOW_SHELF -> {
             if (freq <= f0) gainDb else gainDb * 0.15f
@@ -83,7 +94,7 @@ fun EqGraph(
     }
 
     val responsePoints = remember(bands) {
-        val points = 200
+        val points = 256
         FloatArray(points) { i ->
             val t = i.toFloat() / (points - 1).coerceAtLeast(1)
             val freq = exp(ln(minFreq) + t * (ln(maxFreq) - ln(minFreq)))
@@ -94,6 +105,40 @@ fun EqGraph(
             total.coerceIn(minGain, maxGain)
         }
     }
+
+    var displaySpectrum by remember { mutableStateOf(FloatArray(0)) }
+
+    LaunchedEffect(spectrum) {
+        if (spectrum.isEmpty()) {
+            displaySpectrum = FloatArray(0)
+            return@LaunchedEffect
+        }
+        if (displaySpectrum.size != spectrum.size) {
+            displaySpectrum = spectrum.copyOf()
+            return@LaunchedEffect
+        }
+        repeat(12) {
+            val next = FloatArray(spectrum.size) { i ->
+                val target = spectrum[i].coerceIn(0f, 1f)
+                val cur = displaySpectrum[i]
+                cur + (target - cur) * 0.28f
+            }
+            displaySpectrum = next
+            delay(16)
+        }
+        displaySpectrum = spectrum.map { it.coerceIn(0f, 1f) }.toFloatArray()
+    }
+
+    val infinite = rememberInfiniteTransition(label = "eqGraphTick")
+    val tick by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "tick"
+    )
 
     Box(
         modifier = modifier
@@ -115,7 +160,7 @@ fun EqGraph(
                                 closest = idx
                             }
                         }
-                        if (closest >= 0 && best < 80f) onBandSelected(closest)
+                        if (closest >= 0 && best < 90f) onBandSelected(closest)
                     }
                 }
                 .pointerInput(selectedIndex, bands) {
@@ -132,40 +177,53 @@ fun EqGraph(
                     }
                 }
         ) {
+            val _ = tick
             val w = size.width
             val h = size.height
             val midY = h / 2f
 
-            // Grid horizontal
             for (i in 0..6) {
                 val y = h * i / 6f
                 drawLine(Color(0xFF2A2E38), Offset(0f, y), Offset(w, y), 1f)
             }
-            // Grid vertical
             for (i in 0..8) {
                 val x = w * i / 8f
                 drawLine(Color(0xFF2A2E38), Offset(x, 0f), Offset(x, h), 1f)
             }
-            // 0 dB
             drawLine(Color(0xFF4A5568), Offset(0f, midY), Offset(w, midY), 1.5f)
 
-            // Spectrum suave de fondo (opcional, ligero)
-            if (spectrum.isNotEmpty()) {
-                val n = (spectrum.size - 1).coerceAtLeast(1)
+            if (displaySpectrum.isNotEmpty()) {
+                val n = (displaySpectrum.size - 1).coerceAtLeast(1)
                 val spPath = Path()
-                spectrum.forEachIndexed { i, v ->
+                val spFill = Path()
+                displaySpectrum.forEachIndexed { i, v ->
                     val x = w * i / n.toFloat()
-                    val y = h * (1f - (v.coerceIn(0f, 1f) * 0.5f))
-                    if (i == 0) spPath.moveTo(x, y) else spPath.lineTo(x, y)
+                    val amp = (sqrt(v.coerceIn(0f, 1f)) * 0.55f).coerceIn(0f, 1f)
+                    val y = h * (1f - amp)
+                    if (i == 0) {
+                        spPath.moveTo(x, y)
+                        spFill.moveTo(x, h)
+                        spFill.lineTo(x, y)
+                    } else {
+                        spPath.lineTo(x, y)
+                        spFill.lineTo(x, y)
+                    }
                 }
+                spFill.lineTo(w, h)
+                spFill.close()
+                drawPath(
+                    spFill,
+                    brush = Brush.verticalGradient(
+                        listOf(Color(0x334060A0), Color(0x00000000))
+                    )
+                )
                 drawPath(
                     spPath,
-                    color = Color(0x3360A5FA),
+                    color = Color(0x5560A5FA),
                     style = Stroke(width = 1.2f, cap = StrokeCap.Round)
                 )
             }
 
-            // Curva de respuesta + relleno
             if (responsePoints.isNotEmpty()) {
                 val n = responsePoints.size - 1
                 val linePath = Path()
@@ -190,7 +248,7 @@ fun EqGraph(
                     fillPath,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0x553B82F6),
+                            Color(0x663B82F6),
                             Color(0x223B82F6),
                             Color(0x00000000)
                         )
@@ -199,11 +257,10 @@ fun EqGraph(
                 drawPath(
                     linePath,
                     color = Color.White,
-                    style = Stroke(width = 2.4f, cap = StrokeCap.Round)
+                    style = Stroke(width = 2.6f, cap = StrokeCap.Round)
                 )
             }
 
-            // Puntos de bandas
             bands.forEachIndexed { idx, b ->
                 if (!b.enabled) return@forEachIndexed
                 val x = freqToX(b.frequency, w)
@@ -212,7 +269,7 @@ fun EqGraph(
                 val r = if (selected) 9f else 6f
 
                 if (selected) {
-                    drawCircle(b.color.copy(alpha = 0.3f), radius = r + 6f, center = Offset(x, y))
+                    drawCircle(b.color.copy(alpha = 0.28f), radius = r + 7f, center = Offset(x, y))
                 }
                 drawCircle(b.color, radius = r, center = Offset(x, y))
                 if (selected) {
