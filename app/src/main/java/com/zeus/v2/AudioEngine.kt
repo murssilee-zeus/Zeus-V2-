@@ -1,27 +1,33 @@
 package com.zeus.v2
 
 import android.content.Context
+import android.media.AudioManager
 import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Visualizer
 import android.util.Log
 import kotlin.math.*
 
 /**
- * Zeus EQ — Motor de audio (v19 "Curve Mapper" + MBC por banda).
+ * Zeus EQ — Motor de audio (bajos sísmicos + curva limpia).
  *
- * Pipeline nativo (DynamicsProcessing, API 28+):
- *   1) PreEq   : hasta 128 bandas Peak que aproximan la curva real (biquads)
- *   2) MBC     : compresor multibanda 4 bandas con parámetros independientes
- *   3) PostEq  : refuerzo subgrave
- *   4) Limiter : hard-knee final (ratio hasta 50)
+ * Pipeline:
+ *  1) PreEq  : curva paramétrica → muchas bandas Peak internas
+ *  2) MBC    : 4 bandas (preGain / postGain)
+ *  3) PostEq : refuerzo subgrave extra
+ *  4) Limiter: ratio hasta 50
+ *
+ * Anti-artefacto (no anti-grave):
+ *  - Sample rate real del dispositivo
+ *  - Bandas internas estables
+ *  - Sub-boost fuerte y enfocado, sin techos artificiales en graves
  */
 class AudioEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "ZeusAudioEngine"
 
-        private const val TARGET_PRE_EQ_BANDS = 128
-        private const val FALLBACK_PRE_EQ_BANDS = 64
+        private const val TARGET_PRE_EQ_BANDS = 64
+        private const val FALLBACK_PRE_EQ_BANDS = 48
         private const val MIN_PRE_EQ_BANDS = 32
 
         private const val CHANNEL_COUNT = 2
@@ -29,7 +35,6 @@ class AudioEngine(private val context: Context) {
         private const val POSTEQ_BANDS = 4
         private const val MAX_FREQ = 20000f
         private const val MIN_FREQ = 20f
-        private const val SAMPLE_RATE = 48000f
     }
 
     var settings = EqSettings()
@@ -45,6 +50,7 @@ class AudioEngine(private val context: Context) {
     private var peakTag = true
     private var highShelfTag = true
 
+    private var deviceSampleRate: Float = 48000f
     private var internalFreqs: FloatArray = FloatArray(0)
 
     @Volatile
@@ -63,6 +69,7 @@ class AudioEngine(private val context: Context) {
     fun initialize(sessionId: Int = 0): Boolean {
         release()
         audioSessionId = sessionId
+        deviceSampleRate = resolveSampleRate()
 
         val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 18)
         var lastError: Exception? = null
@@ -90,7 +97,10 @@ class AudioEngine(private val context: Context) {
                     startVisualizer()
                     dp.enabled = true
                     isEnabled = true
-                    Log.i(TAG, "Engine ON → PreEq=$bands bands, MBC=$mbcCount, session=$sessionId")
+                    Log.i(
+                        TAG,
+                        "Engine ON → PreEq=$bands, MBC=\( mbcCount, sr= \){deviceSampleRate.toInt()} Hz"
+                    )
                     return true
                 } catch (e: Exception) {
                     lastError = e
@@ -111,6 +121,16 @@ class AudioEngine(private val context: Context) {
         Log.e(TAG, "Fallo al inicializar: ${lastError?.message}")
         release()
         return false
+    }
+
+    private fun resolveSampleRate(): Float {
+        return try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val sr = am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull()
+            (sr?.toFloat() ?: 48000f).coerceIn(44100f, 192000f)
+        } catch (_: Exception) {
+            48000f
+        }
     }
 
     private fun buildInternalFrequencies(count: Int) {
@@ -164,6 +184,7 @@ class AudioEngine(private val context: Context) {
         peakTag = peak
         highShelfTag = highShelf
         applyEq()
+        applyMbc()
     }
 
     fun setLimiter(
@@ -187,7 +208,9 @@ class AudioEngine(private val context: Context) {
         kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float,
         attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float,
         releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float,
-        postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float
+        postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float,
+        preGainLow: Float = 0f, preGainLoMid: Float = 0f,
+        preGainHiMid: Float = 0f, preGainHigh: Float = 0f
     ) {
         settings.compEnabled = enabled
         settings.cross1 = cross1
@@ -217,6 +240,10 @@ class AudioEngine(private val context: Context) {
         settings.compPostGainLoMid = postGainLoMid
         settings.compPostGainHiMid = postGainHiMid
         settings.compPostGainHigh = postGainHigh
+        settings.compPreGainLow = preGainLow
+        settings.compPreGainLoMid = preGainLoMid
+        settings.compPreGainHiMid = preGainHiMid
+        settings.compPreGainHigh = preGainHigh
         applyMbc()
     }
 
@@ -259,10 +286,11 @@ class AudioEngine(private val context: Context) {
                     gainDb = gain,
                     q = b.q,
                     type = b.filterType,
-                    sampleRate = SAMPLE_RATE
+                    sampleRate = deviceSampleRate
                 )
             }
 
+            // Sub-boost SÍSMICO: hasta 12 dB, enfocado bajo 80 Hz
             val subBoost = s.subBoost.coerceIn(0f, 12f)
 
             for (i in internalFreqs.indices) {
@@ -273,9 +301,11 @@ class AudioEngine(private val context: Context) {
                     totalDb += filter.responseDb(freq)
                 }
 
-                if (freq < 80f && subBoost > 0f) {
-                    val amount = subBoost * (1f - (freq / 80f)).coerceIn(0f, 1f)
-                    totalDb += amount
+                if (freq < 90f && subBoost > 0f) {
+                    // Más peso en sub profundo (20–50 Hz), cae hacia 90 Hz
+                    val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
+                    // curva más “punch”: más gain abajo
+                    totalDb += subBoost * (0.35f + 0.65f * t * t)
                 }
 
                 val gain = totalDb.coerceIn(-30f, 30f)
@@ -312,6 +342,10 @@ class AudioEngine(private val context: Context) {
             val attacks = listOf(s.compAttackLow, s.compAttackLoMid, s.compAttackHiMid, s.compAttackHigh)
             val releases = listOf(s.compReleaseLow, s.compReleaseLoMid, s.compReleaseHiMid, s.compReleaseHigh)
             val postGains = listOf(s.compPostGainLow, s.compPostGainLoMid, s.compPostGainHiMid, s.compPostGainHigh)
+            val preGains = listOf(
+                s.compPreGainLow, s.compPreGainLoMid,
+                s.compPreGainHiMid, s.compPreGainHigh
+            )
 
             for (i in 0 until mbcBandCount) {
                 val band = DynamicsProcessing.MbcBand(
@@ -324,7 +358,7 @@ class AudioEngine(private val context: Context) {
                     knees[i].coerceIn(0f, 20f),
                     -80f,
                     1f,
-                    0f,
+                    preGains[i].coerceIn(-12f, 12f),
                     postGains[i].coerceIn(-12f, 12f)
                 )
                 dp.setMbcBandAllChannelsTo(i, band)
@@ -337,9 +371,12 @@ class AudioEngine(private val context: Context) {
     private fun applyPostEq() {
         val dp = dynamicsProcessing ?: return
         try {
+            // Refuerzo extra de sub (se suma al PreEq de forma controlada)
             val sub = settings.subBoost.coerceIn(0f, 12f)
-            dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(sub > 0f, 31.5f, sub))
-            dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(sub > 0f, 63f, sub * 0.5f))
+            val g31 = sub * 0.55f
+            val g63 = sub * 0.35f
+            dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(g31 > 0.1f, 31.5f, g31))
+            dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(g63 > 0.1f, 63f, g63))
             dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(false, 250f, 0f))
             dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(false, 1000f, 0f))
         } catch (e: Exception) {
@@ -374,11 +411,11 @@ class AudioEngine(private val context: Context) {
             v.setDataCaptureListener(
                 object : Visualizer.OnDataCaptureListener {
                     override fun onWaveFormDataCapture(
-                        v: Visualizer?, waveform: ByteArray?, samplingRate: Int
+                        visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int
                     ) {}
 
                     override fun onFftDataCapture(
-                        v: Visualizer?, fft: ByteArray?, samplingRate: Int
+                        visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int
                     ) {
                         if (fft == null || fft.size < 2) return
                         val n = fft.size / 2
