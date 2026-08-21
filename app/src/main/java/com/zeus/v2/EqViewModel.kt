@@ -61,6 +61,10 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     // ====== COMPRESOR MULTIBANDA – 4 BANDAS INDEPENDIENTES ======
     var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)
+    var compMbPreGainLow by mutableFloatStateOf(0f)
+    var compMbPreGainLoMid by mutableFloatStateOf(0f)
+    var compMbPreGainHiMid by mutableFloatStateOf(0f)
+    var compMbPreGainHigh by mutableFloatStateOf(0f)
 
     // Threshold
     var compMbThLow by mutableFloatStateOf(-18f)
