@@ -177,7 +177,7 @@ fun EqGraph(
                     }
                 }
         ) {
-            val _ = tick
+            if (tick.isNaN()) return@Canvas
             val w = size.width
             val h = size.height
             val midY = h / 2f
