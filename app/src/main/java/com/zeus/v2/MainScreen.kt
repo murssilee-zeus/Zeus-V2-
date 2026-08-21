@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -45,6 +44,12 @@ private val LOW_COLOR = Color(0xFF4FC3F7)
 private val LOMID_COLOR = Color(0xFF66BB6A)
 private val HIMID_COLOR = Color(0xFFFFCA28)
 private val HIGH_COLOR = Color(0xFFAB47BC)
+
+// Limiter purple theme
+private val LIM_PURPLE = Color(0xFFB56BFF)
+private val LIM_PURPLE_DIM = Color(0xFF6B3FA0)
+private val LIM_KNOB_BG = Color(0xFF1A1520)
+private val LIM_PANEL = Color(0xFF141018)
 
 @Composable
 fun MainScreen(
@@ -284,10 +289,7 @@ private fun PreampRow(viewModel: EqViewModel) {
             onValueChange = { viewModel.preamp = it },
             valueRange = -30f..12f,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = PINK_ACCENT,
-                activeTrackColor = PINK_ACCENT
-            )
+            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
         )
         Text(
             String.format("%.1f dB", viewModel.preamp),
@@ -314,11 +316,7 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
                     .size(38.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (selected) band.color else SURFACE)
-                    .border(
-                        1.dp,
-                        if (selected) band.color else CARD_BORDER,
-                        RoundedCornerShape(8.dp)
-                    )
+                    .border(1.dp, if (selected) band.color else CARD_BORDER, RoundedCornerShape(8.dp))
                     .clickable { viewModel.selectBand(index) },
                 contentAlignment = Alignment.Center
             ) {
@@ -394,12 +392,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                "Compresor Multibanda",
-                color = TXT_PRIMARY,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Compresor Multibanda", color = TXT_PRIMARY, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Activado", color = TXT_MUTED, fontSize = 12.sp)
                 Spacer(Modifier.width(6.dp))
@@ -414,7 +407,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
         }
 
-        // Tabs
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -447,7 +439,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Panel izquierdo
             Card(
                 colors = CardDefaults.cardColors(containerColor = SURFACE),
                 shape = RoundedCornerShape(10.dp),
@@ -467,7 +458,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
-
                     CompValueEdit("Thresh", thresholds[selectedCompBand], "dB", -40f..0f, colors[selectedCompBand]) {
                         when (selectedCompBand) {
                             0 -> viewModel.compMbThLow = it
@@ -527,7 +517,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 }
             }
 
-            // 4 faders
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -561,7 +550,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
         }
 
-        // Gráfico de cortes
         CrossoverBandsGraph(
             cross1 = viewModel.crossoverFrequencies[0],
             cross2 = viewModel.crossoverFrequencies[1],
@@ -658,19 +646,9 @@ private fun CompFaderColumn(
                 .fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                title,
-                color = if (selected) color else TXT_MUTED,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text(title, color = if (selected) color else TXT_MUTED, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text(
-                String.format("%.1f dB", threshold),
-                color = color,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text(String.format("%.1f dB", threshold), color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Slider(
                 value = threshold,
                 onValueChange = onThreshold,
@@ -723,75 +701,242 @@ private fun CrossoverBandsGraph(
             path.quadraticBezierTo(mid, h * 0.15f, x1, h * 0.5f)
             drawPath(path, colors[i], style = Stroke(width = 2f, cap = StrokeCap.Round))
         }
-
         listOf(cross1, cross2, cross3).forEach { c ->
             val x = xOf(c, w)
-            drawLine(
-                Color.White.copy(alpha = 0.5f),
-                Offset(x, 0f),
-                Offset(x, h),
-                strokeWidth = 1.2f
-            )
+            drawLine(Color.White.copy(alpha = 0.5f), Offset(x, 0f), Offset(x, h), strokeWidth = 1.2f)
         }
     }
 }
 
 // ============================================================
-// LIMITER
+// LIMITER – estilo plugin morado
 // ============================================================
 @Composable
 private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Limiter", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Activado", color = TXT_MUTED, modifier = Modifier.weight(1f))
-            Switch(
-                checked = viewModel.limiterEnabled,
-                onCheckedChange = { viewModel.limiterEnabled = it },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = PINK_ACCENT,
-                    checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Limiter", color = TXT_PRIMARY, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Activado", color = TXT_MUTED, fontSize = 13.sp)
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = viewModel.limiterEnabled,
+                    onCheckedChange = { viewModel.limiterEnabled = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = LIM_PURPLE,
+                        checkedTrackColor = LIM_PURPLE.copy(alpha = 0.45f),
+                        uncheckedThumbColor = Color(0xFF555555),
+                        uncheckedTrackColor = Color(0xFF333333)
+                    )
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            LimiterKnobCard(
+                label = "THRESHOLD",
+                value = viewModel.limiterThreshold,
+                unit = "dB",
+                range = -20f..0f,
+                format = { String.format("%.1f", it) },
+                accent = LIM_PURPLE,
+                onValueChange = { viewModel.limiterThreshold = it },
+                modifier = Modifier.weight(1f)
+            )
+            LimiterKnobCard(
+                label = "RATIO",
+                value = viewModel.limiterRatio,
+                unit = "",
+                range = 1f..50f,
+                format = { String.format("%.1f", it) },
+                accent = LIM_PURPLE,
+                onValueChange = { viewModel.limiterRatio = it },
+                modifier = Modifier.weight(1f)
+            )
+            LimiterKnobCard(
+                label = "POST GAIN",
+                value = viewModel.limiterPostGain,
+                unit = "dB",
+                range = -12f..12f,
+                format = { String.format("%+.1f", it) },
+                accent = LIM_PURPLE,
+                onValueChange = { viewModel.limiterPostGain = it },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            LimiterKnobCard(
+                label = "ATTACK",
+                value = viewModel.limiterAttack,
+                unit = "ms",
+                range = 0.5f..50f,
+                format = { String.format("%.1f", it) },
+                accent = LIM_PURPLE_DIM,
+                onValueChange = { viewModel.limiterAttack = it },
+                modifier = Modifier.weight(1f)
+            )
+            LimiterKnobCard(
+                label = "RELEASE",
+                value = viewModel.limiterRelease,
+                unit = "ms",
+                range = 20f..500f,
+                format = { String.format("%.0f", it) },
+                accent = LIM_PURPLE_DIM,
+                onValueChange = { viewModel.limiterRelease = it },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = LIM_PANEL),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text("FILTROS ACTIVOS", color = LIM_PURPLE, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                LimiterSwitchRow("Pipeline", viewModel.pipelineEnabled) { viewModel.pipelineEnabled = it }
+                LimiterSwitchRow("Low Shelf", viewModel.lowShelfEnabled) { viewModel.lowShelfEnabled = it }
+                LimiterSwitchRow("Peak Bands", viewModel.peakBandsEnabled) { viewModel.peakBandsEnabled = it }
+                LimiterSwitchRow("High Shelf", viewModel.highShelfEnabled) { viewModel.highShelfEnabled = it }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LimiterKnobCard(
+    label: String,
+    value: Float,
+    unit: String,
+    range: ClosedFloatingPointRange<Float>,
+    format: (Float) -> String,
+    accent: Color,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var editing by remember { mutableStateOf(false) }
+    var text by remember(value) { mutableStateOf(format(value)) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = LIM_PANEL),
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(label, color = TXT_MUTED, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(LIM_KNOB_BG)
+                    .border(2.dp, accent.copy(alpha = 0.7f), CircleShape)
+                    .clickable {
+                        text = format(value)
+                        editing = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (editing) {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        singleLine = true,
+                        modifier = Modifier.width(64.dp),
+                        textStyle = LocalTextStyle.current.copy(
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = accent
+                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardActions = KeyboardActions(onDone = {
+                            text.toFloatOrNull()?.let {
+                                onValueChange(it.coerceIn(range.start, range.endInclusive))
+                            }
+                            editing = false
+                        })
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(format(value), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        if (unit.isNotEmpty()) {
+                            Text(unit, color = accent, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+
+            Slider(
+                value = value.coerceIn(range.start, range.endInclusive),
+                onValueChange = onValueChange,
+                valueRange = range,
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent,
+                    inactiveTrackColor = accent.copy(alpha = 0.2f)
                 )
             )
         }
-        EditableValueRow("Threshold", viewModel.limiterThreshold, -20f..0f, "dB", { String.format("%.1f", it) }) { viewModel.limiterThreshold = it }
-        EditableValueRow("Attack", viewModel.limiterAttack, 0.5f..50f, "ms", { String.format("%.1f", it) }) { viewModel.limiterAttack = it }
-        EditableValueRow("Release", viewModel.limiterRelease, 20f..500f, "ms", { String.format("%.0f", it) }) { viewModel.limiterRelease = it }
-        EditableValueRow("Ratio", viewModel.limiterRatio, 1f..50f, "", { String.format("%.1f", it) }) { viewModel.limiterRatio = it }
-        EditableValueRow("Post Gain", viewModel.limiterPostGain, -12f..12f, "dB", { String.format("%+.1f", it) }) { viewModel.limiterPostGain = it }
+    }
+}
 
-        Divider(color = CARD_BORDER, modifier = Modifier.padding(vertical = 8.dp))
-        Text("Filtros activos", color = TXT_PRIMARY, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        SwitchRow("Pipeline", viewModel.pipelineEnabled) { viewModel.pipelineEnabled = it }
-        SwitchRow("Low Shelf", viewModel.lowShelfEnabled) { viewModel.lowShelfEnabled = it }
-        SwitchRow("Peak Bands", viewModel.peakBandsEnabled) { viewModel.peakBandsEnabled = it }
-        SwitchRow("High Shelf", viewModel.highShelfEnabled) { viewModel.highShelfEnabled = it }
+@Composable
+private fun LimiterSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = LIM_PURPLE,
+                checkedTrackColor = LIM_PURPLE.copy(alpha = 0.45f)
+            )
+        )
     }
 }
 
 // ============================================================
 // REUTILIZABLES
 // ============================================================
-@Composable
-private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = TXT_MUTED, modifier = Modifier.weight(1f))
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = PINK_ACCENT,
-                checkedTrackColor = PINK_ACCENT.copy(alpha = 0.5f)
-            )
-        )
-    }
-}
-
 @Composable
 private fun EditableValueRow(
     label: String,
@@ -814,10 +959,7 @@ private fun EditableValueRow(
             onValueChange = onValueChange,
             valueRange = valueRange,
             modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = PINK_ACCENT,
-                activeTrackColor = PINK_ACCENT
-            )
+            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
         )
         if (isEditing) {
             OutlinedTextField(
