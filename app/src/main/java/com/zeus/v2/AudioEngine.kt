@@ -7,24 +7,13 @@ import android.media.audiofx.Visualizer
 import android.util.Log
 import kotlin.math.*
 
-/**
- * Zeus EQ — Motor de audio (bajos sísmicos + curva limpia).
- *
- * Pipeline:
- *  1) PreEq  : curva paramétrica → muchas bandas Peak internas
- *  2) MBC    : 4 bandas (preGain / postGain)
- *  3) PostEq : refuerzo subgrave extra
- *  4) Limiter: ratio hasta 50
- */
 class AudioEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "ZeusAudioEngine"
-
         private const val TARGET_PRE_EQ_BANDS = 64
         private const val FALLBACK_PRE_EQ_BANDS = 48
         private const val MIN_PRE_EQ_BANDS = 32
-
         private const val CHANNEL_COUNT = 2
         private const val MBC_BANDS = 4
         private const val POSTEQ_BANDS = 4
@@ -92,8 +81,13 @@ class AudioEngine(private val context: Context) {
                     startVisualizer()
                     dp.enabled = true
                     isEnabled = true
-                    Log.i(TAG, "Engine ON PreEq=" + bands + " MBC=" + mbcCount + " sr=" + deviceSampleRate.toInt() + " session=" + sessionId)
-                    
+                    Log.i(
+                        TAG,
+                        "Engine ON PreEq=" + bands +
+                            " MBC=" + mbcCount +
+                            " sr=" + deviceSampleRate.toInt() +
+                            " session=" + sessionId
+                    )
                     return true
                 } catch (e: Exception) {
                     lastError = e
@@ -111,7 +105,7 @@ class AudioEngine(private val context: Context) {
             }
         }
 
-        Log.e(TAG, "Fallo al inicializar: ${lastError?.message}")
+        Log.e(TAG, "Fallo al inicializar: " + (lastError?.message ?: "unknown"))
         release()
         return false
     }
@@ -153,7 +147,7 @@ class AudioEngine(private val context: Context) {
             dynamicsProcessing?.enabled = enabled
             isEnabled = enabled
         } catch (e: Exception) {
-            Log.e(TAG, "setEnabled: ${e.message}")
+            Log.e(TAG, "setEnabled: " + e.message)
         }
     }
 
@@ -281,7 +275,7 @@ class AudioEngine(private val context: Context) {
         try {
             dp.setInputGainAllChannelsTo(settings.preGain.coerceIn(-30f, 30f))
         } catch (e: Exception) {
-            Log.e(TAG, "inputGain: ${e.message}")
+            Log.e(TAG, "inputGain: " + e.message)
         }
     }
 
@@ -311,7 +305,6 @@ class AudioEngine(private val context: Context) {
                 )
             }
 
-            // Sub-boost sismico: hasta 12 dB, enfocado bajo 90 Hz
             val subBoost = s.subBoost.coerceIn(0f, 12f)
 
             for (i in internalFreqs.indices) {
@@ -322,17 +315,25 @@ class AudioEngine(private val context: Context) {
                     totalDb += filter.responseDb(freq)
                 }
 
+                // Sub-boost sismico enfocado bajo 90 Hz
                 if (freq < 90f && subBoost > 0f) {
                     val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
                     totalDb += subBoost * (0.35f + 0.65f * t * t)
                 }
 
+                // Proteccion infrasonica fija \~16 Hz a -20 dB
+                when {
+                    freq <= 12f -> totalDb -= 28f
+                    freq <= 16f -> totalDb -= 20f
+                    freq <= 20f -> totalDb -= 10f
+                    freq < 25f -> totalDb -= 4f
+                }
+
                 val gain = totalDb.coerceIn(-30f, 30f)
-                val band = DynamicsProcessing.EqBand(true, freq, gain)
-                dp.setPreEqBandAllChannelsTo(i, band)
+                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, freq, gain))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "eq: ${e.message}")
+            Log.e(TAG, "eq: " + e.message)
         }
     }
 
@@ -383,7 +384,7 @@ class AudioEngine(private val context: Context) {
                 dp.setMbcBandAllChannelsTo(i, band)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "mbc: ${e.message}")
+            Log.e(TAG, "mbc: " + e.message)
         }
     }
 
@@ -398,7 +399,7 @@ class AudioEngine(private val context: Context) {
             dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(false, 250f, 0f))
             dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(false, 1000f, 0f))
         } catch (e: Exception) {
-            Log.e(TAG, "postEq: ${e.message}")
+            Log.e(TAG, "postEq: " + e.message)
         }
     }
 
@@ -418,7 +419,7 @@ class AudioEngine(private val context: Context) {
             )
             dp.setLimiterAllChannelsTo(lim)
         } catch (e: Exception) {
-            Log.e(TAG, "limiter: ${e.message}")
+            Log.e(TAG, "limiter: " + e.message)
         }
     }
 
@@ -459,7 +460,7 @@ class AudioEngine(private val context: Context) {
             v.enabled = true
             visualizer = v
         } catch (e: Exception) {
-            Log.w(TAG, "Visualizer no disponible: ${e.message}")
+            Log.w(TAG, "Visualizer no disponible: " + e.message)
         }
     }
 }
