@@ -101,6 +101,7 @@ class AudioEngine(private val context: Context) {
                         TAG,
                         "Engine ON → PreEq=$bands, MBC=\( mbcCount, sr= \){deviceSampleRate.toInt()} Hz"
                     )
+                    
                     return true
                 } catch (e: Exception) {
                     lastError = e
