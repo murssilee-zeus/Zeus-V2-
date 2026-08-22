@@ -45,7 +45,6 @@ private val LOMID_COLOR = Color(0xFF66BB6A)
 private val HIMID_COLOR = Color(0xFFFFCA28)
 private val HIGH_COLOR = Color(0xFFAB47BC)
 
-// Limiter purple theme
 private val LIM_PURPLE = Color(0xFFB56BFF)
 private val LIM_PURPLE_DIM = Color(0xFF6B3FA0)
 private val LIM_KNOB_BG = Color(0xFF1A1520)
@@ -343,7 +342,7 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
 }
 
 // ============================================================
-// COMPRESOR MULTIBANDA
+// COMPRESOR — barras = frecuencias de corte
 // ============================================================
 @Composable
 private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
@@ -381,6 +380,14 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         viewModel.compMbPreGainLoMid,
         viewModel.compMbPreGainHiMid,
         viewModel.compMbPreGainHigh
+    )
+
+    // Frecuencias mostradas en cada columna (corte superior de la banda)
+    val crossFreqs = listOf(
+        viewModel.crossoverFrequencies[0],
+        viewModel.crossoverFrequencies[1],
+        viewModel.crossoverFrequencies[2],
+        20000f
     )
 
     Column(
@@ -439,6 +446,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Panel lateral
             Card(
                 colors = CardDefaults.cardColors(containerColor = SURFACE),
                 shape = RoundedCornerShape(10.dp),
@@ -517,36 +525,56 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 }
             }
 
+            // 4 columnas: slider = frecuencia de corte
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                for (i in 0..3) {
-                    CompFaderColumn(
-                        title = titles[i],
-                        color = colors[i],
-                        selected = selectedCompBand == i,
-                        threshold = thresholds[i],
-                        crossLabel = when (i) {
-                            0 -> String.format("%.0f Hz", viewModel.crossoverFrequencies[0])
-                            1 -> String.format("%.0f Hz", viewModel.crossoverFrequencies[1])
-                            2 -> String.format("%.0f Hz", viewModel.crossoverFrequencies[2])
-                            else -> "20 kHz"
-                        },
-                        onSelect = { selectedCompBand = i },
-                        onThreshold = {
-                            when (i) {
-                                0 -> viewModel.compMbThLow = it
-                                1 -> viewModel.compMbThLoMid = it
-                                2 -> viewModel.compMbThHiMid = it
-                                3 -> viewModel.compMbThHigh = it
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                }
+                // LOW → cross1
+                CompFreqColumn(
+                    title = "LOW",
+                    color = colors[0],
+                    selected = selectedCompBand == 0,
+                    freq = viewModel.crossoverFrequencies[0],
+                    range = 40f..1000f,
+                    onSelect = { selectedCompBand = 0 },
+                    onFreq = { viewModel.setCrossover(0, it) },
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                // LO-MID → cross2
+                CompFreqColumn(
+                    title = "LO-MID",
+                    color = colors[1],
+                    selected = selectedCompBand == 1,
+                    freq = viewModel.crossoverFrequencies[1],
+                    range = 200f..6000f,
+                    onSelect = { selectedCompBand = 1 },
+                    onFreq = { viewModel.setCrossover(1, it) },
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                // HI-MID → cross3
+                CompFreqColumn(
+                    title = "HI-MID",
+                    color = colors[2],
+                    selected = selectedCompBand == 2,
+                    freq = viewModel.crossoverFrequencies[2],
+                    range = 2000f..16000f,
+                    onSelect = { selectedCompBand = 2 },
+                    onFreq = { viewModel.setCrossover(2, it) },
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
+                // HIGH → fijo 20 kHz (solo visual / seleccionar)
+                CompFreqColumn(
+                    title = "HIGH",
+                    color = colors[3],
+                    selected = selectedCompBand == 3,
+                    freq = 20000f,
+                    range = 20000f..20000f,
+                    onSelect = { selectedCompBand = 3 },
+                    onFreq = { },
+                    enabled = false,
+                    modifier = Modifier.weight(1f).fillMaxHeight()
+                )
             }
         }
 
@@ -562,6 +590,69 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 .background(SURFACE)
                 .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
         )
+    }
+}
+
+@Composable
+private fun CompFreqColumn(
+    title: String,
+    color: Color,
+    selected: Boolean,
+    freq: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onSelect: () -> Unit,
+    onFreq: (Float) -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    fun formatFreq(f: Float): String {
+        return if (f >= 1000f) String.format("%.1f kHz", f / 1000f)
+        else String.format("%.0f Hz", f)
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = SURFACE),
+        shape = RoundedCornerShape(10.dp),
+        modifier = modifier.clickable { onSelect() }
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(8.dp)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                title,
+                color = if (selected) color else TXT_MUTED,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                formatFreq(freq),
+                color = color,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (enabled && range.endInclusive > range.start) {
+                Slider(
+                    value = freq.coerceIn(range.start, range.endInclusive),
+                    onValueChange = onFreq,
+                    valueRange = range,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 6.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = color,
+                        activeTrackColor = color,
+                        inactiveTrackColor = color.copy(alpha = 0.2f)
+                    )
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+                Text("fijo", color = TXT_MUTED, fontSize = 10.sp)
+            }
+        }
     }
 }
 
@@ -625,49 +716,6 @@ private fun CompValueEdit(
 }
 
 @Composable
-private fun CompFaderColumn(
-    title: String,
-    color: Color,
-    selected: Boolean,
-    threshold: Float,
-    crossLabel: String,
-    onSelect: () -> Unit,
-    onThreshold: (Float) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = SURFACE),
-        shape = RoundedCornerShape(10.dp),
-        modifier = modifier.clickable { onSelect() }
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(8.dp)
-                .fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(title, color = if (selected) color else TXT_MUTED, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text(String.format("%.1f dB", threshold), color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Slider(
-                value = threshold,
-                onValueChange = onThreshold,
-                valueRange = -40f..0f,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 6.dp),
-                colors = SliderDefaults.colors(
-                    thumbColor = color,
-                    activeTrackColor = color,
-                    inactiveTrackColor = color.copy(alpha = 0.2f)
-                )
-            )
-            Text(crossLabel, color = TXT_MUTED, fontSize = 10.sp)
-        }
-    }
-}
-
-@Composable
 private fun CrossoverBandsGraph(
     cross1: Float,
     cross2: Float,
@@ -709,7 +757,7 @@ private fun CrossoverBandsGraph(
 }
 
 // ============================================================
-// LIMITER – estilo plugin morado
+// LIMITER
 // ============================================================
 @Composable
 private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
