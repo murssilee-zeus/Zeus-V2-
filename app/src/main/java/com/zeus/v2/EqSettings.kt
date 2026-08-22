@@ -12,7 +12,7 @@ data class EqSettings(
     // Global
     var preGain: Float = -6f,
     var subBoost: Float = 0f,
-    var bands: List<EqBand> = createDefaultBands(),
+    var bands: List<EqBand> = defaultBands(),
 
     // Limiter
     var limiterEnabled: Boolean = true,
@@ -81,6 +81,7 @@ data class EqSettings(
         val bArr = JSONArray()
         bands.forEach { b ->
             val jo = JSONObject()
+            jo.put("id", b.id)
             jo.put("f", b.frequency.toDouble())
             jo.put("g", b.gain.toDouble())
             jo.put("q", b.q.toDouble())
@@ -162,19 +163,21 @@ data class EqSettings(
                     for (i in 0 until bArr.length()) {
                         val jo = bArr.getJSONObject(i)
                         val typeOrd = jo.optInt("t", EqBand.FilterType.PEAK.ordinal)
-                        val type = EqBand.FilterType.values().getOrElse(typeOrd) { EqBand.FilterType.PEAK }
-                        
+                        val type = EqBand.FilterType.values().getOrElse(typeOrd) {
+                            EqBand.FilterType.PEAK
+                        }
+                        val id = jo.optInt("id", i)
                         list.add(
-    EqBand(
-        id = i,
-        frequency = jo.optDouble("f", 1000.0).toFloat(),
-        gain = jo.optDouble("g", 0.0).toFloat(),
-        q = jo.optDouble("q", 1.0).toFloat(),
-        enabled = jo.optBoolean("e", true),
-        filterType = type,
-        color = bandColor(i)
-    )
-)
+                            EqBand(
+                                id = id,
+                                frequency = jo.optDouble("f", 1000.0).toFloat(),
+                                gain = jo.optDouble("g", 0.0).toFloat(),
+                                q = jo.optDouble("q", 1.0).toFloat(),
+                                enabled = jo.optBoolean("e", true),
+                                filterType = type,
+                                color = bandColor(id)
+                            )
+                        )
                     }
                     s.bands = list
                 }
@@ -196,7 +199,6 @@ data class EqSettings(
                 s.compThHiMid = o.optDouble("compThHiMid", -12.0).toFloat()
                 s.compThHigh = o.optDouble("compThHigh", -14.0).toFloat()
 
-                // Compatibilidad con JSON antiguo (un solo ratio/knee/...)
                 val legacyRatio = o.optDouble("compRatio", 4.0).toFloat()
                 val legacyKnee = o.optDouble("compKnee", 6.0).toFloat()
                 val legacyAttack = o.optDouble("compAttack", 10.0).toFloat()
@@ -243,22 +245,29 @@ data class EqSettings(
                     "0: LOAD - Audio TX Output (Float)"
                 )
             } catch (_: Exception) {
-                // si falla el parse, se devuelve defaults
+                // defaults
             }
             return s
         }
 
-        fun createDefaultBands(): List<EqBand> {
+        /** Defaults locales (si no quieres depender de createDefaultBands de EqBand.kt). */
+        private fun defaultBands(): List<EqBand> {
             val freqs = listOf(
-                31.5f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f
+                31.5f, 63f, 125f, 250f, 500f,
+                1000f, 2000f, 4000f, 8000f, 16000f
             )
             return freqs.mapIndexed { i, f ->
                 EqBand(
+                    id = i,
                     frequency = f,
                     gain = 0f,
                     q = 1.2f,
                     enabled = true,
-                    filterType = EqBand.FilterType.PEAK,
+                    filterType = when (i) {
+                        0 -> EqBand.FilterType.LOW_SHELF
+                        freqs.lastIndex -> EqBand.FilterType.HIGH_SHELF
+                        else -> EqBand.FilterType.PEAK
+                    },
                     color = bandColor(i)
                 )
             }
