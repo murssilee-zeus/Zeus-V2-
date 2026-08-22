@@ -163,16 +163,18 @@ data class EqSettings(
                         val jo = bArr.getJSONObject(i)
                         val typeOrd = jo.optInt("t", EqBand.FilterType.PEAK.ordinal)
                         val type = EqBand.FilterType.values().getOrElse(typeOrd) { EqBand.FilterType.PEAK }
+                        
                         list.add(
-                            EqBand(
-                                frequency = jo.optDouble("f", 1000.0).toFloat(),
-                                gain = jo.optDouble("g", 0.0).toFloat(),
-                                q = jo.optDouble("q", 1.0).toFloat(),
-                                enabled = jo.optBoolean("e", true),
-                                filterType = type,
-                                color = bandColor(i)
-                            )
-                        )
+    EqBand(
+        id = i,
+        frequency = jo.optDouble("f", 1000.0).toFloat(),
+        gain = jo.optDouble("g", 0.0).toFloat(),
+        q = jo.optDouble("q", 1.0).toFloat(),
+        enabled = jo.optBoolean("e", true),
+        filterType = type,
+        color = bandColor(i)
+    )
+)
                     }
                     s.bands = list
                 }
