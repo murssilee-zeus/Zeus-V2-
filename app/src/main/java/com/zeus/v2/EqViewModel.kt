@@ -59,44 +59,39 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var compressorMultibandEnabled by mutableStateOf(true)
     var selectedAudioSession by mutableStateOf("0: LOAD - Audio TX Output (Float)")
 
-    // ====== COMPRESOR MULTIBANDA – 4 BANDAS INDEPENDIENTES ======
+    // ====== COMPRESOR MULTIBANDA ======
     var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)
+
     var compMbPreGainLow by mutableFloatStateOf(0f)
     var compMbPreGainLoMid by mutableFloatStateOf(0f)
     var compMbPreGainHiMid by mutableFloatStateOf(0f)
     var compMbPreGainHigh by mutableFloatStateOf(0f)
 
-    // Threshold
     var compMbThLow by mutableFloatStateOf(-18f)
     var compMbThLoMid by mutableFloatStateOf(-14f)
     var compMbThHiMid by mutableFloatStateOf(-12f)
     var compMbThHigh by mutableFloatStateOf(-14f)
 
-    // Ratio
     var compMbRatioLow by mutableFloatStateOf(4f)
     var compMbRatioLoMid by mutableFloatStateOf(3f)
     var compMbRatioHiMid by mutableFloatStateOf(2.5f)
     var compMbRatioHigh by mutableFloatStateOf(3.5f)
 
-    // Knee
     var compMbKneeLow by mutableFloatStateOf(6f)
     var compMbKneeLoMid by mutableFloatStateOf(6f)
     var compMbKneeHiMid by mutableFloatStateOf(6f)
     var compMbKneeHigh by mutableFloatStateOf(6f)
 
-    // Attack (ms)
     var compMbAttackLow by mutableFloatStateOf(15f)
     var compMbAttackLoMid by mutableFloatStateOf(12f)
     var compMbAttackHiMid by mutableFloatStateOf(8f)
     var compMbAttackHigh by mutableFloatStateOf(5f)
 
-    // Release (ms)
     var compMbReleaseLow by mutableFloatStateOf(180f)
     var compMbReleaseLoMid by mutableFloatStateOf(120f)
     var compMbReleaseHiMid by mutableFloatStateOf(90f)
     var compMbReleaseHigh by mutableFloatStateOf(60f)
 
-    // Post Gain
     var compMbPostGainLow by mutableFloatStateOf(0f)
     var compMbPostGainLoMid by mutableFloatStateOf(0f)
     var compMbPostGainHiMid by mutableFloatStateOf(0f)
@@ -104,6 +99,24 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     var isEngineRunning by mutableStateOf(false)
     var spectrum by mutableStateOf(FloatArray(128) { 0f })
+
+    /** Actualiza un crossover manteniendo orden cross1 < cross2 < cross3 */
+    fun setCrossover(index: Int, freq: Float) {
+        if (index !in 0..2) return
+        val f = freq.coerceIn(40f, 19500f)
+        when (index) {
+            0 -> {
+                crossoverFrequencies[0] = f.coerceAtMost(crossoverFrequencies[1] - 50f)
+            }
+            1 -> {
+                val v = f.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)
+                crossoverFrequencies[1] = v
+            }
+            2 -> {
+                crossoverFrequencies[2] = f.coerceAtLeast(crossoverFrequencies[1] + 50f)
+            }
+        }
+    }
 
     // ====== Persistencia ======
     fun toSettings(): EqSettings = EqSettings(
@@ -144,6 +157,10 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compPostGainLoMid = compMbPostGainLoMid,
         compPostGainHiMid = compMbPostGainHiMid,
         compPostGainHigh = compMbPostGainHigh,
+        compPreGainLow = compMbPreGainLow,
+        compPreGainLoMid = compMbPreGainLoMid,
+        compPreGainHiMid = compMbPreGainHiMid,
+        compPreGainHigh = compMbPreGainHigh,
         pipelineEnabled = pipelineEnabled,
         lowShelfEnabled = lowShelfEnabled,
         peakEnabled = peakBandsEnabled,
@@ -191,6 +208,10 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compMbPostGainLoMid = s.compPostGainLoMid
         compMbPostGainHiMid = s.compPostGainHiMid
         compMbPostGainHigh = s.compPostGainHigh
+        compMbPreGainLow = s.compPreGainLow
+        compMbPreGainLoMid = s.compPreGainLoMid
+        compMbPreGainHiMid = s.compPreGainHiMid
+        compMbPreGainHigh = s.compPreGainHigh
         pipelineEnabled = s.pipelineEnabled
         lowShelfEnabled = s.lowShelfEnabled
         peakBandsEnabled = s.peakEnabled
