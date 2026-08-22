@@ -15,11 +15,6 @@ import kotlin.math.*
  *  2) MBC    : 4 bandas (preGain / postGain)
  *  3) PostEq : refuerzo subgrave extra
  *  4) Limiter: ratio hasta 50
- *
- * Anti-artefacto (no anti-grave):
- *  - Sample rate real del dispositivo
- *  - Bandas internas estables
- *  - Sub-boost fuerte y enfocado, sin techos artificiales en graves
  */
 class AudioEngine(private val context: Context) {
 
@@ -99,9 +94,8 @@ class AudioEngine(private val context: Context) {
                     isEnabled = true
                     Log.i(
                         TAG,
-                        "Engine ON → PreEq=$bands, MBC=\( mbcCount, sr= \){deviceSampleRate.toInt()} Hz"
+                        "Engine ON PreEq=$bands MBC=\( mbcCount sr= \){deviceSampleRate.toInt()} session=$sessionId"
                     )
-                    
                     return true
                 } catch (e: Exception) {
                     lastError = e
@@ -145,11 +139,13 @@ class AudioEngine(private val context: Context) {
         try {
             visualizer?.enabled = false
             visualizer?.release()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         visualizer = null
         try {
             dynamicsProcessing?.release()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         dynamicsProcessing = null
         isEnabled = false
     }
@@ -189,8 +185,12 @@ class AudioEngine(private val context: Context) {
     }
 
     fun setLimiter(
-        enabled: Boolean, threshold: Float, attack: Float,
-        release: Float, ratio: Float, postGain: Float
+        enabled: Boolean,
+        threshold: Float,
+        attack: Float,
+        release: Float,
+        ratio: Float,
+        postGain: Float
     ) {
         settings.limiterEnabled = enabled
         settings.limiterThreshold = threshold
@@ -203,15 +203,37 @@ class AudioEngine(private val context: Context) {
 
     fun setCompressor(
         enabled: Boolean,
-        cross1: Float, cross2: Float, cross3: Float,
-        thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float,
-        ratioLow: Float, ratioLoMid: Float, ratioHiMid: Float, ratioHigh: Float,
-        kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float,
-        attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float,
-        releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float,
-        postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float,
-        preGainLow: Float = 0f, preGainLoMid: Float = 0f,
-        preGainHiMid: Float = 0f, preGainHigh: Float = 0f
+        cross1: Float,
+        cross2: Float,
+        cross3: Float,
+        thLow: Float,
+        thLoMid: Float,
+        thHiMid: Float,
+        thHigh: Float,
+        ratioLow: Float,
+        ratioLoMid: Float,
+        ratioHiMid: Float,
+        ratioHigh: Float,
+        kneeLow: Float,
+        kneeLoMid: Float,
+        kneeHiMid: Float,
+        kneeHigh: Float,
+        attackLow: Float,
+        attackLoMid: Float,
+        attackHiMid: Float,
+        attackHigh: Float,
+        releaseLow: Float,
+        releaseLoMid: Float,
+        releaseHiMid: Float,
+        releaseHigh: Float,
+        postGainLow: Float,
+        postGainLoMid: Float,
+        postGainHiMid: Float,
+        postGainHigh: Float,
+        preGainLow: Float = 0f,
+        preGainLoMid: Float = 0f,
+        preGainHiMid: Float = 0f,
+        preGainHigh: Float = 0f
     ) {
         settings.compEnabled = enabled
         settings.cross1 = cross1
@@ -291,7 +313,7 @@ class AudioEngine(private val context: Context) {
                 )
             }
 
-            // Sub-boost SÍSMICO: hasta 12 dB, enfocado bajo 80 Hz
+            // Sub-boost sismico: hasta 12 dB, enfocado bajo 90 Hz
             val subBoost = s.subBoost.coerceIn(0f, 12f)
 
             for (i in internalFreqs.indices) {
@@ -303,9 +325,7 @@ class AudioEngine(private val context: Context) {
                 }
 
                 if (freq < 90f && subBoost > 0f) {
-                    // Más peso en sub profundo (20–50 Hz), cae hacia 90 Hz
                     val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
-                    // curva más “punch”: más gain abajo
                     totalDb += subBoost * (0.35f + 0.65f * t * t)
                 }
 
@@ -372,7 +392,6 @@ class AudioEngine(private val context: Context) {
     private fun applyPostEq() {
         val dp = dynamicsProcessing ?: return
         try {
-            // Refuerzo extra de sub (se suma al PreEq de forma controlada)
             val sub = settings.subBoost.coerceIn(0f, 12f)
             val g31 = sub * 0.55f
             val g63 = sub * 0.35f
@@ -412,11 +431,16 @@ class AudioEngine(private val context: Context) {
             v.setDataCaptureListener(
                 object : Visualizer.OnDataCaptureListener {
                     override fun onWaveFormDataCapture(
-                        visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int
-                    ) {}
+                        visualizer: Visualizer?,
+                        waveform: ByteArray?,
+                        samplingRate: Int
+                    ) {
+                    }
 
                     override fun onFftDataCapture(
-                        visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int
+                        visualizer: Visualizer?,
+                        fft: ByteArray?,
+                        samplingRate: Int
                     ) {
                         if (fft == null || fft.size < 2) return
                         val n = fft.size / 2
@@ -431,7 +455,8 @@ class AudioEngine(private val context: Context) {
                     }
                 },
                 Visualizer.getMaxCaptureRate() / 2,
-                false, true
+                false,
+                true
             )
             v.enabled = true
             visualizer = v
