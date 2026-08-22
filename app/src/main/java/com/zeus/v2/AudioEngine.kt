@@ -92,10 +92,8 @@ class AudioEngine(private val context: Context) {
                     startVisualizer()
                     dp.enabled = true
                     isEnabled = true
-                    Log.i(
-                        TAG,
-                        "Engine ON PreEq=$bands MBC=\( mbcCount sr= \){deviceSampleRate.toInt()} session=$sessionId"
-                    )
+                    Log.i(TAG, "Engine ON PreEq=" + bands + " MBC=" + mbcCount + " sr=" + deviceSampleRate.toInt() + " session=" + sessionId)
+                    
                     return true
                 } catch (e: Exception) {
                     lastError = e
