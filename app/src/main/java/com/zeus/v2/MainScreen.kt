@@ -157,6 +157,7 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     .fillMaxWidth()
                     .weight(1f)
             )
+            PresetRow(viewModel)
             BandSelectorRow(viewModel)
         }
 
@@ -183,6 +184,46 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 }
             }
             PreampRow(viewModel)
+        }
+    }
+}
+
+@Composable
+private fun PresetRow(viewModel: EqViewModel) {
+    val presets = listOf(
+        "Flat" to { viewModel.applyPresetFlat() },
+        "Infrabass" to { viewModel.applyPresetZeusInfrabass() },
+        "Bass Boost" to { viewModel.applyPresetBassBoost() },
+        "Vocal" to { viewModel.applyPresetVocalClear() }
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        presets.forEach { (name, action) ->
+            val isInfra = name == "Infrabass"
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isInfra) Color(0xFF1A1030) else SURFACE)
+                    .border(
+                        1.dp,
+                        if (isInfra) Color(0xFFB56BFF) else CARD_BORDER,
+                        RoundedCornerShape(10.dp)
+                    )
+                    .clickable { action() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = name,
+                    color = if (isInfra) Color(0xFFB56BFF) else TXT_PRIMARY,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
@@ -251,7 +292,7 @@ private fun BandControlsCard(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            "Banda ${viewModel.selectedBandIndex + 1}",
+            "Banda " + (viewModel.selectedBandIndex + 1),
             color = band.color,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold
@@ -342,7 +383,7 @@ private fun BandSelectorRow(viewModel: EqViewModel) {
 }
 
 // ============================================================
-// COMPRESOR — barras = frecuencias de corte
+// COMPRESOR
 // ============================================================
 @Composable
 private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
@@ -380,14 +421,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         viewModel.compMbPreGainLoMid,
         viewModel.compMbPreGainHiMid,
         viewModel.compMbPreGainHigh
-    )
-
-    // Frecuencias mostradas en cada columna (corte superior de la banda)
-    val crossFreqs = listOf(
-        viewModel.crossoverFrequencies[0],
-        viewModel.crossoverFrequencies[1],
-        viewModel.crossoverFrequencies[2],
-        20000f
     )
 
     Column(
@@ -446,7 +479,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Panel lateral
             Card(
                 colors = CardDefaults.cardColors(containerColor = SURFACE),
                 shape = RoundedCornerShape(10.dp),
@@ -525,12 +557,10 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 }
             }
 
-            // 4 columnas: slider = frecuencia de corte
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // LOW → cross1
                 CompFreqColumn(
                     title = "LOW",
                     color = colors[0],
@@ -541,7 +571,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     onFreq = { viewModel.setCrossover(0, it) },
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 )
-                // LO-MID → cross2
                 CompFreqColumn(
                     title = "LO-MID",
                     color = colors[1],
@@ -552,7 +581,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     onFreq = { viewModel.setCrossover(1, it) },
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 )
-                // HI-MID → cross3
                 CompFreqColumn(
                     title = "HI-MID",
                     color = colors[2],
@@ -563,7 +591,6 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     onFreq = { viewModel.setCrossover(2, it) },
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 )
-                // HIGH → fijo 20 kHz (solo visual / seleccionar)
                 CompFreqColumn(
                     title = "HIGH",
                     color = colors[3],
