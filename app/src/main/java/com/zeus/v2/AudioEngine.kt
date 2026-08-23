@@ -280,62 +280,62 @@ class AudioEngine(private val context: Context) {
     }
 
     private fun applyEq() {
-        val dp = dynamicsProcessing ?: return
-        if (internalFreqs.isEmpty()) return
+    val dp = dynamicsProcessing ?: return
+    if (internalFreqs.isEmpty()) return
 
-        try {
-            val s = settings
-            val activeFilters = mutableListOf<BiquadFilter>()
+    try {
+        val s = settings
+        val activeFilters = mutableListOf<BiquadFilter>()
 
-            for (b in s.bands) {
-                if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
-                if (!tagAllowed(b)) continue
+        for (b in s.bands) {
+            if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
+            if (!tagAllowed(b)) continue
 
-                val gain = when (b.filterType) {
-                    EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
-                    else -> b.gain
-                }
-
-                activeFilters += BiquadFilter(
-                    frequency = b.frequency,
-                    gainDb = gain,
-                    q = b.q,
-                    type = b.filterType,
-                    sampleRate = deviceSampleRate
-                )
+            val gain = when (b.filterType) {
+                EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
+                else -> b.gain
             }
 
-            val subBoost = s.subBoost.coerceIn(0f, 12f)
-
-            for (i in internalFreqs.indices) {
-                val freq = internalFreqs[i]
-                var totalDb = 0f
-
-                for (filter in activeFilters) {
-                    totalDb += filter.responseDb(freq)
-                }
-
-                // Sub-boost sismico enfocado bajo 90 Hz
-                if (freq < 90f && subBoost > 0f) {
-                    val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
-                    totalDb += subBoost * (0.35f + 0.65f * t * t)
-                }
-
-                // Proteccion infrasonica fija \~16 Hz a -20 dB
-                when {
-                    freq <= 12f -> totalDb -= 28f
-                    freq <= 16f -> totalDb -= 20f
-                    freq <= 20f -> totalDb -= 10f
-                    freq < 25f -> totalDb -= 4f
-                }
-
-                val gain = totalDb.coerceIn(-30f, 30f)
-                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, freq, gain))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "eq: " + e.message)
+            activeFilters += BiquadFilter(
+                frequency = b.frequency,
+                gainDb = gain,
+                q = b.q,
+                type = b.filterType,
+                sampleRate = deviceSampleRate
+            )
         }
+
+        val subBoost = s.subBoost.coerceIn(0f, 12f)
+
+        for (i in internalFreqs.indices) {
+            val freq = internalFreqs[i]
+            var totalDb = 0f
+
+            for (filter in activeFilters) {
+                totalDb += filter.responseDb(freq)
+            }
+
+            // Sub-boost sismico enfocado bajo 90 Hz
+            if (freq < 90f && subBoost > 0f) {
+                val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
+                totalDb += subBoost * (0.35f + 0.65f * t * t)
+            }
+
+            // Proteccion infrasonica SUAVE (mantiene punch)
+            when {
+                freq <= 10f -> totalDb -= 18f
+                freq <= 14f -> totalDb -= 10f
+                freq <= 16f -> totalDb -= 6f
+                freq < 20f -> totalDb -= 2f
+            }
+
+            val gain = totalDb.coerceIn(-30f, 30f)
+            dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, freq, gain))
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "eq: " + e.message)
     }
+}
 
     private fun tagAllowed(b: EqBand): Boolean = when (b.filterType) {
         EqBand.FilterType.LOW_SHELF, EqBand.FilterType.LOW_PASS -> lowShelfTag
