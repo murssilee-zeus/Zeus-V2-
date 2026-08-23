@@ -120,100 +120,116 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         limiterEnabled = true
         limiterThreshold = -1.5f
         limiterRatio = 8f
+        limiterAttack = 1f
+        limiterRelease = 120f
+        limiterPostGain = 0f
     }
 
     fun applyPresetZeusInfrabass() {
-    preamp = -6f
-    subBoost = 6f
+        preamp = -5.5f
+        subBoost = 6f
 
-    bands.clear()
-    bands.add(
-        createNewBand(0, 18f).copy(
-            gain = 9f,
-            q = 0.75f,
-            filterType = EqBand.FilterType.LOW_SHELF,
-            enabled = true
+        bands.clear()
+        bands.add(
+            createNewBand(0, 18f).copy(
+                gain = 9f,
+                q = 0.75f,
+                filterType = EqBand.FilterType.LOW_SHELF,
+                enabled = true
+            )
         )
-    )
-    bands.add(
-        createNewBand(1, 33f).copy(
-            gain = 3.5f,
-            q = 1.1f,
-            filterType = EqBand.FilterType.PEAK,
-            enabled = true
+        bands.add(
+            createNewBand(1, 33f).copy(
+                gain = 3.5f,
+                q = 1.1f,
+                filterType = EqBand.FilterType.PEAK,
+                enabled = true
+            )
         )
-    )
-    bands.add(
-        createNewBand(2, 48f).copy(
-            gain = 2.5f,
-            q = 2.2f,
-            filterType = EqBand.FilterType.PEAK,
-            enabled = true
+        bands.add(
+            createNewBand(2, 48f).copy(
+                gain = 2.5f,
+                q = 2.2f,
+                filterType = EqBand.FilterType.PEAK,
+                enabled = true
+            )
         )
-    )
-    bands.add(
-        createNewBand(3, 90f).copy(
-            gain = 1.5f,
-            q = 0.9f,
-            filterType = EqBand.FilterType.LOW_SHELF,
-            enabled = true
+        bands.add(
+            createNewBand(3, 90f).copy(
+                gain = 1.5f,
+                q = 0.9f,
+                filterType = EqBand.FilterType.LOW_SHELF,
+                enabled = true
+            )
         )
-    )
-    bands.add(createNewBand(4, 250f).copy(gain = 0f, q = 1.0f, enabled = true))
-    bands.add(createNewBand(5, 500f).copy(gain = 0f, q = 1.0f, enabled = true))
-    bands.add(createNewBand(6, 1000f).copy(gain = 0f, q = 1.0f, enabled = true))
-    bands.add(createNewBand(7, 2500f).copy(gain = 0.5f, q = 1.2f, enabled = true))
-    bands.add(createNewBand(8, 6000f).copy(gain = 1.0f, q = 1.0f, enabled = true))
-    bands.add(
-        createNewBand(9, 12000f).copy(
-            gain = 1.0f,
-            q = 0.8f,
-            filterType = EqBand.FilterType.HIGH_SHELF,
-            enabled = true
+        bands.add(createNewBand(4, 250f).copy(gain = 0f, q = 1.0f, enabled = true))
+        bands.add(createNewBand(5, 500f).copy(gain = 0f, q = 1.0f, enabled = true))
+        bands.add(createNewBand(6, 1000f).copy(gain = 0f, q = 1.0f, enabled = true))
+        bands.add(createNewBand(7, 2500f).copy(gain = 0.5f, q = 1.2f, enabled = true))
+        bands.add(createNewBand(8, 6000f).copy(gain = 1.0f, q = 1.0f, enabled = true))
+        bands.add(
+            createNewBand(9, 12000f).copy(
+                gain = 1.0f,
+                q = 0.8f,
+                filterType = EqBand.FilterType.HIGH_SHELF,
+                enabled = true
+            )
         )
-    )
-    selectedBandIndex = 0
+        selectedBandIndex = 0
 
-    compressorMultibandEnabled = true
-    crossoverFrequencies[0] = 120f
-    crossoverFrequencies[1] = 2500f
-    crossoverFrequencies[2] = 8000f
+        compressorMultibandEnabled = true
+        crossoverFrequencies[0] = 120f
+        crossoverFrequencies[1] = 2500f
+        crossoverFrequencies[2] = 8000f
 
-    compMbThLow = -16f
-    compMbRatioLow = 3.5f
-    compMbAttackLow = 12f
-    compMbReleaseLow = 160f
-    compMbPostGainLow = 1.5f
-    compMbPreGainLow = 1.5f
+        compMbThLow = -16f
+        compMbRatioLow = 2.2f
+        compMbKneeLow = 8f
+        compMbAttackLow = 12f
+        compMbReleaseLow = 160f
+        compMbPreGainLow = 1.0f
+        compMbPostGainLow = 1.0f
 
-    compMbThLoMid = -14f
-    compMbRatioLoMid = 2.5f
-    compMbPostGainLoMid = 0f
+        compMbThLoMid = -14f
+        compMbRatioLoMid = 2.0f
+        compMbKneeLoMid = 6f
+        compMbAttackLoMid = 10f
+        compMbReleaseLoMid = 120f
+        compMbPreGainLoMid = 0f
+        compMbPostGainLoMid = 0f
 
-    compMbThHiMid = -12f
-    compMbRatioHiMid = 2.0f
-    compMbPostGainHiMid = 0f
+        compMbThHiMid = -12f
+        compMbRatioHiMid = 2.0f
+        compMbKneeHiMid = 6f
+        compMbAttackHiMid = 8f
+        compMbReleaseHiMid = 90f
+        compMbPreGainHiMid = 0f
+        compMbPostGainHiMid = 0f
 
-    compMbThHigh = -14f
-    compMbRatioHigh = 2.5f
-    compMbPostGainHigh = 0f
+        compMbThHigh = -14f
+        compMbRatioHigh = 2.5f
+        compMbKneeHigh = 6f
+        compMbAttackHigh = 5f
+        compMbReleaseHigh = 70f
+        compMbPreGainHigh = 0f
+        compMbPostGainHigh = 0f
 
-    limiterEnabled = true
-    limiterThreshold = -2.0f
-    limiterRatio = 12f
-    limiterAttack = 0.8f
-    limiterRelease = 100f
-    limiterPostGain = 0f
-}
+        limiterEnabled = true
+        limiterThreshold = -1.2f
+        limiterRatio = 6f
+        limiterAttack = 1.0f
+        limiterRelease = 120f
+        limiterPostGain = 0f
+    }
 
     fun applyPresetBassBoost() {
         applyPresetZeusInfrabass()
-        preamp = -4.5f
-        subBoost = 2f
+        preamp = -4.8f
+        subBoost = 3f
         if (bands.isNotEmpty()) {
             bands[0] = bands[0].copy(
                 frequency = 40f,
-                gain = 5f,
+                gain = 5.5f,
                 q = 0.85f,
                 filterType = EqBand.FilterType.LOW_SHELF
             )
@@ -227,17 +243,33 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         preamp = -3f
         subBoost = 0f
         bands.clear()
-        bands.add(createNewBand(0, 60f).copy(gain = -1.5f, q = 0.9f, filterType = EqBand.FilterType.LOW_SHELF))
-        bands.add(createNewBand(1, 200f).copy(gain = -1f, q = 1.2f))
-        bands.add(createNewBand(2, 1000f).copy(gain = 1.5f, q = 1.0f))
-        bands.add(createNewBand(3, 3000f).copy(gain = 2.5f, q = 1.3f))
-        bands.add(createNewBand(4, 6000f).copy(gain = 1.5f, q = 1.0f))
-        bands.add(createNewBand(5, 12000f).copy(gain = 1f, q = 0.8f, filterType = EqBand.FilterType.HIGH_SHELF))
+        bands.add(
+            createNewBand(0, 60f).copy(
+                gain = -1.5f,
+                q = 0.9f,
+                filterType = EqBand.FilterType.LOW_SHELF,
+                enabled = true
+            )
+        )
+        bands.add(createNewBand(1, 200f).copy(gain = -1f, q = 1.2f, enabled = true))
+        bands.add(createNewBand(2, 1000f).copy(gain = 1.5f, q = 1.0f, enabled = true))
+        bands.add(createNewBand(3, 3000f).copy(gain = 2.5f, q = 1.3f, enabled = true))
+        bands.add(createNewBand(4, 6000f).copy(gain = 1.5f, q = 1.0f, enabled = true))
+        bands.add(
+            createNewBand(5, 12000f).copy(
+                gain = 1f,
+                q = 0.8f,
+                filterType = EqBand.FilterType.HIGH_SHELF,
+                enabled = true
+            )
+        )
         selectedBandIndex = 2
         compressorMultibandEnabled = true
         limiterEnabled = true
         limiterThreshold = -2f
         limiterRatio = 8f
+        limiterAttack = 1f
+        limiterRelease = 100f
     }
 
     // ===================== PERSISTENCIA =====================
