@@ -23,6 +23,10 @@ class AudioEngine(private val context: Context) {
 
     var settings = EqSettings()
 
+    /** 0..100. Punch is applied post-MBC, independently from the 18 Hz foundation. */
+    var punch: Float = PunchPreset.DEFAULT
+        private set
+
     private var dynamicsProcessing: DynamicsProcessing? = null
     private var visualizer: Visualizer? = null
     private var audioSessionId: Int = 0
@@ -162,9 +166,16 @@ class AudioEngine(private val context: Context) {
         applyPostEq()
     }
 
+    /** Real DSP punch control. Applied after MBC in post-EQ to reduce compressor pumping. */
+    fun setPunch(v: Float) {
+        punch = v.coerceIn(0f, 100f)
+        applyPostEq()
+    }
+
     fun setBands(list: List<EqBand>) {
         settings.bands = list
         applyEq()
+        applyPostEq()
     }
 
     fun setPipelineTags(pipeline: Boolean, lowShelf: Boolean, peak: Boolean, highShelf: Boolean) {
@@ -174,6 +185,7 @@ class AudioEngine(private val context: Context) {
         highShelfTag = highShelf
         applyEq()
         applyMbc()
+        applyPostEq()
     }
 
     fun setLimiter(
@@ -260,6 +272,7 @@ class AudioEngine(private val context: Context) {
         settings.compPreGainHiMid = preGainHiMid
         settings.compPreGainHigh = preGainHigh
         applyMbc()
+        applyPostEq()
     }
 
     fun applyAll() {
@@ -273,69 +286,71 @@ class AudioEngine(private val context: Context) {
     private fun applyInputGain() {
         val dp = dynamicsProcessing ?: return
         try {
-            dp.setInputGainAllChannelsTo(settings.preGain.coerceIn(-30f, 30f))
+            // Predictive headroom: reserve part of the punch boost before DSP processing.
+            val reserve = PunchControl.midBassGain(punch) * 0.65f
+            dp.setInputGainAllChannelsTo((settings.preGain - reserve).coerceIn(-30f, 12f))
         } catch (e: Exception) {
             Log.e(TAG, "inputGain: " + e.message)
         }
     }
 
     private fun applyEq() {
-    val dp = dynamicsProcessing ?: return
-    if (internalFreqs.isEmpty()) return
+        val dp = dynamicsProcessing ?: return
+        if (internalFreqs.isEmpty()) return
 
-    try {
-        val s = settings
-        val activeFilters = mutableListOf<BiquadFilter>()
+        try {
+            val s = settings
+            val activeFilters = mutableListOf<BiquadFilter>()
 
-        for (b in s.bands) {
-            if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
-            if (!tagAllowed(b)) continue
+            for (b in s.bands) {
+                if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
+                if (!tagAllowed(b)) continue
 
-            val gain = when (b.filterType) {
-                EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
-                else -> b.gain
+                val gain = when (b.filterType) {
+                    EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
+                    else -> b.gain
+                }
+
+                activeFilters += BiquadFilter(
+                    frequency = b.frequency,
+                    gainDb = gain,
+                    q = b.q,
+                    type = b.filterType,
+                    sampleRate = deviceSampleRate
+                )
             }
 
-            activeFilters += BiquadFilter(
-                frequency = b.frequency,
-                gainDb = gain,
-                q = b.q,
-                type = b.filterType,
-                sampleRate = deviceSampleRate
-            )
+            val subBoost = s.subBoost.coerceIn(0f, 12f)
+
+            for (i in internalFreqs.indices) {
+                val freq = internalFreqs[i]
+                var totalDb = 0f
+
+                for (filter in activeFilters) {
+                    totalDb += filter.responseDb(freq)
+                }
+
+                // Sub foundation: intentionally concentrated below 90 Hz.
+                if (freq < 90f && subBoost > 0f) {
+                    val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
+                    totalDb += subBoost * (0.35f + 0.65f * t * t)
+                }
+
+                // Soft infrasonic protection. The 18 Hz foundation remains audible/usable.
+                when {
+                    freq <= 10f -> totalDb -= 18f
+                    freq <= 14f -> totalDb -= 10f
+                    freq <= 16f -> totalDb -= 6f
+                    freq < 20f -> totalDb -= 2f
+                }
+
+                val gain = totalDb.coerceIn(-30f, 30f)
+                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, freq, gain))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "eq: " + e.message)
         }
-
-        val subBoost = s.subBoost.coerceIn(0f, 12f)
-
-        for (i in internalFreqs.indices) {
-            val freq = internalFreqs[i]
-            var totalDb = 0f
-
-            for (filter in activeFilters) {
-                totalDb += filter.responseDb(freq)
-            }
-
-            // Sub-boost sismico enfocado bajo 90 Hz
-            if (freq < 90f && subBoost > 0f) {
-                val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
-                totalDb += subBoost * (0.35f + 0.65f * t * t)
-            }
-
-            // Proteccion infrasonica SUAVE (mantiene punch)
-            when {
-                freq <= 10f -> totalDb -= 18f
-                freq <= 14f -> totalDb -= 10f
-                freq <= 16f -> totalDb -= 6f
-                freq < 20f -> totalDb -= 2f
-            }
-
-            val gain = totalDb.coerceIn(-30f, 30f)
-            dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, freq, gain))
-        }
-    } catch (e: Exception) {
-        Log.e(TAG, "eq: " + e.message)
     }
-}
 
     private fun tagAllowed(b: EqBand): Boolean = when (b.filterType) {
         EqBand.FilterType.LOW_SHELF, EqBand.FilterType.LOW_PASS -> lowShelfTag
@@ -392,12 +407,30 @@ class AudioEngine(private val context: Context) {
         val dp = dynamicsProcessing ?: return
         try {
             val sub = settings.subBoost.coerceIn(0f, 12f)
-            val g31 = sub * 0.55f
-            val g63 = sub * 0.35f
+            val punchAmount = PunchControl.amount(punch)
+            val center = PunchControl.punchCenter(punch)
+            val q = PunchControl.punchQ(punch)
+            val sigma = 0.55f / q
+
+            fun punchAt(freq: Float): Float {
+                val x = ln((freq / center).coerceAtLeast(0.001f)).toFloat()
+                return PunchControl.midBassGain(punch) * exp(-(x * x) / (2f * sigma * sigma))
+            }
+
+            // Punch is post-MBC: 18 Hz remains the foundation and MBC does not chase the boost.
+            val g31 = sub * 0.55f + punchAt(31.5f) * 0.55f
+            val g63 = sub * 0.35f + punchAt(63f)
             dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(g31 > 0.1f, 31.5f, g31))
             dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(g63 > 0.1f, 63f, g63))
             dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(false, 250f, 0f))
             dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(false, 1000f, 0f))
+
+            if (punchAmount <= 0f && sub <= 0f) {
+                dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(false, 31.5f, 0f))
+                dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(false, 63f, 0f))
+            }
+            // Keep the compiler aware that amount is intentionally part of the control path.
+            @Suppress("UNUSED_VARIABLE") val _amount = punchAmount
         } catch (e: Exception) {
             Log.e(TAG, "postEq: " + e.message)
         }
