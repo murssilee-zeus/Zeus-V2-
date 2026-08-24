@@ -74,7 +74,7 @@ fun EqGraph(
     onBandMoved: (Int, frequency: Float, gain: Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val minFreq = 20f
+    val minFreq = 18f
     val maxFreq = 20000f
     val minGain = -30f
     val maxGain = 30f
@@ -170,7 +170,7 @@ fun EqGraph(
                         if (idx !in bands.indices) return@detectDragGestures
                         val w = size.width.toFloat()
                         val h = size.height.toFloat()
-                        val f = xToFreq(change.position.x, w).coerceIn(20f, 20000f)
+                        val f = xToFreq(change.position.x, w).coerceIn(18f, 20000f)
                         val g = (maxGain - (change.position.y / h) * (maxGain - minGain))
                             .coerceIn(minGain, maxGain)
                         onBandMoved(idx, f, g)
@@ -196,8 +196,19 @@ fun EqGraph(
                 val n = (displaySpectrum.size - 1).coerceAtLeast(1)
                 val spPath = Path()
                 val spFill = Path()
-                displaySpectrum.forEachIndexed { i, v ->
-                    val x = w * i / n.toFloat()
+                val nyquist = 24000f
+                val logMin = ln(minFreq)
+                val logMax = ln(maxFreq)
+
+                for (i in 0 until displaySpectrum.size) {
+                    val t = i.toFloat() / n.toFloat()
+                    val targetFreq = exp(logMin + t * (logMax - logMin))
+                    val linearIndex = (targetFreq / nyquist * n).coerceIn(0f, n.toFloat())
+                    val lo = floor(linearIndex).toInt().coerceIn(0, n)
+                    val hi = ceil(linearIndex).toInt().coerceIn(0, n)
+                    val frac = linearIndex - lo
+                    val v = displaySpectrum[lo] * (1f - frac) + displaySpectrum[hi] * frac
+                    val x = w * t
                     val amp = (sqrt(v.coerceIn(0f, 1f)) * 0.55f).coerceIn(0f, 1f)
                     val y = h * (1f - amp)
                     if (i == 0) {
