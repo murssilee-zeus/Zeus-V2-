@@ -13,13 +13,18 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
@@ -59,9 +64,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         try {
             requestNeededPermissions()
-            setContent {
-                ComposeRoot()
-            }
+            setContent { ComposeRoot() }
         } catch (e: Throwable) {
             android.util.Log.e("ZeusMain", "onCreate fatal: ${android.util.Log.getStackTraceString(e)}")
             android.widget.Toast.makeText(this, "Error: ${e.javaClass.simpleName}", android.widget.Toast.LENGTH_LONG).show()
@@ -71,9 +74,11 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ComposeRoot() {
         val viewModel: EqViewModel = viewModel(factory = EqViewModel.Factory)
+        val punchViewModel: PunchViewModel = viewModel()
 
         LaunchedEffect(Unit) {
             viewModel.loadSavedIfAny()
+            punchViewModel.loadSaved()
         }
 
         LaunchedEffect(Unit) {
@@ -89,13 +94,15 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(audioService) {
             audioService?.audioEngine?.let { engine ->
                 engine.settings = viewModel.toSettings()
+                engine.setPunch(punchViewModel.amount)
                 engine.applyAll()
             }
         }
 
-        LaunchedEffect(viewModel.bands.toList(), viewModel.subBoost) {
+        LaunchedEffect(viewModel.bands.toList(), viewModel.subBoost, punchViewModel.amount) {
             audioService?.audioEngine?.setBands(viewModel.bands.toList())
             audioService?.audioEngine?.setSubBoost(viewModel.subBoost)
+            audioService?.audioEngine?.setPunch(punchViewModel.amount)
         }
 
         LaunchedEffect(viewModel.preamp) {
@@ -197,18 +204,29 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = Color(0xFF0D0D12)
             ) {
-                MainScreen(
-                    viewModel = viewModel,
-                    onToggleEngine = { toggleEngine(viewModel) },
-                    onSave = {
-                        viewModel.saveSettings()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Configuración guardada",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                )
+                Box(Modifier.fillMaxSize()) {
+                    MainScreen(
+                        viewModel = viewModel,
+                        onToggleEngine = { toggleEngine(viewModel) },
+                        onSave = {
+                            viewModel.saveSettings()
+                            punchViewModel.save()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Configuración guardada",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    )
+
+                    PunchControlPanel(
+                        viewModel = punchViewModel,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .width(225.dp)
+                            .padding(8.dp)
+                    )
+                }
             }
         }
     }
@@ -272,7 +290,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // No conectar el servicio al abrir: evita crash en algunos dispositivos.
         // El motor solo arranca al pulsar el botón de power.
     }
 
