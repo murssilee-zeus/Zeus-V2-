@@ -1,6 +1,7 @@
 package com.zeus.v2
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
@@ -22,14 +23,14 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadSaved() {
         amount = getApplication<Application>()
-            .getSharedPreferences(PREFS, Application.MODE_PRIVATE)
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getFloat(KEY_AMOUNT, PunchPreset.DEFAULT)
             .coerceIn(0f, 100f)
     }
 
     fun save() {
         getApplication<Application>()
-            .getSharedPreferences(PREFS, Application.MODE_PRIVATE)
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putFloat(KEY_AMOUNT, amount)
             .apply()
