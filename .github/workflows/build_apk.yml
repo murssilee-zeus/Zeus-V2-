@@ -3,6 +3,8 @@ name: Build Zeus-V2 APK
 on:
   push:
     branches: [ main, master, fix/punch-v2 ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
