@@ -169,6 +169,7 @@ class AudioEngine(private val context: Context) {
     /** Real DSP punch control. Applied after MBC in post-EQ to reduce compressor pumping. */
     fun setPunch(v: Float) {
         punch = v.coerceIn(0f, 100f)
+        applyInputGain()
         applyPostEq()
     }
 
@@ -286,7 +287,6 @@ class AudioEngine(private val context: Context) {
     private fun applyInputGain() {
         val dp = dynamicsProcessing ?: return
         try {
-            // Predictive headroom: reserve part of the punch boost before DSP processing.
             val reserve = PunchControl.midBassGain(punch) * 0.65f
             dp.setInputGainAllChannelsTo((settings.preGain - reserve).coerceIn(-30f, 12f))
         } catch (e: Exception) {
@@ -330,13 +330,11 @@ class AudioEngine(private val context: Context) {
                     totalDb += filter.responseDb(freq)
                 }
 
-                // Sub foundation: intentionally concentrated below 90 Hz.
                 if (freq < 90f && subBoost > 0f) {
                     val t = (1f - (freq / 90f)).coerceIn(0f, 1f)
                     totalDb += subBoost * (0.35f + 0.65f * t * t)
                 }
 
-                // Soft infrasonic protection. The 18 Hz foundation remains audible/usable.
                 when {
                     freq <= 10f -> totalDb -= 18f
                     freq <= 14f -> totalDb -= 10f
@@ -407,7 +405,6 @@ class AudioEngine(private val context: Context) {
         val dp = dynamicsProcessing ?: return
         try {
             val sub = settings.subBoost.coerceIn(0f, 12f)
-            val punchAmount = PunchControl.amount(punch)
             val center = PunchControl.punchCenter(punch)
             val q = PunchControl.punchQ(punch)
             val sigma = 0.55f / q
@@ -417,7 +414,6 @@ class AudioEngine(private val context: Context) {
                 return PunchControl.midBassGain(punch) * exp(-(x * x) / (2f * sigma * sigma))
             }
 
-            // Punch is post-MBC: 18 Hz remains the foundation and MBC does not chase the boost.
             val g31 = sub * 0.55f + punchAt(31.5f) * 0.55f
             val g63 = sub * 0.35f + punchAt(63f)
             dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(g31 > 0.1f, 31.5f, g31))
@@ -425,12 +421,10 @@ class AudioEngine(private val context: Context) {
             dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(false, 250f, 0f))
             dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(false, 1000f, 0f))
 
-            if (punchAmount <= 0f && sub <= 0f) {
+            if (punch <= 0f && sub <= 0f) {
                 dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(false, 31.5f, 0f))
                 dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(false, 63f, 0f))
             }
-            // Keep the compiler aware that amount is intentionally part of the control path.
-            @Suppress("UNUSED_VARIABLE") val _amount = punchAmount
         } catch (e: Exception) {
             Log.e(TAG, "postEq: " + e.message)
         }
