@@ -17,7 +17,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     var amount by mutableFloatStateOf(PunchPreset.DEFAULT)
         private set
 
-    fun setAmount(value: Float) {
+    fun updatePunchAmount(value: Float) {
         amount = value.coerceIn(0f, 100f)
     }
 
