@@ -219,12 +219,14 @@ class MainActivity : ComponentActivity() {
                         }
                     )
 
+                    // Punch is kept as a floating control, but lifted above the
+                    // bottom Preamp row so it can never block the value controls.
                     PunchControlPanel(
                         viewModel = punchViewModel,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .width(225.dp)
-                            .padding(8.dp)
+                            .padding(end = 8.dp, bottom = 82.dp)
                     )
                 }
             }
@@ -290,7 +292,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        // El motor solo arranca al pulsar el botón de power.
     }
 
     override fun onStop() {
