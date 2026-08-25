@@ -40,13 +40,13 @@ fun PunchControlPanel(
             .fillMaxWidth()
             .background(Color(0xFF15131A), RoundedCornerShape(12.dp))
             .border(1.dp, Color(0xFFB56BFF), RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("PUNCH", color = Color(0xFFB56BFF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(6.dp))
-            Text("35–65 Hz · post-MBC", color = Color(0xFF888892), fontSize = 10.sp)
+            Text("35–65 Hz · post-MBC", color = Color(0xFF888892), fontSize = 9.sp)
             Spacer(Modifier.weight(1f))
             Text("%.0f%%".format(viewModel.amount), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
@@ -65,7 +65,7 @@ fun PunchControlPanel(
                     activeTrackColor = Color(0xFFB56BFF)
                 )
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(5.dp))
             OutlinedTextField(
                 value = text,
                 onValueChange = { raw ->
@@ -74,9 +74,9 @@ fun PunchControlPanel(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                suffix = { Text("%", fontSize = 11.sp) },
-                modifier = Modifier.width(64.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp, color = Color.White)
+                suffix = { Text("%", fontSize = 10.sp) },
+                modifier = Modifier.width(60.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White)
             )
         }
     }
