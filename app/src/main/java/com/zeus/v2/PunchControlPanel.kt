@@ -55,7 +55,7 @@ fun PunchControlPanel(
             Slider(
                 value = viewModel.amount,
                 onValueChange = {
-                    viewModel.setAmount(it)
+                    viewModel.updatePunchAmount(it)
                     text = "%.0f".format(it)
                 },
                 valueRange = 0f..100f,
@@ -70,7 +70,7 @@ fun PunchControlPanel(
                 value = text,
                 onValueChange = { raw ->
                     text = raw.filter { it.isDigit() }.take(3)
-                    text.toFloatOrNull()?.let { viewModel.setAmount(it) }
+                    text.toFloatOrNull()?.let { viewModel.updatePunchAmount(it) }
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
