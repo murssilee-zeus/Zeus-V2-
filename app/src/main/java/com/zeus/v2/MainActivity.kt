@@ -15,16 +15,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
@@ -205,8 +201,9 @@ class MainActivity : ComponentActivity() {
                 color = Color(0xFF0D0D12)
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    MainScreen(
+                    ZeusStudioScreen(
                         viewModel = viewModel,
+                        punchViewModel = punchViewModel,
                         onToggleEngine = { toggleEngine(viewModel) },
                         onSave = {
                             viewModel.saveSettings()
@@ -218,16 +215,6 @@ class MainActivity : ComponentActivity() {
                             ).show()
                         }
                     )
-
-                    // Punch is kept as a floating control, but lifted above the
-                    // bottom Preamp row so it can never block the value controls.
-                    PunchControlPanel(
-                        viewModel = punchViewModel,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .width(225.dp)
-                            .padding(end = 8.dp, bottom = 82.dp)
-                    )
                 }
             }
         }
@@ -235,19 +222,10 @@ class MainActivity : ComponentActivity() {
 
     private fun toggleEngine(viewModel: EqViewModel) {
         if (viewModel.isEngineRunning) {
-            try {
-                audioService?.audioEngine?.setEnabled(false)
-            } catch (_: Exception) {
-            }
-            try {
-                stopService(Intent(this, AudioEngineService::class.java))
-            } catch (_: Exception) {
-            }
+            try { audioService?.audioEngine?.setEnabled(false) } catch (_: Exception) { }
+            try { stopService(Intent(this, AudioEngineService::class.java)) } catch (_: Exception) { }
             if (bound) {
-                try {
-                    unbindService(connection)
-                } catch (_: Exception) {
-                }
+                try { unbindService(connection) } catch (_: Exception) { }
                 bound = false
             }
             audioService = null
@@ -255,21 +233,13 @@ class MainActivity : ComponentActivity() {
         } else {
             val intent = Intent(this, AudioEngineService::class.java)
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
-                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
                 bindService(intent, connection, Context.BIND_AUTO_CREATE)
                 viewModel.isEngineRunning = true
                 Toast.makeText(this, "Zeus EQ Pro18 activado", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 viewModel.isEngineRunning = false
-                Toast.makeText(
-                    this,
-                    "No se pudo iniciar el motor: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "No se pudo iniciar el motor: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -279,28 +249,19 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.MODIFY_AUDIO_SETTINGS
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         val toRequest = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (toRequest.isNotEmpty()) {
-            requestPermissionLauncher.launch(toRequest.toTypedArray())
-        }
+        if (toRequest.isNotEmpty()) requestPermissionLauncher.launch(toRequest.toTypedArray())
     }
 
-    override fun onStart() {
-        super.onStart()
-    }
+    override fun onStart() { super.onStart() }
 
     override fun onStop() {
         super.onStop()
         if (bound) {
-            try {
-                unbindService(connection)
-            } catch (_: Exception) {
-            }
+            try { unbindService(connection) } catch (_: Exception) { }
             bound = false
         }
     }
