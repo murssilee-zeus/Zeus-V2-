@@ -236,7 +236,7 @@ private fun SmallButton(text: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EditableStudio(label: String, value: Float, unit: String, range: ClosedFloatingPointRange<Float>, onValue: (Float) -> Unit) {
+private fun RowScope.EditableStudio(label: String, value: Float, unit: String, range: ClosedFloatingPointRange<Float>, onValue: (Float) -> Unit) {
     Column(Modifier.weight(1f)) {
         Text(label, color = ZMUTED, fontSize = 9.sp)
         Text("${if (value >= 1000f) "%.1fk".format(value / 1000f) else "%.2f".format(value)} $unit", color = ZPINK, fontSize = 12.sp, fontWeight = FontWeight.Bold)
