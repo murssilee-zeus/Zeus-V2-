@@ -38,6 +38,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     var preamp by mutableFloatStateOf(-6.0f)
+    /** Manual safety trim used by the Punch/Headroom UI; 0 dB preserves the existing DSP behavior. */
+    var headroomTrim by mutableFloatStateOf(0f)
     var subBoost by mutableFloatStateOf(0f)
 
     var limiterEnabled by mutableStateOf(true)
