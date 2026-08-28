@@ -36,7 +36,9 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
-   PunchCard(punch,vm); Pipe(vm)
+   SubSismoCard(vm)
+   PunchCard(punch,vm)
+   Pipe(vm)
   }
  }
 }
@@ -45,6 +47,14 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
 @Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
+
+@Composable private fun SubSismoCard(vm:EqViewModel){
+ Card("SUB / SISMO (18Hz - 90Hz)"){
+  Text("Realce independiente de Punch · graves profundos",color=ZM,fontSize=9.sp)
+  S("Power",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
+  Text("18 Hz foundation · protected by Headroom + Limiter",color=ZM,fontSize=9.sp)
+ }
+}
 
 @Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){Card("PUNCH (35Hz - 65Hz)"){Text("Post-MBC · 18 Hz stays independent",color=ZM,fontSize=9.sp)
   S("Amount",p.amount,0f..100f," %"){p.updatePunchAmount(it)}
