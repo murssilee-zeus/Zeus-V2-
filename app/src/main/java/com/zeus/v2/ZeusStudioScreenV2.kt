@@ -22,7 +22,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  var page by remember{mutableIntStateOf(0)}
  Column(Modifier.fillMaxSize().background(ZBG).padding(10.dp)){
   Row(Modifier.fillMaxWidth().padding(bottom=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
-   Row(verticalAlignment=Alignment.CenterVertically){Text(if(page==0)"Equalizer" else "Dynamics",color=ZT,fontSize=19.sp,fontWeight=FontWeight.Bold);Text("›",color=ZP,fontSize=28.sp,modifier=Modifier.clickable{page=(page+1)%2}.padding(start=4.dp))}
+   Row(verticalAlignment=Alignment.CenterVertically){Text(if(page==0)"Equalizer" else "Dynamics",color=ZT,fontSize=19.sp,fontWeight=FontWeight.Bold);Text(if(page==0)"›" else "‹",color=ZP,fontSize=28.sp,modifier=Modifier.clickable{page=if(page==0)1 else 0}.padding(start=4.dp))}
    Row(verticalAlignment=Alignment.CenterVertically){Text("Guardar",color=Color.White,fontSize=12.sp,modifier=Modifier.background(Color(0xFF0E4D3A),RoundedCornerShape(18.dp)).border(1.dp,ZG,RoundedCornerShape(18.dp)).clickable{onSave()}.padding(horizontal=14.dp,vertical=8.dp));Spacer(Modifier.width(10.dp));Text(if(vm.isEngineRunning)"●" else "○",color=if(vm.isEngineRunning) ZG else ZM,fontSize=26.sp,modifier=Modifier.clickable{onToggleEngine()})}
   }
   if(page==0) EqPage(vm,punch) else DynPage(vm)
@@ -46,11 +46,44 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
 @Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
 
-@Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){Card("PUNCH (35Hz - 65Hz)"){Text("Post-MBC · 18 Hz stays independent",color=ZM,fontSize=9.sp);S("Amount",p.amount,0f..100f," %"){p.updatePunchAmount(it)};S("Center",49f,35f..65f," Hz"){};S("Q",1.2f,.5f..3f){};S("Headroom trim",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
-  Text("Headroom protection · manual trim",color=ZM,fontSize=9.sp)}}
+@Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){Card("PUNCH (35Hz - 65Hz)"){Text("Post-MBC · 18 Hz stays independent",color=ZM,fontSize=9.sp)
+  S("Amount",p.amount,0f..100f," %"){p.updatePunchAmount(it)}
+  S("Center",p.centerHz,35f..65f," Hz"){p.updatePunchCenter(it)}
+  S("Q",p.q,.5f..3f){p.updatePunchQ(it)}
+  S("Headroom trim",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
+  Text("Punch center and Q are now manual. 18 Hz remains independent.",color=ZM,fontSize=9.sp)}}
 
-@Composable private fun CompCard(vm:EqViewModel){var b by remember{mutableIntStateOf(0)};val n=listOf("LOW","LO-MID","HI-MID","HIGH");val th=listOf(vm.compMbThLow,vm.compMbThLoMid,vm.compMbThHiMid,vm.compMbThHigh);val ra=listOf(vm.compMbRatioLow,vm.compMbRatioLoMid,vm.compMbRatioHiMid,vm.compMbRatioHigh);val at=listOf(vm.compMbAttackLow,vm.compMbAttackLoMid,vm.compMbAttackHiMid,vm.compMbAttackHigh);val re=listOf(vm.compMbReleaseLow,vm.compMbReleaseLoMid,vm.compMbReleaseHiMid,vm.compMbReleaseHigh)
- Card("COMPRESOR MULTIBANDA"){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)){n.forEachIndexed{i,x->Text(x,color=if(b==i)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(b==i)ZP else Color(0xFF1A1B22),RoundedCornerShape(5.dp)).clickable{b=i}.padding(vertical=6.dp))}};S("Threshold",th[b],-60f..0f," dB"){uTh(vm,b,it)};S("Ratio",ra[b],1f..20f," :1"){uRa(vm,b,it)};S("Attack",at[b],1f..100f," ms"){uAt(vm,b,it)};S("Release",re[b],20f..500f," ms"){uRe(vm,b,it)};Row{S("C1",vm.crossoverFrequencies[0],40f..1000f," Hz",Modifier.weight(1f)){vm.setCrossover(0,it)};S("C2",vm.crossoverFrequencies[1],100f..5000f," Hz",Modifier.weight(1f)){vm.setCrossover(1,it)};S("C3",vm.crossoverFrequencies[2],1000f..19500f," Hz",Modifier.weight(1f)){vm.setCrossover(2,it)}};Row(verticalAlignment=Alignment.CenterVertically){Text("Activado",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));Switch(checked=vm.compressorMultibandEnabled,onCheckedChange={vm.compressorMultibandEnabled=it})}}}
+@Composable private fun CompCard(vm:EqViewModel){
+ var b by remember{mutableIntStateOf(0)}
+ val n=listOf("LOW","LO-MID","HI-MID","HIGH")
+ val th=listOf(vm.compMbThLow,vm.compMbThLoMid,vm.compMbThHiMid,vm.compMbThHigh)
+ val ra=listOf(vm.compMbRatioLow,vm.compMbRatioLoMid,vm.compMbRatioHiMid,vm.compMbRatioHigh)
+ val at=listOf(vm.compMbAttackLow,vm.compMbAttackLoMid,vm.compMbAttackHiMid,vm.compMbAttackHigh)
+ val re=listOf(vm.compMbReleaseLow,vm.compMbReleaseLoMid,vm.compMbReleaseHiMid,vm.compMbReleaseHigh)
+ val pre=listOf(vm.compMbPreGainLow,vm.compMbPreGainLoMid,vm.compMbPreGainHiMid,vm.compMbPreGainHigh)
+ val post=listOf(vm.compMbPostGainLow,vm.compMbPostGainLoMid,vm.compMbPostGainHiMid,vm.compMbPostGainHigh)
+ Card("COMPRESOR MULTIBANDA"){
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)){n.forEachIndexed{i,x->Text(x,color=if(b==i)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(b==i)ZP else Color(0xFF1A1B22),RoundedCornerShape(5.dp)).clickable{b=i}.padding(vertical=6.dp))}}
+  Row(Modifier.fillMaxWidth().height(72.dp),horizontalArrangement=Arrangement.spacedBy(3.dp)){
+   listOf("20Hz–120Hz","120Hz–1.2k","1.2k–8k","8k–20k").forEachIndexed{i,label->Box(Modifier.weight(1f).fillMaxHeight().background(if(i==b)ZP.copy(alpha=.22f) else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(i==b)ZP else ZBR,RoundedCornerShape(5.dp)).clickable{b=i},contentAlignment=Alignment.Center){Text(label,color=if(i==b)ZP else ZM,fontSize=8.sp,textAlign=TextAlign.Center)}}}
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+   S("PRE",pre[b],-12f..12f," dB",Modifier.weight(1f)){uPre(vm,b,it)}
+   S("THRESHOLD",th[b],-60f..0f," dB",Modifier.weight(1f)){uTh(vm,b,it)}
+   S("POST",post[b],-12f..12f," dB",Modifier.weight(1f)){uPost(vm,b,it)}
+  }
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+   S("RATIO",ra[b],1f..20f," :1",Modifier.weight(1f)){uRa(vm,b,it)}
+   S("ATTACK",at[b],1f..100f," ms",Modifier.weight(1f)){uAt(vm,b,it)}
+   S("RELEASE",re[b],20f..500f," ms",Modifier.weight(1f)){uRe(vm,b,it)}
+  }
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+   S("CROSS 1",vm.crossoverFrequencies[0],40f..1000f," Hz",Modifier.weight(1f)){vm.setCrossover(0,it)}
+   S("CROSS 2",vm.crossoverFrequencies[1],100f..5000f," Hz",Modifier.weight(1f)){vm.setCrossover(1,it)}
+   S("CROSS 3",vm.crossoverFrequencies[2],1000f..19500f," Hz",Modifier.weight(1f)){vm.setCrossover(2,it)}
+  }
+  Row(verticalAlignment=Alignment.CenterVertically){Text("COMPRESSOR",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));Switch(checked=vm.compressorMultibandEnabled,onCheckedChange={vm.compressorMultibandEnabled=it})}
+ }
+}
 
 @Composable private fun LimCard(vm:EqViewModel){Card("LIMITADOR"){S("Threshold",vm.limiterThreshold,-12f..0f," dB"){vm.limiterThreshold=it};S("Attack",vm.limiterAttack,.1f..20f," ms"){vm.limiterAttack=it};S("Release",vm.limiterRelease,20f..500f," ms"){vm.limiterRelease=it};S("Ratio",vm.limiterRatio,1f..30f," :1"){vm.limiterRatio=it};S("Post Gain",vm.limiterPostGain,-12f..12f," dB"){vm.limiterPostGain=it};Row(verticalAlignment=Alignment.CenterVertically){Text("Activado",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));Switch(checked=vm.limiterEnabled,onCheckedChange={vm.limiterEnabled=it})}}}
 @Composable private fun Pipe(vm:EqViewModel){Card("AUDIO EFFECTS PIPELINE"){Text("1  MBC · Procesamiento multibanda",color=ZT,fontSize=10.sp);Text("2  PUNCH 35-65 Hz · Controlado de subgraves",color=ZT,fontSize=10.sp);Text("3  LIMITER · Protección final de picos",color=ZT,fontSize=10.sp);Text("DIRECT OUTPUT · ACTIVO",color=ZG,fontSize=10.sp,fontWeight=FontWeight.Bold)}}
@@ -88,6 +121,8 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
 @Composable private fun Presets(vm:EqViewModel){Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("Flat" to {vm.applyPresetFlat()},"Infrabass" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal" to {vm.applyPresetVocalClear()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}}}
 @Composable private fun Bands(vm:EqViewModel){Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(3.dp)){vm.bands.forEachIndexed{i,b->Text("${i+1}\n${if(b.frequency>=1000)(b.frequency/1000).toString()+"k" else b.frequency.toInt().toString()}",color=if(i==vm.selectedBandIndex)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.width(42.dp).background(if(i==vm.selectedBandIndex)b.color else ZSUR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(i)}.padding(vertical=5.dp))}}}
 
+private fun uPre(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbPreGainLow=x;1->v.compMbPreGainLoMid=x;2->v.compMbPreGainHiMid=x;3->v.compMbPreGainHigh=x}}
+private fun uPost(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbPostGainLow=x;1->v.compMbPostGainLoMid=x;2->v.compMbPostGainHiMid=x;3->v.compMbPostGainHigh=x}}
 private fun uTh(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbThLow=x;1->v.compMbThLoMid=x;2->v.compMbThHiMid=x;3->v.compMbThHigh=x}}
 private fun uRa(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbRatioLow=x;1->v.compMbRatioLoMid=x;2->v.compMbRatioHiMid=x;3->v.compMbRatioHigh=x}}
 private fun uAt(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbAttackLow=x;1->v.compMbAttackLoMid=x;2->v.compMbAttackHiMid=x;3->v.compMbAttackHigh=x}}
