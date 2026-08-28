@@ -25,7 +25,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    Row(verticalAlignment=Alignment.CenterVertically){Text(if(page==0)"Equalizer" else "Dynamics",color=ZT,fontSize=19.sp,fontWeight=FontWeight.Bold);Text("›",color=ZP,fontSize=28.sp,modifier=Modifier.clickable{page=(page+1)%2}.padding(start=4.dp))}
    Row(verticalAlignment=Alignment.CenterVertically){Text("Guardar",color=Color.White,fontSize=12.sp,modifier=Modifier.background(Color(0xFF0E4D3A),RoundedCornerShape(18.dp)).border(1.dp,ZG,RoundedCornerShape(18.dp)).clickable{onSave()}.padding(horizontal=14.dp,vertical=8.dp));Spacer(Modifier.width(10.dp));Text(if(vm.isEngineRunning)"●" else "○",color=if(vm.isEngineRunning) ZG else ZM,fontSize=26.sp,modifier=Modifier.clickable{onToggleEngine()})}
   }
-  if(page==0) EqPage(vm,punch) else DynPage(vm,punch)
+  if(page==0) EqPage(vm,punch) else DynPage(vm)
  }
 }
 
@@ -41,7 +41,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  }
 }
 
-@Composable private fun DynPage(vm:EqViewModel,punch:PunchViewModel){Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm)};Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){LimCard(vm)}}}
+@Composable private fun DynPage(vm:EqViewModel){Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm)};Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){LimCard(vm)}}}
 
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
 @Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
@@ -59,17 +59,17 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  val b=vm.selectedBand()?:return
  Card("BANDA ${vm.selectedBandIndex+1}"){
   Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
-   EditableBox("FREQ",b.frequency,"Hz",1f,30000f){vm.updateSelectedBand(frequency=it)}
-   EditableBox("GAIN",b.gain,"dB",-30f,30f){vm.updateSelectedBand(gain=it)}
-   EditableBox("Q",b.q,"",.1f,40f){vm.updateSelectedBand(q=it)}
+   EditableBox("FREQ",b.frequency,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
+   EditableBox("GAIN",b.gain,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
+   EditableBox("Q",b.q,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
   }
-  EditableBox("PREAMP",vm.preamp,"dB",-30f,12f){vm.preamp=it}
+  EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.fillMaxWidth()){vm.preamp=it}
  }
 }
 
-@Composable private fun EditableBox(label:String,value:Float,unit:String,min:Float,max:Float,onSet:(Float)->Unit){
+@Composable private fun EditableBox(label:String,value:Float,unit:String,min:Float,max:Float,modifier:Modifier,onSet:(Float)->Unit){
  var show by remember{mutableStateOf(false)}
- Column(Modifier.weight(1f).background(Color(0xFF0D0E13),RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{show=true}.padding(7.dp)){
+ Column(modifier.background(Color(0xFF0D0E13),RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{show=true}.padding(7.dp)){
   Text(label,color=ZM,fontSize=8.sp)
   Text("${fmt(value)} $unit",color=ZPK,fontSize=12.sp,fontWeight=FontWeight.Bold)
  }
@@ -88,3 +88,5 @@ private fun uTh(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbThLow=x;1->v.com
 private fun uRa(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbRatioLow=x;1->v.compMbRatioLoMid=x;2->v.compMbRatioHiMid=x;3->v.compMbRatioHigh=x}}
 private fun uAt(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbAttackLow=x;1->v.compMbAttackLoMid=x;2->v.compMbAttackHiMid=x;3->v.compMbAttackHigh=x}}
 private fun uRe(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbReleaseLow=x;1->v.compMbReleaseLoMid=x;2->v.compMbReleaseHiMid=x;3->v.compMbReleaseHigh=x}}
+
+private fun fmt(v:Float):String = if (kotlin.math.abs(v) >= 1000f) "%.1fk".format(v/1000f) else "%.2f".format(v)
