@@ -55,30 +55,33 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 @Composable private fun Pipe(vm:EqViewModel){Card("AUDIO EFFECTS PIPELINE"){Text("1  MBC · Procesamiento multibanda",color=ZT,fontSize=10.sp);Text("2  PUNCH 35-65 Hz · Controlado de subgraves",color=ZT,fontSize=10.sp);Text("3  LIMITER · Protección final de picos",color=ZT,fontSize=10.sp);Text("DIRECT OUTPUT · ACTIVO",color=ZG,fontSize=10.sp,fontWeight=FontWeight.Bold)}}
 
 @Composable private fun Filters(vm:EqViewModel){val b=vm.selectedBand();val t=listOf(EqBand.FilterType.PEAK to "PEAK",EqBand.FilterType.LOW_SHELF to "LOW",EqBand.FilterType.HIGH_SHELF to "HIGH",EqBand.FilterType.LOW_PASS to "LPF",EqBand.FilterType.HIGH_PASS to "HPF",EqBand.FilterType.BYPASS to "BYPASS");Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(3.dp)){t.forEach{(x,l)->Text(l,color=if(b?.filterType==x)Color.Black else ZT,fontSize=8.sp,modifier=Modifier.background(if(b?.filterType==x) ZPK else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{vm.updateSelectedBand(filterType=x)}.padding(horizontal=8.dp,vertical=6.dp))}}}
-@Composable private fun BandEdit(vm:EqViewModel){
- val b=vm.selectedBand()?:return
- Card("BANDA ${vm.selectedBandIndex+1}"){
-  Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
-   EditableBox("FREQ",b.frequency,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
-   EditableBox("GAIN",b.gain,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
-   EditableBox("Q",b.q,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
-  }
-  EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.fillMaxWidth()){vm.preamp=it}
- }
+@Composable
+private fun BandEdit(vm: EqViewModel) {
+    val b = vm.selectedBand() ?: return
+    Card("BANDA ${vm.selectedBandIndex + 1}") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            EditableBox("FREQ", b.frequency, "Hz", 1f, 30000f, Modifier.weight(1f)) { vm.updateSelectedBand(frequency = it) }
+            EditableBox("GAIN", b.gain, "dB", -30f, 30f, Modifier.weight(1f)) { vm.updateSelectedBand(gain = it) }
+            EditableBox("Q", b.q, "", .1f, 40f, Modifier.weight(1f)) { vm.updateSelectedBand(q = it) }
+        }
+        EditableBox("PREAMP", vm.preamp, "dB", -30f, 12f, Modifier.fillMaxWidth()) { vm.preamp = it }
+    }
 }
 
-@Composable private fun EditableBox(label:String,value:Float,unit:String,min:Float,max:Float,modifier:Modifier,onSet:(Float)->Unit){
- var show by remember{mutableStateOf(false)}
- Column(modifier.background(Color(0xFF0D0E13),RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{show=true}.padding(7.dp)){
-  Text(label,color=ZM,fontSize=8.sp)
-  Text("${fmt(value)} $unit",color=ZPK,fontSize=12.sp,fontWeight=FontWeight.Bold)
- }
- if(show) NumberDialog(label,value,min,max,unit,{onSet(it);show=false},{show=false})
+@Composable
+private fun EditableBox(label:String,value:Float,unit:String,min:Float,max:Float,modifier:Modifier,onSet:(Float)->Unit){
+    var show by remember { mutableStateOf(false) }
+    Column(modifier.background(Color(0xFF0D0E13),RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{show=true}.padding(7.dp)){
+        Text(label,color=ZM,fontSize=8.sp)
+        Text("${fmt(value)} $unit",color=ZPK,fontSize=12.sp,fontWeight=FontWeight.Bold)
+    }
+    if(show) NumberDialog(label,value,min,max,unit,{v->onSet(v);show=false},{show=false})
 }
 
-@Composable private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:String,onConfirm:(Float)->Unit,onCancel:()->Unit){
- var text by remember(value){mutableStateOf(fmt(value))}
- AlertDialog(onDismissRequest=onCancel,title={Text(title)},text={OutlinedTextField(value=text,onValueChange={text=it},singleLine=true,label={Text(if(unit.isEmpty())"Valor" else unit)})},confirmButton={TextButton(onClick={text.toFloatOrNull()?.let{onConfirm(it.coerceIn(min,max))}}){Text("OK")}},dismissButton={TextButton(onClick=onCancel){Text("Cancelar")}})
+@Composable
+private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:String,onConfirm:(Float)->Unit,onCancel:()->Unit){
+    var text by remember(value){mutableStateOf(fmt(value))}
+    AlertDialog(onDismissRequest=onCancel,title={Text(title)},text={OutlinedTextField(value=text,onValueChange={text=it},singleLine=true,label={Text(if(unit.isEmpty())"Valor" else unit)})},confirmButton={TextButton(onClick={text.toFloatOrNull()?.let{onConfirm(it.coerceIn(min,max))}}){Text("OK")}},dismissButton={TextButton(onClick=onCancel){Text("Cancelar")}})
 }
 
 @Composable private fun Presets(vm:EqViewModel){Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("Flat" to {vm.applyPresetFlat()},"Infrabass" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal" to {vm.applyPresetVocalClear()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}}}
