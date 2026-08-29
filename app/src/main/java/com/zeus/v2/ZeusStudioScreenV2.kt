@@ -130,8 +130,85 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
     AlertDialog(onDismissRequest=onCancel,title={Text(title)},text={OutlinedTextField(value=text,onValueChange={text=it},singleLine=true,label={Text(if(unit.isEmpty())"Valor" else unit)})},confirmButton={TextButton(onClick={text.toFloatOrNull()?.let{onConfirm(it.coerceIn(min,max))}}){Text("OK")}},dismissButton={TextButton(onClick=onCancel){Text("Cancelar")}})
 }
 
-@Composable private fun Presets(vm:EqViewModel){Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("Flat" to {vm.applyPresetFlat()},"Infrabass" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal" to {vm.applyPresetVocalClear()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}}}
-@Composable private fun Bands(vm:EqViewModel){Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(3.dp)){vm.bands.forEachIndexed{i,b->Text("${i+1}\n${if(b.frequency>=1000)(b.frequency/1000).toString()+"k" else b.frequency.toInt().toString()}",color=if(i==vm.selectedBandIndex)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.width(42.dp).background(if(i==vm.selectedBandIndex)b.color else ZSUR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(i)}.padding(vertical=5.dp))}}}
+@Composable private fun Presets(vm:EqViewModel){
+ Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+   listOf("Flat" to {vm.applyPresetFlat()},"Infrabass" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal" to {vm.applyPresetVocalClear()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}
+  }
+  SavedPresetsCard(vm)
+  AutoEqCard(vm)
+ }
+}
+@Composable private fun Bands(vm:EqViewModel){
+ Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(3.dp)){
+   vm.bands.forEachIndexed{i,b->Text("\${i+1}\\n\${if(b.frequency>=1000)(b.frequency/1000).toString()+"k" else b.frequency.toInt().toString()}",color=if(i==vm.selectedBandIndex)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.width(42.dp).background(if(i==vm.selectedBandIndex)b.color else ZSUR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(i)}.padding(vertical=5.dp))}
+  }
+  Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
+   Text("BANDAS \${vm.bands.size}/\${EqViewModel.MAX_BANDS}",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f))
+   Text("−",color=ZT,fontSize=18.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{vm.removeSelectedBand()}.padding(horizontal=10.dp,vertical=2.dp))
+   Text("+ BANDA",color=Color.White,fontSize=9.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{vm.addBand()}.padding(horizontal=9.dp,vertical=6.dp))
+  }
+ }
+}
+
+@Composable private fun SavedPresetsCard(vm:EqViewModel){
+ var names by remember { mutableStateOf(vm.namedPresetNames()) }
+ var showSave by remember { mutableStateOf(false) }
+ var name by remember { mutableStateOf("") }
+ Card("MIS CONFIGURACIONES"){
+  Row(verticalAlignment=Alignment.CenterVertically){
+   Text("Guardar configuración con nombre",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f))
+   Text("+ GUARDAR",color=Color.White,fontSize=9.sp,modifier=Modifier.background(ZG,RoundedCornerShape(6.dp)).clickable{showSave=true}.padding(horizontal=8.dp,vertical=6.dp))
+  }
+  names.forEach { preset ->
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Text(preset,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{vm.loadNamedPreset(preset)})
+    Text("CARGAR",color=ZP,fontSize=8.sp,modifier=Modifier.clickable{vm.loadNamedPreset(preset)}.padding(4.dp))
+    Text("×",color=ZPK,fontSize=14.sp,modifier=Modifier.clickable{vm.deleteNamedPreset(preset);names=vm.namedPresetNames()}.padding(4.dp))
+   }
+  }
+  if(names.isEmpty()) Text("Aún no hay configuraciones guardadas.",color=ZM,fontSize=8.sp)
+ }
+ if(showSave){
+  AlertDialog(onDismissRequest={showSave=false},title={Text("Guardar configuración")},text={OutlinedTextField(value=name,onValueChange={name=it},singleLine=true,label={Text("Nombre")})},
+   confirmButton={TextButton(onClick={if(name.trim().isNotEmpty()){vm.saveNamedPreset(name);names=vm.namedPresetNames();name="";showSave=false}}){Text("Guardar")}},
+   dismissButton={TextButton(onClick={showSave=false}){Text("Cancelar")}})
+ }
+}
+
+@Composable private fun AutoEqCard(vm:EqViewModel){
+ var show by remember { mutableStateOf(false) }
+ var query by remember { mutableStateOf("") }
+ var loading by remember { mutableStateOf(false) }
+ var error by remember { mutableStateOf<String?>(null) }
+ val scope=rememberCoroutineScope()
+ Card("AUTOEQ"){
+  Row(verticalAlignment=Alignment.CenterVertically){
+   Column(Modifier.weight(1f)){Text("Corrección de auriculares basada en AutoEq",color=ZM,fontSize=9.sp);Text("Lista de modelos · perfil paramétrico",color=ZT,fontSize=9.sp)}
+   Text("ELEGIR MODELO",color=Color.White,fontSize=9.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{show=true;error=null}.padding(horizontal=8.dp,vertical=6.dp))
+  }
+  if(error!=null) Text(error!!,color=ZPK,fontSize=8.sp)
+ }
+ if(show){
+  AlertDialog(onDismissRequest={if(!loading)show=false},title={Text("AutoEQ · Modelos")},text={
+   Column(Modifier.heightIn(max=430.dp)){
+    OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo")},modifier=Modifier.fillMaxWidth())
+    Spacer(Modifier.height(6.dp))
+    androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)){
+     items(AutoEqRepository.models(query)){model->
+      Row(Modifier.fillMaxWidth().clickable{
+       if(!loading){loading=true;error=null;scope.launch{try{val profile=AutoEqRepository.load(model);vm.applyAutoEqProfile(profile);show=false}catch(t:Throwable){error=t.message?:"No se pudo cargar AutoEQ"}finally{loading=false}}}
+      }.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){
+       Text(model.name,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+       Text(if(loading)"..." else "APLICAR",color=ZP,fontSize=8.sp)
+      }
+     }
+    }
+   }
+  },confirmButton={TextButton(onClick={if(!loading)show=false}){Text(if(loading)"Cargando..." else "Cerrar")}})
+ }
+}
 
 private fun uPre(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbPreGainLow=x;1->v.compMbPreGainLoMid=x;2->v.compMbPreGainHiMid=x;3->v.compMbPreGainHigh=x}}
 private fun uPost(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbPostGainLow=x;1->v.compMbPostGainLoMid=x;2->v.compMbPostGainHiMid=x;3->v.compMbPostGainHigh=x}}
