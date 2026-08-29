@@ -19,7 +19,7 @@ enum class EqSection {
 class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
-        const val MAX_BANDS = 18
+        const val MAX_BANDS = 32
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -377,6 +377,29 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         selectedAudioSession = s.selectedAudioSession
     }
 
+    fun saveNamedPreset(name: String) {
+        val clean = name.trim()
+        if (clean.isNotEmpty()) EqPrefs.saveNamed(getApplication(), clean, toSettings())
+    }
+
+    fun loadNamedPreset(name: String) {
+        EqPrefs.loadNamed(getApplication(), name)?.let { loadFrom(it) }
+    }
+
+    fun deleteNamedPreset(name: String) { EqPrefs.deleteNamed(getApplication(), name) }
+
+    fun namedPresetNames(): List<String> = EqPrefs.listNamed(getApplication())
+
+    fun applyAutoEqProfile(profile: AutoEqProfile) {
+        preamp = profile.preamp
+        bands.clear()
+        profile.filters.take(MAX_BANDS).forEachIndexed { i, f ->
+            bands.add(createNewBand(i, f.frequency).copy(gain=f.gain, q=f.q, filterType=f.type, enabled=true))
+        }
+        if (bands.isEmpty()) bands.add(createNewBand(0, 1000f))
+        selectedBandIndex = 0
+        limiterEnabled = true
+    }
     fun saveSettings() {
         EqPrefs.save(getApplication(), toSettings())
     }
