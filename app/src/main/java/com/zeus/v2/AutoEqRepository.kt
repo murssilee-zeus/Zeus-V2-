@@ -11,7 +11,7 @@ data class AutoEqFilter(val frequency: Float, val gain: Float, val q: Float, val
 data class AutoEqModel(val name: String, val source: String = "oratory1990")
 
 object AutoEqRepository {
-    private const val BASE = "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/oratory1990/harman_over-ear_2018/"
+    private const val BASE = "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/oratory1990/over-ear/"
     private val modelNames = listOf(
         "Sennheiser HD 600","Sennheiser HD 650","Sennheiser HD 560S","Sennheiser HD 800 S",
         "Sennheiser HD 800","Sennheiser HD 660S2","Sennheiser HD 490 Pro (mixing earpads)",
@@ -23,7 +23,7 @@ object AutoEqRepository {
         "Audio-Technica ATH-M50x","Audio-Technica ATH-M70x","Audio-Technica ATH-R70x",
         "Focal Bathys","Focal Utopia","Focal Elear","Audeze LCD-X","Audeze LCD-XC",
         "Bose QuietComfort 45","Bose Noise Cancelling Headphones 700","RØDE NTH-100",
-        "Shure SRH440","Shure SRH840","Philips Fidelio X2HR","Meze 109 Pro"
+        "Shure SRH440","Shure SRH840","Philips Fidelio X2HR","Meze 109 Pro","Sony WH-1000XM5","Koss KSC75X (Yaxi earpads)","FiiO FT5 (suede earpads)"
     ).sorted()
 
     fun models(query: String = ""): List<AutoEqModel> {
@@ -49,13 +49,13 @@ object AutoEqRepository {
         var preamp = 0f
         val filters = mutableListOf<AutoEqFilter>()
         val pre = Regex("""(?i)^\s*Preamp\s*:\s*([-+]?\d+(?:\.\d+)?)\s*dB""")
-        val filter = Regex("""(?i)^\s*Filter\s*\d+\s*:\s*ON\s+(PK|LS|HS|LP|HP)\s+Fc\s+([-+]?\d+(?:\.\d+)?)\s*Hz\s+Gain\s+([-+]?\d+(?:\.\d+)?)\s*dB\s+Q\s+([-+]?\d+(?:\.\d+)?)""")
+        val filter = Regex("""(?i)^\s*Filter\s*\d+\s*:\s*ON\s+(PK|LSC|HSC|LP|HP)\s+Fc\s+([-+]?\d+(?:\.\d+)?)\s*Hz\s+Gain\s+([-+]?\d+(?:\.\d+)?)\s*dB\s+Q\s+([-+]?\d+(?:\.\d+)?)""")
         text.lineSequence().forEach { line ->
             pre.find(line)?.let { preamp = it.groupValues[1].toFloatOrNull() ?: preamp }
             filter.find(line)?.let {
                 val type = when (it.groupValues[1].uppercase(Locale.ROOT)) {
-                    "LS" -> EqBand.FilterType.LOW_SHELF
-                    "HS" -> EqBand.FilterType.HIGH_SHELF
+                    "LSC" -> EqBand.FilterType.LOW_SHELF
+                    "HSC" -> EqBand.FilterType.HIGH_SHELF
                     "LP" -> EqBand.FilterType.LOW_PASS
                     "HP" -> EqBand.FilterType.HIGH_PASS
                     else -> EqBand.FilterType.PEAK
