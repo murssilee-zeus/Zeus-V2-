@@ -68,6 +68,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  val n=listOf("LOW","LO-MID","HI-MID","HIGH")
  val th=listOf(vm.compMbThLow,vm.compMbThLoMid,vm.compMbThHiMid,vm.compMbThHigh)
  val ra=listOf(vm.compMbRatioLow,vm.compMbRatioLoMid,vm.compMbRatioHiMid,vm.compMbRatioHigh)
+ val knee=listOf(vm.compMbKneeLow,vm.compMbKneeLoMid,vm.compMbKneeHiMid,vm.compMbKneeHigh)
  val at=listOf(vm.compMbAttackLow,vm.compMbAttackLoMid,vm.compMbAttackHiMid,vm.compMbAttackHigh)
  val re=listOf(vm.compMbReleaseLow,vm.compMbReleaseLoMid,vm.compMbReleaseHiMid,vm.compMbReleaseHigh)
  val pre=listOf(vm.compMbPreGainLow,vm.compMbPreGainLoMid,vm.compMbPreGainHiMid,vm.compMbPreGainHigh)
@@ -83,6 +84,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   }
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
    S("RATIO",ra[b],1f..20f," :1",Modifier.weight(1f)){uRa(vm,b,it)}
+   S("KNEE",knee[b],0f..20f," dB",Modifier.weight(1f)){uKnee(vm,b,it)}
    S("ATTACK",at[b],1f..100f," ms",Modifier.weight(1f)){uAt(vm,b,it)}
    S("RELEASE",re[b],20f..500f," ms",Modifier.weight(1f)){uRe(vm,b,it)}
   }
@@ -135,6 +137,7 @@ private fun uPre(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbPreGainLow=x;1-
 private fun uPost(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbPostGainLow=x;1->v.compMbPostGainLoMid=x;2->v.compMbPostGainHiMid=x;3->v.compMbPostGainHigh=x}}
 private fun uTh(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbThLow=x;1->v.compMbThLoMid=x;2->v.compMbThHiMid=x;3->v.compMbThHigh=x}}
 private fun uRa(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbRatioLow=x;1->v.compMbRatioLoMid=x;2->v.compMbRatioHiMid=x;3->v.compMbRatioHigh=x}}
+private fun uKnee(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbKneeLow=x;1->v.compMbKneeLoMid=x;2->v.compMbKneeHiMid=x;3->v.compMbKneeHigh=x}}
 private fun uAt(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbAttackLow=x;1->v.compMbAttackLoMid=x;2->v.compMbAttackHiMid=x;3->v.compMbAttackHigh=x}}
 private fun uRe(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbReleaseLow=x;1->v.compMbReleaseLoMid=x;2->v.compMbReleaseHiMid=x;3->v.compMbReleaseHigh=x}}
 
