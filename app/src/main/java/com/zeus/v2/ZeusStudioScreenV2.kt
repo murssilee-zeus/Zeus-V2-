@@ -187,13 +187,16 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
  val scope=rememberCoroutineScope()
  Card("AUTOEQ"){
   Row(verticalAlignment=Alignment.CenterVertically){
-   Column(Modifier.weight(1f)){Text("Corrección de auriculares basada en AutoEq",color=ZM,fontSize=9.sp);Text("Lista de modelos · perfil paramétrico",color=ZT,fontSize=9.sp)}
-   Text("ELEGIR MODELO",color=Color.White,fontSize=9.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{show=true;error=null}.padding(horizontal=8.dp,vertical=6.dp))
+   Column(Modifier.weight(1f)){
+    Text("Corrección de auriculares basada en AutoEQ",color=ZM,fontSize=9.sp)
+    Text("${AutoEqRepository.models().size} modelos disponibles · perfil paramétrico",color=ZT,fontSize=9.sp)
+   }
+   Text("VER MODELOS",color=Color.White,fontSize=9.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{show=true;query="";error=null}.padding(horizontal=8.dp,vertical=6.dp))
   }
   if(error!=null) Text(error!!,color=ZPK,fontSize=8.sp)
  }
  if(show){
-  AlertDialog(onDismissRequest={if(!loading)show=false},title={Text("AutoEQ · Modelos")},text={
+  AlertDialog(onDismissRequest={if(!loading)show=false},title={Text("AutoEQ · Lista de modelos")},text={
    Column(Modifier.heightIn(max=430.dp)){
     OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo")},modifier=Modifier.fillMaxWidth())
     Spacer(Modifier.height(6.dp))
