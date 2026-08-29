@@ -68,6 +68,6 @@ object AutoEqRepository {
                 )
             }
         }
-        AutoEqProfile(preamp.coerceIn(-30f, 12f), filters)
+        return AutoEqProfile(preamp.coerceIn(-30f, 12f), filters)
     }
 }
