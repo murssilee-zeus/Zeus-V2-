@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -146,7 +147,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
    vm.bands.forEachIndexed{i,b->Text("\${i+1}\\n\${if(b.frequency>=1000)(b.frequency/1000).toString()+"k" else b.frequency.toInt().toString()}",color=if(i==vm.selectedBandIndex)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.width(42.dp).background(if(i==vm.selectedBandIndex)b.color else ZSUR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(i)}.padding(vertical=5.dp))}
   }
   Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
-   Text("BANDAS \${vm.bands.size}/\${EqViewModel.MAX_BANDS}",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f))
+   Text("BANDAS ${vm.bands.size}/${EqViewModel.MAX_BANDS}",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f))
    Text("−",color=ZT,fontSize=18.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{vm.removeSelectedBand()}.padding(horizontal=10.dp,vertical=2.dp))
    Text("+ BANDA",color=Color.White,fontSize=9.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{vm.addBand()}.padding(horizontal=9.dp,vertical=6.dp))
   }
