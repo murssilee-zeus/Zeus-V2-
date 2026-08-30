@@ -45,6 +45,8 @@ class AudioEngine(private val context: Context) {
     var spectrumData: FloatArray = FloatArray(128) { 0f }
         private set
 
+    private val spectrumAnalyzer = SpectrumAnalyzer(sampleRate = 48000, fftLen = 2048, hopLen = 512, nFFTAverage = 1)
+
     @Volatile
     var isEnabled = false
         private set
