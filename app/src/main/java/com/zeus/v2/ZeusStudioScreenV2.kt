@@ -22,31 +22,72 @@ private val ZT=Color(0xFFF1F1F4); private val ZM=Color(0xFF8D8F9A)
 @Composable
 fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit){
  var page by remember{mutableIntStateOf(0)}
- Column(Modifier.fillMaxSize().background(ZBG).padding(10.dp)){
-  Row(Modifier.fillMaxWidth().padding(bottom=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
-   Row(verticalAlignment=Alignment.CenterVertically){Text(if(page==0)"Equalizer" else "Dynamics",color=ZT,fontSize=19.sp,fontWeight=FontWeight.Bold);Text(if(page==0)"›" else "‹",color=ZP,fontSize=28.sp,modifier=Modifier.clickable{page=if(page==0)1 else 0}.padding(start=4.dp))}
-   Row(verticalAlignment=Alignment.CenterVertically){Text("Guardar",color=Color.White,fontSize=12.sp,modifier=Modifier.background(Color(0xFF0E4D3A),RoundedCornerShape(18.dp)).border(1.dp,ZG,RoundedCornerShape(18.dp)).clickable{onSave()}.padding(horizontal=14.dp,vertical=8.dp));Spacer(Modifier.width(10.dp));Text(if(vm.isEngineRunning)"●" else "○",color=if(vm.isEngineRunning) ZG else ZM,fontSize=26.sp,modifier=Modifier.clickable{onToggleEngine()})}
+ Column(Modifier.fillMaxSize().background(ZBG).padding(8.dp)){
+  Row(Modifier.fillMaxWidth().height(42.dp),verticalAlignment=Alignment.CenterVertically){
+   Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp))
+   Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
+    Text("ZEUS EQ PRO18",color=ZT,fontSize=20.sp,fontWeight=FontWeight.Bold)
+    Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZP,fontSize=8.sp)
+   }
+   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp))
   }
-  if(page==0) EqPage(vm,punch) else DynPage(vm)
+  Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+   listOf("1  EQ / PUNCH","2  DYNAMICS","3  AUTOEQ / PRESETS").forEachIndexed{i,label->
+    Text(label,color=if(page==i)Color.Black else ZT,fontSize=9.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(6.dp)).clickable{page=i}.padding(vertical=7.dp))
+   }
+  }
+  Box(Modifier.weight(1f).fillMaxWidth()){
+   when(page){0->EqPage(vm,punch);1->DynPage(vm);2->AutoEqPage(vm)}
+  }
+  Row(Modifier.fillMaxWidth().padding(top=4.dp),verticalAlignment=Alignment.CenterVertically){
+   Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{onToggleEngine()})
+   Text("GUARDAR",color=Color.White,fontSize=9.sp,modifier=Modifier.background(Color(0xFF0E4D3A),RoundedCornerShape(7.dp)).border(1.dp,ZG,RoundedCornerShape(7.dp)).clickable{onSave()}.padding(horizontal=12.dp,vertical=6.dp))
+  }
  }
 }
 
 @Composable private fun EqPage(vm:EqViewModel,punch:PunchViewModel){
  Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-  Column(Modifier.weight(1.35f),verticalArrangement=Arrangement.spacedBy(6.dp)){
-   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().weight(1f))
+  Column(Modifier.weight(1.55f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Text("SPECTRUM / EQ CURVE",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+    Text("+ BANDA",color=Color.White,fontSize=8.sp,modifier=Modifier.background(ZP,RoundedCornerShape(5.dp)).clickable{vm.addBand()}.padding(horizontal=8.dp,vertical=5.dp))
+   }
+   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().height(310.dp))
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
-   SubSismoCard(vm)
-   PunchCard(punch,vm)
-   Pipe(vm)
+   SubSismoCard(vm); PunchCard(punch,vm); Pipe(vm)
   }
  }
 }
 
-@Composable private fun DynPage(vm:EqViewModel){Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm)};Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){LimCard(vm)}}}
+@Composable private fun DynPage(vm:EqViewModel){
+ Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+  Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm)}
+  Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){LimCard(vm)}
+ }
+}
 
+@Composable private fun AutoEqPage(vm:EqViewModel){
+ var query by remember{mutableStateOf("")}
+ Card("AUTOEQ · PERFILES DE AUDÍFONOS"){
+  Text("Selecciona tus audífonos y aplica automáticamente su perfil paramétrico.",color=ZM,fontSize=10.sp)
+  OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo o fabricante")},modifier=Modifier.fillMaxWidth())
+  Text("${AutoEqRepository.models().size} modelos disponibles",color=ZP,fontSize=9.sp,fontWeight=FontWeight.Bold)
+  Column(Modifier.fillMaxWidth().weight(1f,false).heightIn(min=220.dp,max=430.dp).verticalScroll(rememberScrollState())){
+   AutoEqRepository.models(query).forEach{model->
+    Row(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZBR,RoundedCornerShape(7.dp)).padding(9.dp),verticalAlignment=Alignment.CenterVertically){
+     Column(Modifier.weight(1f)){Text(model.name,color=ZT,fontSize=10.sp);Text("Perfil paramétrico AutoEQ",color=ZM,fontSize=8.sp)}
+     Text("APLICAR",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{
+      runCatching{AutoEqRepository.load(model)}.getOrNull()?.let{vm.applyAutoEqProfile(it)}
+     }.padding(7.dp))
+    }
+   }
+  }
+ }
+ SavedPresetsCard(vm)
+}
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
 @Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
 
@@ -138,7 +179,6 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
    listOf("Flat" to {vm.applyPresetFlat()},"Infrabass" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal" to {vm.applyPresetVocalClear()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}
   }
   SavedPresetsCard(vm)
-  AutoEqCard(vm)
  }
 }
 @Composable private fun Bands(vm:EqViewModel){
