@@ -51,10 +51,10 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
   Column(Modifier.weight(1.55f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
    Row(verticalAlignment=Alignment.CenterVertically){
-    Text("SPECTRUM / EQ CURVE",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+    Column(Modifier.weight(1f)){Text("SPECTRUM / EQ CURVE",color=ZT,fontSize=11.sp,fontWeight=FontWeight.Bold);Text("18 Hz  •  20 kHz  •  REAL-TIME",color=ZM,fontSize=7.sp)}
     Text("+ BANDA",color=Color.White,fontSize=8.sp,modifier=Modifier.background(ZP,RoundedCornerShape(5.dp)).clickable{vm.addBand()}.padding(horizontal=8.dp,vertical=5.dp))
    }
-   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().height(310.dp))
+   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().height(390.dp))
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
