@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 
 private val ZBG=Color(0xFF08090C); private val ZSUR=Color(0xFF12131A); private val ZBR=Color(0xFF2A2C36)
 private val ZP=Color(0xFFB65CFF); private val ZPK=Color(0xFFFF5AA5); private val ZG=Color(0xFF25D17F)
