@@ -196,6 +196,8 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
 }
 
 @Composable private fun SavedPresetsCard(vm:EqViewModel){
+  val autoEqContext = LocalContext.current
+  val scope = rememberCoroutineScope()
  var names by remember { mutableStateOf(vm.namedPresetNames()) }
  var showSave by remember { mutableStateOf(false) }
  var name by remember { mutableStateOf("") }
