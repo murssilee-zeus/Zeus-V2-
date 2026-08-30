@@ -45,8 +45,6 @@ class AudioEngine(private val context: Context) {
     var spectrumData: FloatArray = FloatArray(128) { 0f }
         private set
 
-    private val spectrumAnalyzer = SpectrumAnalyzer(sampleRate = 48000, fftLen = 2048, hopLen = 512, nFFTAverage = 1)
-
     @Volatile
     var isEnabled = false
         private set
@@ -458,31 +456,39 @@ class AudioEngine(private val context: Context) {
             v.captureSize = 1024
             v.setDataCaptureListener(
                 object : Visualizer.OnDataCaptureListener {
-                    override fun onWaveFormDataCapture(
-                        visualizer: Visualizer?,
-                        waveform: ByteArray?,
-                        samplingRate: Int
-                    ) {
-                    }
+                    override fun onWaveFormDataCapture(visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
+                    override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int) {
+                        if (fft == null || fft.size < 4) return
+                        val bins = fft.size / 2
+                        val raw = FloatArray(bins)
+                        for (b in 1 until bins) {
+                            val re = fft[b * 2].toInt()
+                            val im = fft[b * 2 + 1].toInt()
+                            val mag = sqrt((re * re + im * im).toFloat()).coerceAtLeast(1f)
+                            raw[b] = 20f * log10(mag / 128f).coerceAtLeast(1e-4f)
+                        }
 
-                    override fun onFftDataCapture(
-                        visualizer: Visualizer?,
-                        fft: ByteArray?,
-                        samplingRate: Int
-                    ) {
-                        if (fft == null || fft.size < 2) return
-                        val n = fft.size / 2
+                        // 128 display points distributed logarithmically from 18 Hz to 20 kHz.
                         val out = FloatArray(128)
-                        for (i in 0 until 128) {
-                            val idx = (i.toFloat() / 127f * (n - 1)).toInt().coerceIn(0, n - 1)
-                            val re = ((fft[idx * 2].toInt() and 0xFF) - 128).toFloat()
-                            val im = ((fft[idx * 2 + 1].toInt() and 0xFF) - 128).toFloat()
-                            out[i] = (sqrt(re * re + im * im) / 128f).coerceIn(0f, 1f)
+                        var previous = 0f
+                        for (i in out.indices) {
+                            val t = i.toFloat() / (out.lastIndex)
+                            val freq = 18.0 * Math.pow(20000.0 / 18.0, t.toDouble())
+                            val bin = (freq / samplingRate.coerceAtLeast(1) * (bins * 2)).toInt()
+                                .coerceIn(1, bins - 1)
+                            val db = raw[bin]
+                            // Fast attack + controlled decay makes the spectrum visibly responsive.
+                            previous = if (db > previous) {
+                                previous + (db - previous) * 0.72f
+                            } else {
+                                previous * 0.88f + db * 0.12f
+                            }
+                            out[i] = ((previous + 48f) / 48f).coerceIn(0f, 1f)
                         }
                         spectrumData = out
                     }
                 },
-                Visualizer.getMaxCaptureRate() / 2,
+                Visualizer.getMaxCaptureRate(),
                 false,
                 true
             )
