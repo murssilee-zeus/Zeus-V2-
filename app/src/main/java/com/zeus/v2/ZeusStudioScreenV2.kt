@@ -77,11 +77,11 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo o fabricante")},modifier=Modifier.fillMaxWidth())
   Text("${AutoEqRepository.models(LocalContext.current).size} modelos disponibles",color=ZP,fontSize=9.sp,fontWeight=FontWeight.Bold)
   Column(Modifier.fillMaxWidth().weight(1f,false).heightIn(min=220.dp,max=430.dp).verticalScroll(rememberScrollState())){
-   AutoEqRepository.models(LocalContext.current, query).forEach{model->
+   AutoEqRepository.models(autoEqContext, query).forEach{model->
     Row(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZBR,RoundedCornerShape(7.dp)).padding(9.dp),verticalAlignment=Alignment.CenterVertically){
      Column(Modifier.weight(1f)){Text(model.name,color=ZT,fontSize=10.sp);Text("Perfil paramétrico AutoEQ",color=ZM,fontSize=8.sp)}
      Text("APLICAR",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{
-      scope.launch{runCatching{AutoEqRepository.load(LocalContext.current, model)}.getOrNull()?.let{vm.applyAutoEqProfile(it)}}
+      scope.launch{runCatching{AutoEqRepository.load(autoEqContext, model)}.getOrNull()?.let{vm.applyAutoEqProfile(it)}}
      }.padding(7.dp))
     }
    }
@@ -242,9 +242,9 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
     OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo")},modifier=Modifier.fillMaxWidth())
     Spacer(Modifier.height(6.dp))
     androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)){
-     items(AutoEqRepository.models(LocalContext.current, query)){model->
+     items(AutoEqRepository.models(autoEqContext, query)){model->
       Row(Modifier.fillMaxWidth().clickable{
-       if(!loading){loading=true;error=null;scope.launch{try{val profile=AutoEqRepository.load(LocalContext.current, model);vm.applyAutoEqProfile(profile);show=false}catch(t:Throwable){error=t.message?:"No se pudo cargar AutoEQ"}finally{loading=false}}}
+       if(!loading){loading=true;error=null;scope.launch{try{val profile=AutoEqRepository.load(autoEqContext, model);vm.applyAutoEqProfile(profile);show=false}catch(t:Throwable){error=t.message?:"No se pudo cargar AutoEQ"}finally{loading=false}}}
       }.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){
        Text(model.name,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
        Text(if(loading)"..." else "APLICAR",color=ZP,fontSize=8.sp)
