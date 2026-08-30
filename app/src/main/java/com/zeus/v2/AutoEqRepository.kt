@@ -1,48 +1,51 @@
 package com.zeus.v2
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
+import org.json.JSONArray
 import java.util.Locale
 
 data class AutoEqProfile(val preamp: Float, val filters: List<AutoEqFilter>)
 data class AutoEqFilter(val frequency: Float, val gain: Float, val q: Float, val type: EqBand.FilterType = EqBand.FilterType.PEAK)
-data class AutoEqModel(val name: String, val source: String = "oratory1990")
+data class AutoEqModel(
+    val name: String,
+    val source: String = "",
+    val type: String = "",
+    val path: String = ""
+)
 
 object AutoEqRepository {
-    private const val BASE = "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/oratory1990/over-ear/"
-    private val modelNames = listOf(
-        "Sennheiser HD 600","Sennheiser HD 650","Sennheiser HD 560S","Sennheiser HD 800 S",
-        "Sennheiser HD 800","Sennheiser HD 660S2","Sennheiser HD 490 Pro (mixing earpads)",
-        "Beyerdynamic DT 770 Pro","Beyerdynamic DT 770 Pro (250 Ohm)","Beyerdynamic DT 880",
-        "Beyerdynamic DT 990 Pro","Beyerdynamic DT 900 Pro X","Beyerdynamic DT 700 Pro X",
-        "Beyerdynamic DT 1990","AKG K371","AKG K712","AKG K240 MKII",
-        "HIFIMAN Sundara","HIFIMAN Edition XS","HIFIMAN Arya","HIFIMAN HE400se",
-        "HIFIMAN HE4XX","HIFIMAN HE1000 Stealth","Sony MDR-7506","Sony MDR-MV1",
-        "Audio-Technica ATH-M50x","Audio-Technica ATH-M70x","Audio-Technica ATH-R70x",
-        "Focal Bathys","Focal Utopia","Focal Elear","Audeze LCD-X","Audeze LCD-XC",
-        "Bose QuietComfort 45","Bose Noise Cancelling Headphones 700","RØDE NTH-100",
-        "Shure SRH440","Shure SRH840","Philips Fidelio X2HR","Meze 109 Pro","Sony WH-1000XM5","Koss KSC75X (Yaxi earpads)","FiiO FT5 (suede earpads)"
-    ).sorted()
+    private fun readIndex(context: Context): List<AutoEqModel> = runCatching {
+        val json = context.assets.open("autoeq/index.json").bufferedReader().use { it.readText() }
+        val arr = JSONArray(json)
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                add(AutoEqModel(
+                    name = o.optString("n"),
+                    source = o.optString("s"),
+                    type = o.optString("t"),
+                    path = o.optString("p")
+                ))
+            }
+        }
+    }.getOrDefault(emptyList())
 
-    fun models(query: String = ""): List<AutoEqModel> {
+    fun models(context: Context, query: String = ""): List<AutoEqModel> {
         val q = query.trim().lowercase(Locale.ROOT)
-        return modelNames.filter { q.isEmpty() || it.lowercase(Locale.ROOT).contains(q) }.map(::AutoEqModel)
+        return readIndex(context).filter {
+            q.isEmpty() ||
+            it.name.lowercase(Locale.ROOT).contains(q) ||
+            it.source.lowercase(Locale.ROOT).contains(q)
+        }
     }
 
-    suspend fun load(model: AutoEqModel): AutoEqProfile = withContext(Dispatchers.IO) {
-        val encoded = model.name.replace(" ", "%20")
-        val url = URL(BASE + encoded + "/" + encoded + "%20ParametricEQ.txt")
-        val conn = (url.openConnection() as HttpURLConnection).apply {
-            connectTimeout = 8000
-            readTimeout = 8000
-            requestMethod = "GET"
-        }
-        try {
-            if (conn.responseCode !in 200..299) error("AutoEQ: HTTP " + conn.responseCode)
-            parse(conn.inputStream.bufferedReader().use { it.readText() })
-        } finally { conn.disconnect() }
+    suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile = withContext(Dispatchers.IO) {
+        require(model.path.isNotBlank()) { "Perfil AutoEQ no disponible" }
+        val text = context.assets.open("autoeq/profiles/" + model.path)
+            .bufferedReader().use { it.readText() }
+        parse(text)
     }
 
     private fun parse(text: String): AutoEqProfile {
