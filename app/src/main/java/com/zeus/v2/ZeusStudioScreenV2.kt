@@ -241,6 +241,8 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
   if(error!=null) Text(error!!,color=ZPK,fontSize=8.sp)
  }
  if(show){
+  val autoEqContext = LocalContext.current
+  val scope = rememberCoroutineScope()
   AlertDialog(onDismissRequest={if(!loading)show=false},title={Text("AutoEQ · Lista de modelos")},text={
    Column(Modifier.heightIn(max=430.dp)){
     OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo")},modifier=Modifier.fillMaxWidth())
