@@ -36,6 +36,28 @@ jobs:
           fi
           chmod +x ./gradlew
 
+      - name: Sync AutoEQ database and targets
+        run: |
+          rm -rf /tmp/AutoEq app/src/main/assets/autoeq app/src/main/assets/targets
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
+          cd /tmp/AutoEq
+          git sparse-checkout set results targets
+          cd -
+          mkdir -p app/src/main/assets/autoeq/profiles app/src/main/assets/targets
+          cp -R /tmp/AutoEq/results/. app/src/main/assets/autoeq/profiles/
+          cp -R /tmp/AutoEq/targets/. app/src/main/assets/targets/
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('app/src/main/assets/autoeq/profiles')
+          rows=[]
+          for p in sorted(root.rglob('*ParametricEQ.txt')):
+              rel=p.relative_to(root).as_posix()
+              parts=p.parts
+              rows.append({'n':p.stem.replace(' ParametricEQ',''),'s':parts[0] if parts else '','t':next((x for x in parts if x in ('in-ear','over-ear','earbud','on-ear')), ''),'r':'','p':rel})
+          pathlib.Path('app/src/main/assets/autoeq/index.json').write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
+          print('AutoEQ profiles:',len(rows))
+          PY
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
