@@ -71,6 +71,8 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 }
 
 @Composable private fun AutoEqPage(vm:EqViewModel){
+  val autoEqContext = LocalContext.current
+  val scope = rememberCoroutineScope()
  var query by remember{mutableStateOf("")}
  Card("AUTOEQ · PERFILES DE AUDÍFONOS"){
   Text("Selecciona tus audífonos y aplica automáticamente su perfil paramétrico.",color=ZM,fontSize=10.sp)
