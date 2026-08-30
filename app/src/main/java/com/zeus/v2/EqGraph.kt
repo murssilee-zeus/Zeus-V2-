@@ -34,7 +34,7 @@ import kotlin.math.*
 fun calculateBandResponse(freq: Float, band: EqBand): Float {
     val f0=band.frequency.coerceAtLeast(1f); val w=freq/f0; val gainDb=band.gain
     return when(band.filterType){
-        EqBand.FilterType.PEAK->{val bw=1f/band.q.coerceAtLeast(.1f);val x=(ln(w)).pow(2)/(2f*bw*bw);gainDb*(1f-x).coerceIn(0f,1f)}
+        EqBand.FilterType.PEAK->{val bw=1f/band.q.coerceAtLeast(.1f);val x=(ln(w)).pow(2)/(2f*bw*bw);gainDb*exp(-x)}
         EqBand.FilterType.LOW_SHELF->if(freq<=f0)gainDb else gainDb*.15f
         EqBand.FilterType.HIGH_SHELF->if(freq>=f0)gainDb else gainDb*.15f
         EqBand.FilterType.LOW_PASS->{val order=(band.q*2f).coerceIn(1f,6f);-12f*log10(1f+(freq/f0).pow(order))}
@@ -50,7 +50,7 @@ fun EqGraph(bands:List<EqBand>,selectedIndex:Int,spectrum:FloatArray,onBandSelec
     val minFreq=18f;val maxFreq=20000f;val minGain=-30f;val maxGain=30f
     fun freqToX(freq:Float,width:Float):Float{val a=ln(minFreq);val b=ln(maxFreq);return ((ln(freq.coerceIn(minFreq,maxFreq))-a)/(b-a))*width}
     fun xToFreq(x:Float,width:Float):Float{val a=ln(minFreq);val b=ln(maxFreq);return exp(a+(x/width).coerceIn(0f,1f)*(b-a))}
-    val responsePoints=remember(bands){FloatArray(256){i->val t=i.toFloat()/255f;val f=exp(ln(minFreq)+t*(ln(maxFreq)-ln(minFreq)));var total=0f;for(bb in bands)if(bb.enabled)total+=calculateBandResponse(f,bb);total.coerceIn(minGain,maxGain)}}
+    val responsePoints=remember(bands){FloatArray(320){i->val t=i.toFloat()/319f;val f=exp(ln(minFreq)+t*(ln(maxFreq)-ln(minFreq)));var total=0f;for(bb in bands)if(bb.enabled)total+=calculateBandResponse(f,bb);total.coerceIn(minGain,maxGain)}}
     var displaySpectrum by remember{mutableStateOf(FloatArray(0))}
     LaunchedEffect(spectrum){
         if(spectrum.isEmpty()){displaySpectrum=FloatArray(0);return@LaunchedEffect}
@@ -63,9 +63,13 @@ fun EqGraph(bands:List<EqBand>,selectedIndex:Int,spectrum:FloatArray,onBandSelec
     Box(modifier.background(Color(0xFF12141A)).padding(6.dp)){
         Canvas(Modifier.fillMaxSize().pointerInput(bands){detectTapGestures{off->var closest=-1;var best=Float.MAX_VALUE;bands.forEachIndexed{idx,b->val bx=freqToX(b.frequency,size.width.toFloat());val d=abs(bx-off.x);if(d<best){best=d;closest=idx}};if(closest>=0&&best<90f)onBandSelected(closest)}}.pointerInput(selectedIndex,bands){detectDragGestures{change,_->change.consume();val idx=selectedIndex;if(idx !in bands.indices)return@detectDragGestures;val w=size.width.toFloat();val h=size.height.toFloat();val f=xToFreq(change.position.x,w).coerceIn(18f,20000f);val g=(maxGain-(change.position.y/h)*(maxGain-minGain)).coerceIn(minGain,maxGain);onBandMoved(idx,f,g)}}){
             if(tick.isNaN())return@Canvas;val w=size.width;val h=size.height;val midY=h/2f
-            for(i in 0..6){val y=h*i/6f;drawLine(Color(0xFF2A2E38),Offset(0f,y),Offset(w,y),1f)}
-            for(i in 0..8){val x=w*i/8f;drawLine(Color(0xFF2A2E38),Offset(x,0f),Offset(x,h),1f)}
-            drawLine(Color(0xFF4A5568),Offset(0f,midY),Offset(w,midY),1.5f)
+            for(i in 0..6){val y=h*i/6f;drawLine(Color(0xFF242832),Offset(0f,y),Offset(w,y),1f)}
+            val gridFreqs=floatArrayOf(18f,31.5f,63f,125f,250f,500f,1000f,2000f,4000f,8000f,16000f,20000f)
+            gridFreqs.forEach{f->val x=freqToX(f,w);drawLine(Color(0xFF242832),Offset(x,0f),Offset(x,h),1f)}
+            val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.rgb(120,124,136);textSize=22f}
+            gridFreqs.forEach{f->val x=freqToX(f,w);val label=if(f>=1000f)"${(f/1000f).toInt()}k" else "${f.toInt()}";drawContext.canvas.nativeCanvas.drawText(label,(x+2f).coerceAtMost(w-42f),h-8f,paint)}
+            for(db in intArrayOf(30,20,10,0,-10,-20,-30)){val y=(1f-((db-minGain)/(maxGain-minGain)))*h;drawContext.canvas.nativeCanvas.drawText("${db}dB",4f,(y-4f).coerceAtLeast(18f),paint)}
+            drawLine(Color(0xFF596273),Offset(0f,midY),Offset(w,midY),1.5f)
             if(displaySpectrum.isNotEmpty()){
                 val n=(displaySpectrum.size-1).coerceAtLeast(1);val spPath=Path();val spFill=Path();val nyquist=24000f;val logMin=ln(minFreq);val logMax=ln(maxFreq)
                 for(i in displaySpectrum.indices){val t=i.toFloat()/n;val targetFreq=exp(logMin+t*(logMax-logMin));val linearIndex=(targetFreq/nyquist*n).coerceIn(0f,n.toFloat());val lo=floor(linearIndex).toInt().coerceIn(0,n);val hi=ceil(linearIndex).toInt().coerceIn(0,n);val frac=linearIndex-lo;val v=displaySpectrum[lo]*(1f-frac)+displaySpectrum[hi]*frac;val x=w*t;val normalized=((v-.01f)/.99f).coerceIn(0f,1f);val amp=(normalized.pow(.45f)*.86f).coerceIn(0f,.92f);val y=h*(1f-amp);if(i==0){spPath.moveTo(x,y);spFill.moveTo(x,h);spFill.lineTo(x,y)}else{spPath.lineTo(x,y);spFill.lineTo(x,y)}}
