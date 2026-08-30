@@ -74,13 +74,13 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  Card("AUTOEQ · PERFILES DE AUDÍFONOS"){
   Text("Selecciona tus audífonos y aplica automáticamente su perfil paramétrico.",color=ZM,fontSize=10.sp)
   OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo o fabricante")},modifier=Modifier.fillMaxWidth())
-  Text("${AutoEqRepository.models().size} modelos disponibles",color=ZP,fontSize=9.sp,fontWeight=FontWeight.Bold)
+  Text("${AutoEqRepository.models(LocalContext.current).size} modelos disponibles",color=ZP,fontSize=9.sp,fontWeight=FontWeight.Bold)
   Column(Modifier.fillMaxWidth().weight(1f,false).heightIn(min=220.dp,max=430.dp).verticalScroll(rememberScrollState())){
    AutoEqRepository.models(query).forEach{model->
     Row(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZBR,RoundedCornerShape(7.dp)).padding(9.dp),verticalAlignment=Alignment.CenterVertically){
      Column(Modifier.weight(1f)){Text(model.name,color=ZT,fontSize=10.sp);Text("Perfil paramétrico AutoEQ",color=ZM,fontSize=8.sp)}
      Text("APLICAR",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{
-      runCatching{AutoEqRepository.load(model)}.getOrNull()?.let{vm.applyAutoEqProfile(it)}
+      runCatching{AutoEqRepository.load(LocalContext.current, model)}.getOrNull()?.let{vm.applyAutoEqProfile(it)}
      }.padding(7.dp))
     }
    }
@@ -241,7 +241,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
     OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo")},modifier=Modifier.fillMaxWidth())
     Spacer(Modifier.height(6.dp))
     androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)){
-     items(AutoEqRepository.models(query)){model->
+     items(AutoEqRepository.models(LocalContext.current, query)){model->
       Row(Modifier.fillMaxWidth().clickable{
        if(!loading){loading=true;error=null;scope.launch{try{val profile=AutoEqRepository.load(model);vm.applyAutoEqProfile(profile);show=false}catch(t:Throwable){error=t.message?:"No se pudo cargar AutoEQ"}finally{loading=false}}}
       }.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){
