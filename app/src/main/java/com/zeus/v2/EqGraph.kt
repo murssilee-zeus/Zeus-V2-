@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -67,8 +68,8 @@ fun EqGraph(bands:List<EqBand>,selectedIndex:Int,spectrum:FloatArray,onBandSelec
             val gridFreqs=floatArrayOf(18f,31.5f,63f,125f,250f,500f,1000f,2000f,4000f,8000f,16000f,20000f)
             gridFreqs.forEach{f->val x=freqToX(f,w);drawLine(Color(0xFF242832),Offset(x,0f),Offset(x,h),1f)}
             val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.rgb(120,124,136);textSize=22f}
-            gridFreqs.forEach{f->val x=freqToX(f,w);val label=if(f>=1000f)"${(f/1000f).toInt()}k" else "${f.toInt()}";drawContext.canvas.nativeCanvas.drawText(label,(x+2f).coerceAtMost(w-42f),h-8f,paint)}
-            for(db in intArrayOf(30,20,10,0,-10,-20,-30)){val y=(1f-((db-minGain)/(maxGain-minGain)))*h;drawContext.canvas.nativeCanvas.drawText("${db}dB",4f,(y-4f).coerceAtLeast(18f),paint)}
+            gridFreqs.forEach{f->val x=freqToX(f,w);val label=if(f>=1000f)"${(f/1000f).toInt()}k" else "${f.toInt()}";drawIntoCanvas { it.nativeCanvas.drawText(label,(x+2f).coerceAtMost(w-42f),h-8f,paint) } }
+            for(db in intArrayOf(30,20,10,0,-10,-20,-30)){val y=(1f-((db-minGain)/(maxGain-minGain)))*h;drawContext.canvas.nativeCanvas.drawText("${db}dB",4f,(y-4f).coerceAtLeast(18f),paint) } }
             drawLine(Color(0xFF596273),Offset(0f,midY),Offset(w,midY),1.5f)
             if(displaySpectrum.isNotEmpty()){
                 val n=(displaySpectrum.size-1).coerceAtLeast(1);val spPath=Path();val spFill=Path();val nyquist=24000f;val logMin=ln(minFreq);val logMax=ln(maxFreq)
