@@ -117,6 +117,8 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
   }
 
+  Bands(vm)
+
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){
    Column(Modifier.weight(1f)){ Card("SUB / SISMO (18 — 90 Hz)"){
     Text("Realce independiente de PUNCH",color=ZM,fontSize=9.sp)
