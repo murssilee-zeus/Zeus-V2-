@@ -207,6 +207,7 @@ fun EqGraph(
                 if (db > 0) "+$db" else db.toString(),
                 5f, dbToY(db.toFloat(), h) - 4f, paint
             ) }
+        }
 
         // Band nodes remain the interactive controls.
         bands.forEachIndexed { index, band ->
