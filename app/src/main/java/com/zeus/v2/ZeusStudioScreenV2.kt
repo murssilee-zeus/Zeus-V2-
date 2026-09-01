@@ -84,32 +84,79 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 }
 
 @Composable private fun EqPagePortrait(vm:EqViewModel,punch:PunchViewModel){
- Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
   Card("SPECTRUM / EQ CURVE"){
    Row(verticalAlignment=Alignment.CenterVertically){
-    Column(Modifier.weight(1f)){Text("RTA  •  SPECTRUM",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold);Text("18 Hz  —  20 kHz  •  REAL-TIME",color=ZM,fontSize=7.sp)}
-    Text("+ BANDA",color=Color.White,fontSize=8.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{vm.addBand()}.padding(horizontal=9.dp,vertical=6.dp))
+    Column(Modifier.weight(1f)){
+     Text("RTA",color=ZG,fontSize=9.sp,fontWeight=FontWeight.Bold)
+     Text("SPECTRUM  •  18 Hz — 20 kHz  •  REAL-TIME",color=ZT,fontSize=10.sp,fontWeight=FontWeight.SemiBold)
+    }
+    Text("+ BANDA",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(7.dp)).clickable{vm.addBand()}.padding(horizontal=11.dp,vertical=7.dp))
    }
-   Spacer(Modifier.height(4.dp))
-   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxWidth().height(320.dp))
-   Spacer(Modifier.height(3.dp))
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){Text("EQ",color=Color.White,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZP,RoundedCornerShape(6.dp)).padding(vertical=7.dp),textAlign=TextAlign.Center);Text("CURVE",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).padding(vertical=7.dp),textAlign=TextAlign.Center);Text("BANDAS ${vm.bands.size}",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).padding(vertical=7.dp),textAlign=TextAlign.Center)}
+   Spacer(Modifier.height(5.dp))
+   Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF080B12))){
+    EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxSize())
+   }
   }
-  Card("PREAMP / BANDA"){
-   val b=vm.selectedBand()
+
+  Card("PREAMP / EQ CURVE / BANDAS"){
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
     EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
-    EditableBox("FREQ",b?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
-    EditableBox("GAIN",b?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
+    EditableBox("FREQ",vm.selectedBand()?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
+    EditableBox("GAIN",vm.selectedBand()?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
+    EditableBox("Q",vm.selectedBand()?.q?:1f,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
    }
-   Spacer(Modifier.height(3.dp));EditableBox("Q",b?.q?:1f,"",.1f,40f,Modifier.fillMaxWidth()){vm.updateSelectedBand(q=it)}
+   Spacer(Modifier.height(4.dp))
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+    listOf("PEAK","LOW","HIGH","LPF","HPF","BYPASS").forEachIndexed{i,t->
+     Text(t,color=if((i==0 && vm.selectedBand()?.filterType==EqBand.FilterType.PEAK))Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(i==0)ZP else ZSUR,RoundedCornerShape(5.dp)).clickable{
+      vm.updateSelectedBand(filterType=when(i){0->EqBand.FilterType.PEAK;1->EqBand.FilterType.LOW_SHELF;2->EqBand.FilterType.HIGH_SHELF;3->EqBand.FilterType.LOW_PASS;4->EqBand.FilterType.HIGH_PASS;else->EqBand.FilterType.BYPASS})
+     }.padding(vertical=7.dp))
+    }
+   }
   }
-  Card("SUB / SISMO"){Text("18 — 90 Hz  •  independiente de PUNCH",color=ZM,fontSize=9.sp);S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}}
-  Card("PUNCH  •  35 — 65 Hz"){Text("Control de impacto de subgraves",color=ZM,fontSize=9.sp);S("AMOUNT",punch.amount,0f..100f," %"){punch.updatePunchAmount(it)};S("CENTER",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)};S("Q",punch.q,.5f..3f){punch.updatePunchQ(it)};S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}}
-  Card("MBC  →  PUNCH  →  LIMITER"){Text("Cadena de procesamiento",color=ZM,fontSize=9.sp);Text("MBC     →     PUNCH     →     LIMITER",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth())}
-  Filters(vm);Bands(vm);Presets(vm)
+
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){
+   Card("SUB / SISMO (18 — 90 Hz)",Modifier.weight(1f)){
+    Text("Realce independiente de PUNCH",color=ZM,fontSize=9.sp)
+    S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
+   }
+   Card("PUNCH (35 — 65 Hz)",Modifier.weight(1.15f)){
+    Row(verticalAlignment=Alignment.CenterVertically){
+     Text("PUNCH",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+     Text("●",color=ZG,fontSize=11.sp)
+    }
+    S("Hz",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)}
+    S("Q",punch.q,.5f..3f){punch.updatePunchQ(it)}
+    S("AMOUNT",punch.amount,0f..100f," %"){punch.updatePunchAmount(it)}
+   }
+   Card("HEADROOM",Modifier.weight(.9f)){
+    S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
+    Text("Protección de salida",color=ZM,fontSize=8.sp)
+   }
+  }
+
+  Card("MBC  →  PUNCH  →  LIMITER"){
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
+    Text("SUB/SISMO",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold)
+    Text("→",color=ZM)
+    Text("MBC",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+    Text("→",color=ZM)
+    Text("PUNCH",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+    Text("→",color=ZM)
+    Text("LIMITER",color=ZG,fontSize=8.sp,fontWeight=FontWeight.Bold)
+   }
+  }
+
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+   Text("MBC",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{}.padding(8.dp),textAlign=TextAlign.Center)
+   Text("VER BANDAS  →",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1.4f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).padding(8.dp),textAlign=TextAlign.Center)
+  }
+
+  Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))
  }
 }
+
 @Composable private fun AutoEqPage(vm:EqViewModel){
   val autoEqContext = LocalContext.current
   val scope = rememberCoroutineScope()
