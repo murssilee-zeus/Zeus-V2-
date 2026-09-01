@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 import kotlin.math.exp
@@ -193,9 +195,9 @@ fun EqGraph(
             textAlign = android.graphics.Paint.Align.CENTER
         }
         labels.forEach { (freq, label) ->
-            drawContext.canvas.nativeCanvas.drawText(
+            drawIntoCanvas { canvas -> canvas.nativeCanvas.drawText(
                 label, freqToX(freq, w), h - 5f, paint
-            )
+            ) }
         }
 
         // dB labels on the left edge.
@@ -204,7 +206,7 @@ fun EqGraph(
             drawContext.canvas.nativeCanvas.drawText(
                 if (db > 0) "+$db" else db.toString(),
                 5f, dbToY(db.toFloat(), h) - 4f, paint
-            )
+            ) }
         }
 
         // Band nodes remain the interactive controls.
