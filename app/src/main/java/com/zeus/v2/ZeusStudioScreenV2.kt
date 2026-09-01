@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 
 private val ZBG=Color(0xFF08090C); private val ZSUR=Color(0xFF12131A); private val ZBR=Color(0xFF2A2C36)
 private val ZP=Color(0xFFB65CFF); private val ZPK=Color(0xFFFF5AA5); private val ZG=Color(0xFF25D17F)
@@ -23,17 +24,17 @@ private val ZT=Color(0xFFF1F1F4); private val ZM=Color(0xFF8D8F9A)
 @Composable
 fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit){
  var page by remember{mutableIntStateOf(0)}
- Column(Modifier.fillMaxSize().background(ZBG).padding(8.dp)){
+ Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=10.dp,vertical=6.dp)){
   Row(Modifier.fillMaxWidth().height(42.dp),verticalAlignment=Alignment.CenterVertically){
    Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp))
    Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
-    Text("ZEUS EQ PRO18",color=ZT,fontSize=20.sp,fontWeight=FontWeight.Bold)
+    Text("Zeus EQ Pro18",color=ZT,fontSize=21.sp,fontWeight=FontWeight.Bold)
     Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZP,fontSize=8.sp)
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp))
   }
   Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-   listOf("1  EQ / PUNCH","2  DYNAMICS","3  AUTOEQ / PRESETS").forEachIndexed{i,label->
+   listOf("①  EQ / PUNCH","②  DYNAMICS","③  AUTOEQ / PRESETS").forEachIndexed{i,label->
     Text(label,color=if(page==i)Color.Black else ZT,fontSize=9.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(6.dp)).clickable{page=i}.padding(vertical=7.dp))
    }
   }
@@ -48,6 +49,11 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 }
 
 @Composable private fun EqPage(vm:EqViewModel,punch:PunchViewModel){
+ val cfg=LocalConfiguration.current
+ if(cfg.screenHeightDp > cfg.screenWidthDp) { EqPagePortrait(vm,punch) } else { EqPageLandscape(vm,punch) }
+}
+
+@Composable private fun EqPageLandscape(vm:EqViewModel,punch:PunchViewModel){
  Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
   Column(Modifier.weight(1.55f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
    Row(verticalAlignment=Alignment.CenterVertically){
@@ -64,12 +70,46 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 }
 
 @Composable private fun DynPage(vm:EqViewModel){
+ val cfg=LocalConfiguration.current
+ if(cfg.screenHeightDp > cfg.screenWidthDp){
+  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm);LimCard(vm)}
+ } else { DynPageLandscape(vm) }
+}
+
+@Composable private fun DynPageLandscape(vm:EqViewModel){
  Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
   Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm)}
   Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){LimCard(vm)}
  }
 }
 
+@Composable private fun EqPagePortrait(vm:EqViewModel,punch:PunchViewModel){
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
+  Card("SPECTRUM / EQ CURVE"){
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Column(Modifier.weight(1f)){Text("RTA  •  SPECTRUM",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold);Text("18 Hz  —  20 kHz  •  REAL-TIME",color=ZM,fontSize=7.sp)}
+    Text("+ BANDA",color=Color.White,fontSize=8.sp,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{vm.addBand()}.padding(horizontal=9.dp,vertical=6.dp))
+   }
+   Spacer(Modifier.height(4.dp))
+   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxWidth().height(320.dp))
+   Spacer(Modifier.height(3.dp))
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){Text("EQ",color=Color.White,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZP,RoundedCornerShape(6.dp)).padding(vertical=7.dp),textAlign=TextAlign.Center);Text("CURVE",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).padding(vertical=7.dp),textAlign=TextAlign.Center);Text("BANDAS ${vm.bands.size}",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).padding(vertical=7.dp),textAlign=TextAlign.Center)}
+  }
+  Card("PREAMP / BANDA"){
+   val b=vm.selectedBand()
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+    EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
+    EditableBox("FREQ",b?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
+    EditableBox("GAIN",b?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
+   }
+   Spacer(Modifier.height(3.dp));EditableBox("Q",b?.q?:1f,"",.1f,40f,Modifier.fillMaxWidth()){vm.updateSelectedBand(q=it)}
+  }
+  Card("SUB / SISMO"){Text("18 — 90 Hz  •  independiente de PUNCH",color=ZM,fontSize=9.sp);S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}}
+  Card("PUNCH  •  35 — 65 Hz"){Text("Control de impacto de subgraves",color=ZM,fontSize=9.sp);S("AMOUNT",punch.amount,0f..100f," %"){punch.updatePunchAmount(it)};S("CENTER",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)};S("Q",punch.q,.5f..3f){punch.updatePunchQ(it)};S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}}
+  Card("MBC  →  PUNCH  →  LIMITER"){Text("Cadena de procesamiento",color=ZM,fontSize=9.sp);Text("MBC     →     PUNCH     →     LIMITER",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth())}
+  Filters(vm);Bands(vm);Presets(vm)
+ }
+}
 @Composable private fun AutoEqPage(vm:EqViewModel){
   val autoEqContext = LocalContext.current
   val scope = rememberCoroutineScope()
