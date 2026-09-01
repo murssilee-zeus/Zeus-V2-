@@ -179,7 +179,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
   }
  }
- SavedPresetsCard(vm)
+ Presets(vm)
 }
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
 @Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
@@ -269,7 +269,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
 @Composable private fun Presets(vm:EqViewModel){
  Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-   listOf("Flat" to {vm.applyPresetFlat()},"Infrabass" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal" to {vm.applyPresetVocalClear()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}
+   listOf("Flat" to {vm.applyPresetFlat()},"Zeus" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal Clear" to {vm.applyPresetVocalClear()},"Jazz" to {vm.applyPresetJazz()},"Bass-Treble" to {vm.applyPresetBassTreble()},"Acoustic" to {vm.applyPresetAcoustic()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}
   }
   SavedPresetsCard(vm)
  }
