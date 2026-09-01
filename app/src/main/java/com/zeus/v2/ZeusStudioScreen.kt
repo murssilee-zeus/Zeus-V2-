@@ -79,7 +79,7 @@ private fun EqStudioPanel(viewModel: EqViewModel, modifier: Modifier) {
                 bands = viewModel.bands,
                 selectedBandIndex = viewModel.selectedBandIndex,
                 spectrum = viewModel.spectrum,
-                onBandSelected = viewModel::selectBand,
+                onSelect = viewModel::selectBand,
                 onMove = { idx, freq, gain ->
                     viewModel.selectBand(idx)
                     viewModel.updateSelectedBand(frequency = freq, gain = gain)
