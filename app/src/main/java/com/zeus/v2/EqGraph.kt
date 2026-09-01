@@ -203,11 +203,10 @@ fun EqGraph(
         // dB labels on the left edge.
         paint.textAlign = android.graphics.Paint.Align.LEFT
         dbLines.forEach { db ->
-            drawContext.canvas.nativeCanvas.drawText(
+            drawIntoCanvas { canvas -> canvas.nativeCanvas.drawText(
                 if (db > 0) "+$db" else db.toString(),
                 5f, dbToY(db.toFloat(), h) - 4f, paint
             ) }
-        }
 
         // Band nodes remain the interactive controls.
         bands.forEachIndexed { index, band ->
