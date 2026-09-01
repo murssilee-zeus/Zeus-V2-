@@ -77,10 +77,10 @@ private fun EqStudioPanel(viewModel: EqViewModel, modifier: Modifier) {
         CardPanel(Modifier.weight(1f)) {
             EqGraph(
                 bands = viewModel.bands,
-                selectedIndex = viewModel.selectedBandIndex,
+                selectedBandIndex = viewModel.selectedBandIndex,
                 spectrum = viewModel.spectrum,
                 onBandSelected = viewModel::selectBand,
-                onBandMoved = { idx, freq, gain ->
+                onMove = { idx, freq, gain ->
                     viewModel.selectBand(idx)
                     viewModel.updateSelectedBand(frequency = freq, gain = gain)
                 },
