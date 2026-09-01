@@ -274,6 +274,82 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         limiterRelease = 100f
     }
 
+    fun applyPresetJazz() {
+        preamp = -4f
+        subBoost = 0.5f
+        bands.clear()
+        listOf(
+            60f to -1.0f, 120f to 0.5f, 250f to -0.5f, 500f to 0.0f,
+            1000f to 1.0f, 2200f to 1.5f, 4500f to 1.0f, 8000f to 0.5f,
+            12000f to 1.0f
+        ).forEachIndexed { i, (freq, gain) ->
+            bands.add(createNewBand(i, freq).copy(gain = gain, q = if (freq in 1800f..5000f) 1.15f else 1.0f, enabled = true))
+        }
+        selectedBandIndex = 4
+        compressorMultibandEnabled = true
+        limiterEnabled = true
+        limiterThreshold = -2f
+        limiterRatio = 5f
+        limiterAttack = 8f
+        limiterRelease = 120f
+    }
+
+    fun applyPresetBassTreble() {
+        preamp = -5f
+        subBoost = 2f
+        bands.clear()
+        listOf(
+            45f to 3.5f, 100f to 2.5f, 250f to 0f, 500f to -0.5f,
+            1000f to 0f, 2500f to -0.5f, 5000f to 2.0f, 10000f to 3.0f,
+            16000f to 3.5f
+        ).forEachIndexed { i, (freq, gain) ->
+            val type = when (i) {
+                0 -> EqBand.FilterType.LOW_SHELF
+                8 -> EqBand.FilterType.HIGH_SHELF
+                else -> EqBand.FilterType.PEAK
+            }
+            bands.add(createNewBand(i, freq).copy(gain = gain, q = 0.95f, filterType = type, enabled = true))
+        }
+        selectedBandIndex = 0
+        compressorMultibandEnabled = true
+        limiterEnabled = true
+        limiterThreshold = -1.5f
+        limiterRatio = 6f
+        limiterAttack = 2f
+        limiterRelease = 110f
+    }
+
+    fun applyPresetAcoustic() {
+        // Acoustic: graves profundos, voces presentes y agudos finos, sin volver áspera la zona alta.
+        preamp = -5.5f
+        subBoost = 2.5f
+        bands.clear()
+        listOf(
+            32f to 2.8f, 70f to 3.2f, 140f to 1.2f, 280f to -0.8f,
+            900f to 0.8f, 1800f to 1.8f, 3200f to 2.2f, 6500f to 1.5f,
+            10000f to 1.8f, 14500f to 1.2f, 18000f to 0.8f
+        ).forEachIndexed { i, (freq, gain) ->
+            val type = when {
+                i == 0 -> EqBand.FilterType.LOW_SHELF
+                i == 10 -> EqBand.FilterType.HIGH_SHELF
+                else -> EqBand.FilterType.PEAK
+            }
+            val q = when {
+                freq in 1500f..4000f -> 1.05f
+                freq >= 6000f -> 0.8f
+                else -> 1.0f
+            }
+            bands.add(createNewBand(i, freq).copy(gain = gain, q = q, filterType = type, enabled = true))
+        }
+        selectedBandIndex = 5
+        compressorMultibandEnabled = true
+        limiterEnabled = true
+        limiterThreshold = -1.8f
+        limiterRatio = 5f
+        limiterAttack = 3f
+        limiterRelease = 120f
+    }
+
     // ===================== PERSISTENCIA =====================
 
     fun toSettings(): EqSettings = EqSettings(
