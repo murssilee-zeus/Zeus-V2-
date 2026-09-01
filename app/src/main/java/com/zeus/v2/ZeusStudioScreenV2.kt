@@ -117,11 +117,11 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   }
 
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){
-   Card("SUB / SISMO (18 — 90 Hz)",Modifier.weight(1f)){
+   Column(Modifier.weight(1f)){ Card("SUB / SISMO (18 — 90 Hz)"){
     Text("Realce independiente de PUNCH",color=ZM,fontSize=9.sp)
     S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
-   }
-   Card("PUNCH (35 — 65 Hz)",Modifier.weight(1.15f)){
+   } }
+   Column(Modifier.weight(1.15f)){ Card("PUNCH (35 — 65 Hz)"){
     Row(verticalAlignment=Alignment.CenterVertically){
      Text("PUNCH",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
      Text("●",color=ZG,fontSize=11.sp)
@@ -129,11 +129,11 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     S("Hz",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)}
     S("Q",punch.q,.5f..3f){punch.updatePunchQ(it)}
     S("AMOUNT",punch.amount,0f..100f," %"){punch.updatePunchAmount(it)}
-   }
-   Card("HEADROOM",Modifier.weight(.9f)){
+   } }
+   Column(Modifier.weight(.9f)){ Card("HEADROOM"){
     S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
     Text("Protección de salida",color=ZM,fontSize=8.sp)
-   }
+   } }
   }
 
   Card("MBC  →  PUNCH  →  LIMITER"){
