@@ -161,25 +161,73 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 }
 
 @Composable private fun AutoEqPage(vm:EqViewModel){
-  val autoEqContext = LocalContext.current
-  val scope = rememberCoroutineScope()
+ val ctx=LocalContext.current
+ val scope=rememberCoroutineScope()
  var query by remember{mutableStateOf("")}
- Card("AUTOEQ · PERFILES DE AUDÍFONOS"){
-  Text("Selecciona tus audífonos y aplica automáticamente su perfil paramétrico.",color=ZM,fontSize=10.sp)
-  OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,label={Text("Buscar modelo o fabricante")},modifier=Modifier.fillMaxWidth())
-  Text("${AutoEqRepository.models(LocalContext.current).size} modelos disponibles",color=ZP,fontSize=9.sp,fontWeight=FontWeight.Bold)
-  Column(Modifier.fillMaxWidth().weight(1f,false).heightIn(min=220.dp,max=430.dp).verticalScroll(rememberScrollState())){
-   AutoEqRepository.models(autoEqContext, query).forEach{model->
-    Row(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZBR,RoundedCornerShape(7.dp)).padding(9.dp),verticalAlignment=Alignment.CenterVertically){
-     Column(Modifier.weight(1f)){Text(model.name,color=ZT,fontSize=10.sp);Text("Perfil paramétrico AutoEQ",color=ZM,fontSize=8.sp)}
-     Text("APLICAR",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{
-      scope.launch{runCatching{AutoEqRepository.load(autoEqContext, model)}.getOrNull()?.let{vm.applyAutoEqProfile(it)}}
-     }.padding(7.dp))
+ var maker by remember{mutableStateOf("")}
+ var type by remember{mutableStateOf("")}
+ var selected by remember{mutableStateOf<AutoEqModel?>(null)}
+ var status by remember{mutableStateOf("")}
+ var makerMenu by remember{mutableStateOf(false)}
+ var typeMenu by remember{mutableStateOf(false)}
+ val makers=remember{AutoEqRepository.manufacturers(ctx)}
+ val types=remember{AutoEqRepository.types(ctx)}
+ val models=remember(query,maker,type){AutoEqRepository.models(ctx,query,maker,type)}
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
+  Card("AUTOEQ"){
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Column(Modifier.weight(1f)){Text("☁",color=ZP,fontSize=25.sp);Text("AUTOEQ",color=ZT,fontSize=16.sp,fontWeight=FontWeight.Bold);Text("Selecciona tus audífonos y aplica su perfil",color=ZM,fontSize=9.sp)}
+    Text("\${AutoEqRepository.allModels(ctx).size}",color=ZP,fontSize=18.sp,fontWeight=FontWeight.Bold)
+   }
+   OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,placeholder={Text("Buscar modelo, marca o ID...",color=ZM)},modifier=Modifier.fillMaxWidth(),leadingIcon={Text("⌕",color=ZT,fontSize=18.sp)})
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+    Box(Modifier.weight(1f)){
+     Text(if(maker.isBlank())"Todos los fabricantes" else maker,color=ZT,fontSize=9.sp,modifier=Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(6.dp)).clickable{makerMenu=true}.padding(9.dp))
+     DropdownMenu(expanded=makerMenu,onDismissRequest={makerMenu=false}){
+      DropdownMenuItem(text={Text("Todos los fabricantes")},onClick={makerMenu=false;maker=""})
+      makers.take(80).forEach{m->DropdownMenuItem(text={Text(m)},onClick={makerMenu=false;maker=m})}
+     }
+    }
+    Box(Modifier.weight(1f)){
+     Text(if(type.isBlank())"Todos los tipos" else type,color=ZT,fontSize=9.sp,modifier=Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(6.dp)).clickable{typeMenu=true}.padding(9.dp))
+     DropdownMenu(expanded=typeMenu,onDismissRequest={typeMenu=false}){
+      DropdownMenuItem(text={Text("Todos los tipos")},onClick={typeMenu=false;type=""})
+      types.take(40).forEach{t->DropdownMenuItem(text={Text(t)},onClick={typeMenu=false;type=t})}
+     }
     }
    }
   }
+  Card("MODELOS AUTOEQ"){
+   Row(verticalAlignment=Alignment.CenterVertically){
+    Text("Resultados",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+    Text("(\${models.size})",color=ZM,fontSize=9.sp)
+   }
+   Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+    models.take(40).forEach{model->
+     Row(Modifier.fillMaxWidth().background(if(selected?.path==model.path)Color(0xFF1C1530) else ZSUR,RoundedCornerShape(7.dp)).border(1.dp,if(selected?.path==model.path)ZP else ZBR,RoundedCornerShape(7.dp)).clickable{selected=model}.padding(8.dp),verticalAlignment=Alignment.CenterVertically){
+      Text("◉",color=ZP,fontSize=14.sp,modifier=Modifier.padding(end=8.dp))
+      Column(Modifier.weight(1f)){Text(model.name,color=ZT,fontSize=10.sp,fontWeight=FontWeight.SemiBold);Text(listOf(model.source,model.type).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Perfil paramétrico AutoEQ"},color=ZM,fontSize=8.sp)}
+      Text("APLICAR",color=Color.White,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(5.dp)).clickable{
+       selected=model
+       scope.launch{status=runCatching{AutoEqRepository.load(ctx,model).also{vm.applyAutoEqProfile(it)}}.fold({"Perfil aplicado: \${model.name}"},{"Error: \${it.message}"})}
+      }.padding(horizontal=8.dp,vertical=6.dp))
+     }
+    }
+    if(models.size>40) Text("Mostrando 40 de \${models.size}. Usa la búsqueda para encontrar cualquier modelo.",color=ZM,fontSize=8.sp)
+   }
+  }
+  Card("PERFIL SELECCIONADO"){
+   val m=selected
+   if(m==null) Text("Selecciona un modelo de la lista.",color=ZM,fontSize=9.sp)
+   else{
+    Text(m.name,color=ZT,fontSize=13.sp,fontWeight=FontWeight.Bold)
+    Text(listOf(m.source,m.type).filter{it.isNotBlank()}.joinToString(" · "),color=ZM,fontSize=9.sp)
+    Text("APLICAR PERFIL",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{scope.launch{status=runCatching{AutoEqRepository.load(ctx,m).also{vm.applyAutoEqProfile(it)}}.fold({"Perfil aplicado"},{"Error: \${it.message}"})}}.padding(9.dp))
+   }
+   if(status.isNotBlank()) Text(status,color=ZG,fontSize=9.sp)
+  }
+  Presets(vm)
  }
- Presets(vm)
 }
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
 @Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
