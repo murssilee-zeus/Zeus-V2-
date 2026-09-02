@@ -834,7 +834,7 @@ private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier)
             LimiterKnobCard(
                 label = "RATIO",
                 value = viewModel.limiterRatio,
-                unit = "",
+                unit = ":1",
                 range = 1f..50f,
                 format = { String.format("%.1f", it) },
                 accent = LIM_PURPLE,
