@@ -291,11 +291,9 @@ class AudioEngine(private val context: Context) {
             if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
             if (!tagAllowed(b)) continue
 
-            val gain = when (b.filterType) {
-                EqBand.FilterType.LOW_PASS, EqBand.FilterType.HIGH_PASS -> 0f
-                else -> b.gain
-            }
-
+            // Todos los tipos usan su respuesta biquad real. LP/HP deben
+            // conservar su atenuacion fuera de banda; forzarlos a 0 dB
+            // anulaba por completo esos modos en DynamicsProcessing.
             activeFilters += BiquadFilter(
                 frequency = b.frequency,
                 gainDb = gain,
