@@ -296,7 +296,7 @@ class AudioEngine(private val context: Context) {
             // anulaba por completo esos modos en DynamicsProcessing.
             activeFilters += BiquadFilter(
                 frequency = b.frequency,
-                gainDb = gain,
+                gainDb = b.gain,
                 q = b.q,
                 type = b.filterType,
                 sampleRate = deviceSampleRate
