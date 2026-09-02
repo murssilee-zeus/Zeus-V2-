@@ -61,7 +61,8 @@ object AutoEqRepository {
         }
     }
 
-    suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile = withContext(Dispatchers.IO) {
+    suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile {
+        return withContext(Dispatchers.IO) {
         require(model.path.isNotBlank()) { "Perfil AutoEQ no disponible" }
         val text = context.assets.open("autoeq/profiles/" + model.path).bufferedReader().use { it.readText() }
         parse(text)
@@ -86,5 +87,6 @@ object AutoEqRepository {
             }
         }
         AutoEqProfile(preamp.coerceIn(-30f, 12f), filters)
+        }
     }
 }
