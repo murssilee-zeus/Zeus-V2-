@@ -61,8 +61,7 @@ object AutoEqRepository {
         }
     }
 
-    suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile {
-        return withContext(Dispatchers.IO) {
+    suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile = withContext(Dispatchers.IO) {
         require(model.path.isNotBlank()) { "Perfil AutoEQ no disponible" }
         val text = context.assets.open("autoeq/profiles/" + model.path).bufferedReader().use { it.readText() }
         parse(text)
@@ -83,10 +82,15 @@ object AutoEqRepository {
                     "HP" -> EqBand.FilterType.HIGH_PASS
                     else -> EqBand.FilterType.PEAK
                 }
-                filters += AutoEqFilter(it.groupValues[2].toFloat().coerceIn(20f, 20000f), it.groupValues[3].toFloat().coerceIn(-30f, 30f), it.groupValues[4].toFloat().coerceIn(.1f, 40f), type)
+                filters += AutoEqFilter(
+                    it.groupValues[2].toFloat().coerceIn(20f, 20000f),
+                    it.groupValues[3].toFloat().coerceIn(-30f, 30f),
+                    it.groupValues[4].toFloat().coerceIn(.1f, 40f),
+                    type
+                )
             }
         }
-        AutoEqProfile(preamp.coerceIn(-30f, 12f), filters)
-        }
+        return AutoEqProfile(preamp.coerceIn(-30f, 12f), filters)
     }
+
 }
