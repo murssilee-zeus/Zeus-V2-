@@ -125,10 +125,45 @@ fun MainScreen(
             EqSection.EQUALIZER, EqSection.PIPELINE -> EqualizerScreen(viewModel, Modifier.weight(1f))
             EqSection.CROSSOVER -> CrossoverScreen(viewModel, Modifier.weight(1f))
             EqSection.LIMITER -> LimiterScreen(viewModel, Modifier.weight(1f))
+            EqSection.AUTOEQ -> AutoEqScreen(viewModel, Modifier.weight(1f))
         }
     }
 }
 
+@Composable
+private fun AutoEqScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var query by remember { mutableStateOf("") }
+    var target by remember { mutableStateOf("flat.csv") }
+    val targets = remember { runCatching { ctx.assets.list("targets")?.filter { it.endsWith(".csv", true) }?.sorted() ?: emptyList() }.getOrDefault(emptyList()) }
+    val presets = listOf("Flat" to { viewModel.applyPresetFlat() }, "Zeus" to { viewModel.applyPresetZeusInfrabass() }, "Bass Boost" to { viewModel.applyPresetBassBoost() }, "Vocal Clear" to { viewModel.applyPresetVocalClear() }, "Jazz" to { viewModel.applyPresetJazz() }, "Bass-Treble" to { viewModel.applyPresetBassTreble() }, "Acoustic" to { viewModel.applyPresetAcoustic() })
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionCard("AUTOEQ") {
+            Text("Perfiles y targets", color = TXT_PRIMARY, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Biblioteca AutoEQ y selección de modelos", color = TXT_MUTED, fontSize = 10.sp)
+            OutlinedTextField(value = query, onValueChange = { query = it }, singleLine = true, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Buscar audífonos o modelo...", color = TXT_MUTED) })
+            Text(if (query.isBlank()) "Ningún modelo seleccionado" else query, color = TXT_PRIMARY, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        SectionCard("TARGET") {
+            Text("Curva objetivo", color = TXT_MUTED, fontSize = 10.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                targets.take(24).forEach { t -> Box(Modifier.clip(RoundedCornerShape(8.dp)).background(if (target == t) PINK_ACCENT else SURFACE).clickable { target = t }.padding(horizontal = 9.dp, vertical = 7.dp)) { Text(t.removeSuffix(".csv"), color = if (target == t) Color.Black else TXT_PRIMARY, fontSize = 9.sp) } }
+            }
+            if (targets.isEmpty()) Text("No se encontraron targets en assets/targets", color = Color(0xFFFF6B6B), fontSize = 9.sp)
+        }
+        SectionCard("PRESETS") {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                presets.forEach { (name, action) -> Box(Modifier.clip(RoundedCornerShape(9.dp)).background(SURFACE).border(1.dp, CARD_BORDER, RoundedCornerShape(9.dp)).clickable { action() }.padding(horizontal = 11.dp, vertical = 9.dp)) { Text(name, color = TXT_PRIMARY, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) } }
+            }
+        }
+        SectionCard("MIS CONFIGURACIONES") { Text("Usa Guardar para conservar la configuración actual.", color = TXT_MUTED, fontSize = 10.sp) }
+    }
+}
+
+@Composable
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SURFACE).border(1.dp, CARD_BORDER, RoundedCornerShape(12.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { Text(title, color = TXT_MUTED, fontSize = 10.sp, fontWeight = FontWeight.Bold); content() }
+}
 // ============================================================
 // EQUALIZER
 // ============================================================
