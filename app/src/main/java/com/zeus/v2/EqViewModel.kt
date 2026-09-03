@@ -56,6 +56,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var highShelfEnabled by mutableStateOf(true)
     var compressorMultibandEnabled by mutableStateOf(true)
     var selectedAudioSession by mutableStateOf("0: LOAD - Audio TX Output (Float)")
+    var selectedTargetName by mutableStateOf("Flat")
+    var targetCurve by mutableStateOf<List<TargetPoint>>(emptyList())
 
     var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)
 
@@ -465,6 +467,11 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteNamedPreset(name: String) { EqPrefs.deleteNamed(getApplication(), name) }
 
     fun namedPresetNames(): List<String> = EqPrefs.listNamed(getApplication())
+
+    fun selectTarget(context: android.content.Context, target: TargetModel) {
+        selectedTargetName = target.name
+        targetCurve = AutoEqRepository.loadTarget(context, target)
+    }
 
     fun applyAutoEqProfile(profile: AutoEqProfile) {
         preamp = profile.preamp
