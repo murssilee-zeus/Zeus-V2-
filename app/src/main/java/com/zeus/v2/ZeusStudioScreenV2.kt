@@ -18,27 +18,28 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 
-private val ZBG=Color(0xFF08090C); private val ZSUR=Color(0xFF12131A); private val ZBR=Color(0xFF2A2C36)
-private val ZP=Color(0xFFB65CFF); private val ZPK=Color(0xFFFF5AA5); private val ZG=Color(0xFF25D17F)
-private val ZT=Color(0xFFF1F1F4); private val ZM=Color(0xFF8D8F9A)
+private val ZBG=Color(0xFF05070B); private val ZSUR=Color(0xFF0D1118); private val ZBR=Color(0xFF263241)
+private val ZP=Color(0xFF9B5CFF); private val ZPK=Color(0xFFFF4FA3); private val ZG=Color(0xFF24E58A)
+private val ZT=Color(0xFFF5F7FA); private val ZM=Color(0xFF8490A0)
+private val ZCY=Color(0xFF20C7E8); private val ZOR=Color(0xFFFFC857)
 
 @Composable
 fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit,onExport:()->Unit){
  var page by remember{mutableIntStateOf(0)}
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
- Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=10.dp,vertical=6.dp)){
-  Row(Modifier.fillMaxWidth().height(42.dp),verticalAlignment=Alignment.CenterVertically){
+ Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=8.dp,vertical=5.dp)){
+  Row(Modifier.fillMaxWidth().height(38.dp).background(ZSUR,RoundedCornerShape(9.dp)).border(1.dp,ZBR,RoundedCornerShape(9.dp)).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showMenu=true})
    Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
-    Text("Zeus EQ Pro18",color=ZT,fontSize=21.sp,fontWeight=FontWeight.Bold)
-    Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZP,fontSize=8.sp)
+    Text("ZEUS EQ PRO18",color=ZT,fontSize=17.sp,fontWeight=FontWeight.ExtraBold)
+    Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
   Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-   listOf("①  EQ / PUNCH","②  DYNAMICS","③  AUTOEQ / PRESETS").forEachIndexed{i,label->
-    Text(label,color=if(page==i)Color.Black else ZT,fontSize=9.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(6.dp)).clickable{page=i}.padding(vertical=7.dp))
+   listOf("EQ / PUNCH","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
+    Text(label,color=if(page==i)Color.Black else ZT,fontSize=8.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(6.dp)).clickable{page=i}.padding(vertical=7.dp))
    }
   }
   Box(Modifier.weight(1f).fillMaxWidth()){
@@ -106,7 +107,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 
 @Composable private fun EqPagePortrait(vm:EqViewModel,punch:PunchViewModel,onGoDynamics:()->Unit){
  var showBandList by remember{mutableStateOf(false)}
- Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+ Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(6.dp)){
   Card("SPECTRUM / EQ CURVE"){
    Row(verticalAlignment=Alignment.CenterVertically){
     Column(Modifier.weight(1f)){
