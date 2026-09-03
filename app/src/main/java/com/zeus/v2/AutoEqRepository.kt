@@ -15,6 +15,9 @@ data class AutoEqModel(
     val path: String = ""
 )
 
+data class TargetModel(val name: String, val type: String, val file: String)
+data class TargetPoint(val frequency: Float, val gain: Float)
+
 object AutoEqRepository {
     @Volatile private var cachedModels: List<AutoEqModel>? = null
     @Volatile private var cachedTargets: List<String>? = null
@@ -60,6 +63,31 @@ object AutoEqRepository {
             }.getOrDefault(emptyList()).also { cachedTargets = it }
         }
     }
+
+    fun targetModels(context: Context): List<TargetModel> = runCatching {
+        val text = context.assets.open("targets/targets_index.json").bufferedReader().use { it.readText() }
+        val arr = JSONArray(text)
+        buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val file = o.optString("file").trim()
+                if (file.isNotBlank()) add(TargetModel(o.optString("name", file), o.optString("type", "Neutral"), file))
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    fun loadTarget(context: Context, target: TargetModel): List<TargetPoint> = runCatching {
+        context.assets.open("targets/${target.file}.csv").bufferedReader().useLines { lines ->
+            lines.drop(1).mapNotNull { line ->
+                val p = line.split(',')
+                if (p.size >= 2) {
+                    val f = p[0].trim().toFloatOrNull()
+                    val g = p[1].trim().toFloatOrNull()
+                    if (f != null && g != null) TargetPoint(f, g) else null
+                } else null
+            }.filter { it.frequency in 18f..20000f && it.gain.isFinite() }.toList()
+        }
+    }.getOrDefault(emptyList())
 
     suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile = withContext(Dispatchers.IO) {
         require(model.path.isNotBlank()) { "Perfil AutoEQ no disponible" }
