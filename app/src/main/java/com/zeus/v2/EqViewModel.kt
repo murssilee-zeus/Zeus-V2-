@@ -457,7 +457,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveNamedPreset(name: String) {
         val clean = name.trim()
-        if (clean.isNotEmpty()) EqPrefs.saveNamed(getApplication(), clean, toSettings())
+        if (clean.isNotEmpty()) { val settings=toSettings(); EqPrefs.saveNamed(getApplication(), clean, settings); ConfigFileRepository.saveNamed(getApplication(), clean, settings) }
     }
 
     fun loadNamedPreset(name: String) {
@@ -484,7 +484,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         limiterEnabled = true
     }
     fun saveSettings() {
-        EqPrefs.save(getApplication(), toSettings())
+        val settings=toSettings(); EqPrefs.save(getApplication(), settings); ConfigFileRepository.saveLatest(getApplication(), settings)
     }
 
     fun loadSavedIfAny() {
