@@ -105,6 +105,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 }
 
 @Composable private fun EqPagePortrait(vm:EqViewModel,punch:PunchViewModel,onGoDynamics:()->Unit){
+ var showBandList by remember{mutableStateOf(false)}
  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
   Card("SPECTRUM / EQ CURVE"){
    Row(verticalAlignment=Alignment.CenterVertically){
@@ -173,10 +174,23 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
    Text("MBC",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{onGoDynamics()}.padding(8.dp),textAlign=TextAlign.Center)
-   Text("VER BANDAS  →",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1.4f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(vm.selectedBandIndex)}.padding(8.dp),textAlign=TextAlign.Center)
+   Text("VER BANDAS  →",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1.4f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)) .clickable{showBandList=true}.padding(8.dp),textAlign=TextAlign.Center)
   }
 
   Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))
+  if(showBandList){
+   AlertDialog(onDismissRequest={showBandList=false},title={Text("Bandas del ecualizador")},text={
+    Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(3.dp)){
+     vm.bands.forEachIndexed{i,b->
+      Row(Modifier.fillMaxWidth().background(if(i==vm.selectedBandIndex)Color(0xFF1C1530) else ZSUR,RoundedCornerShape(5.dp)).clickable{vm.selectBand(i);showBandList=false}.padding(7.dp),verticalAlignment=Alignment.CenterVertically){
+       Text(i.toString(),color=if(i==vm.selectedBandIndex)ZP else ZT,fontSize=9.sp,modifier=Modifier.width(28.dp))
+       Text(fmt(b.frequency)+" Hz",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+       Text(fmt(b.gain)+" dB",color=ZPK,fontSize=9.sp)
+      }
+     }
+    }
+   },confirmButton={TextButton(onClick={showBandList=false}){Text("Cerrar")}})
+  }
  }
 }
 
