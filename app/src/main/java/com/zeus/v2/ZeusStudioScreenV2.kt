@@ -25,14 +25,16 @@ private val ZT=Color(0xFFF1F1F4); private val ZM=Color(0xFF8D8F9A)
 @Composable
 fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit){
  var page by remember{mutableIntStateOf(0)}
+ var showMenu by remember{mutableStateOf(false)}
+ var showSettings by remember{mutableStateOf(false)}
  Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=10.dp,vertical=6.dp)){
   Row(Modifier.fillMaxWidth().height(42.dp),verticalAlignment=Alignment.CenterVertically){
-   Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp))
+   Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showMenu=true})
    Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
     Text("Zeus EQ Pro18",color=ZT,fontSize=21.sp,fontWeight=FontWeight.Bold)
     Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZP,fontSize=8.sp)
    }
-   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp))
+   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
   Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
    listOf("①  EQ / PUNCH","②  DYNAMICS","③  AUTOEQ / PRESETS").forEachIndexed{i,label->
@@ -45,6 +47,22 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   Row(Modifier.fillMaxWidth().padding(top=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{onToggleEngine()})
    Text("GUARDAR",color=Color.White,fontSize=9.sp,modifier=Modifier.background(Color(0xFF0E4D3A),RoundedCornerShape(7.dp)).border(1.dp,ZG,RoundedCornerShape(7.dp)).clickable{onSave()}.padding(horizontal=12.dp,vertical=6.dp))
+  }
+  if(showMenu){
+   AlertDialog(onDismissRequest={showMenu=false},title={Text("Zeus EQ Pro18")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Text("Navegación y estado",fontWeight=FontWeight.Bold)
+    Text("Página actual: "+(page+1)+"/3",fontSize=11.sp)
+    Text(if(vm.isEngineRunning)"Motor de audio: ACTIVO" else "Motor de audio: DETENIDO",fontSize=11.sp)
+    Text("FFT / Spectrum: tiempo real",fontSize=11.sp)
+    Text("AutoEQ: perfiles y targets integrados",fontSize=11.sp)
+   }} ,confirmButton={TextButton(onClick={showMenu=false}){Text("Cerrar")}})
+  }
+  if(showSettings){
+   AlertDialog(onDismissRequest={showSettings=false},title={Text("Configuración")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
+    Row(verticalAlignment=Alignment.CenterVertically){Text("Procesamiento de audio",modifier=Modifier.weight(1f));Switch(checked=vm.isEngineRunning,onCheckedChange={onToggleEngine()})}
+    Text("EQ, FFT, Punch, Dynamics y Limiter mantienen sus parámetros actuales.",fontSize=10.sp,color=ZM)
+    Text("Interfaz: vertical / 3 páginas",fontSize=10.sp,color=ZM)
+   }},confirmButton={TextButton(onClick={showSettings=false}){Text("Cerrar")}})
   }
  }
 }
@@ -177,7 +195,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   Card("AUTOEQ"){
    Row(verticalAlignment=Alignment.CenterVertically){
     Column(Modifier.weight(1f)){Text("☁",color=ZP,fontSize=25.sp);Text("AUTOEQ",color=ZT,fontSize=16.sp,fontWeight=FontWeight.Bold);Text("Selecciona tus audífonos y aplica su perfil",color=ZM,fontSize=9.sp)}
-    Text("\${AutoEqRepository.allModels(ctx).size}",color=ZP,fontSize=18.sp,fontWeight=FontWeight.Bold)
+    Text("${AutoEqRepository.allModels(ctx).size}",color=ZP,fontSize=18.sp,fontWeight=FontWeight.Bold)
    }
    OutlinedTextField(value=query,onValueChange={query=it},singleLine=true,placeholder={Text("Buscar modelo, marca o ID...",color=ZM)},modifier=Modifier.fillMaxWidth(),leadingIcon={Text("⌕",color=ZT,fontSize=18.sp)})
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
@@ -200,7 +218,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   Card("MODELOS AUTOEQ"){
    Row(verticalAlignment=Alignment.CenterVertically){
     Text("Resultados",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
-    Text("(\${models.size})",color=ZM,fontSize=9.sp)
+    Text("(${models.size})",color=ZM,fontSize=9.sp)
    }
    Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
     models.take(40).forEach{model->
@@ -213,7 +231,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
       }.padding(horizontal=8.dp,vertical=6.dp))
      }
     }
-    if(models.size>40) Text("Mostrando 40 de \${models.size}. Usa la búsqueda para encontrar cualquier modelo.",color=ZM,fontSize=8.sp)
+    if(models.size>40) Text("Mostrando 40 de ${models.size}. Usa la búsqueda para encontrar cualquier modelo.",color=ZM,fontSize=8.sp)
    }
   }
   Card("PERFIL SELECCIONADO"){
