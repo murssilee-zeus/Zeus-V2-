@@ -25,6 +25,7 @@ fun EqGraph(
     bands: List<EqBand>,
     selectedBandIndex: Int,
     spectrum: FloatArray,
+    targetCurve: List<TargetPoint> = emptyList(),
     onSelect: (Int) -> Unit,
     onMove: (Int, Float, Float) -> Unit,
     modifier: Modifier = Modifier
@@ -153,6 +154,15 @@ fun EqGraph(
                 Color(0xFF18B8D0).copy(alpha = .72f),
                 Offset(0f, zeroY), Offset(w, zeroY), 1.2f
             )
+        }
+
+        if (targetCurve.size > 1) {
+            val targetPath = Path()
+            targetCurve.forEachIndexed { index, point ->
+                val p = Offset(freqToX(point.frequency, w), dbToY(point.gain, h))
+                if (index == 0) targetPath.moveTo(p.x, p.y) else targetPath.lineTo(p.x, p.y)
+            }
+            drawPath(targetPath, Color(0xFFFFC857).copy(alpha = .80f), style = Stroke(width = 2f, cap = StrokeCap.Round))
         }
 
         // Parametric EQ response, rendered above the live RTA.
