@@ -243,23 +243,6 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun applyPresetJazz() {
-        applyPresetFlat()
-        preamp = -4f
-        bands.forEachIndexed { i,b -> val g = when { b.frequency in 80f..180f -> 1.5f; b.frequency in 400f..900f -> -1f; b.frequency in 2000f..5000f -> 1.5f; b.frequency > 7000f -> 1f; else -> 0f }; bands[i]=b.copy(gain=g) }
-    }
-
-    fun applyPresetBassTreble() {
-        applyPresetFlat()
-        preamp = -5f
-        bands.forEachIndexed { i,b -> val g = when { b.frequency < 120f -> 5f; b.frequency > 7000f -> 3f; b.frequency in 300f..3000f -> -1.5f; else -> 0f }; bands[i]=b.copy(gain=g) }
-    }
-
-    fun applyPresetAcoustic() {
-        applyPresetFlat()
-        preamp = -5f
-        bands.forEachIndexed { i,b -> val g = when { b.frequency < 100f -> 5.5f; b.frequency in 100f..250f -> 2f; b.frequency in 1500f..4000f -> 2.5f; b.frequency in 7000f..12000f -> 2f; b.frequency > 14000f -> 1f; else -> 0f }; bands[i]=b.copy(gain=g) }
-    }
     fun applyPresetVocalClear() {
         preamp = -3f
         subBoost = 0f
