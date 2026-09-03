@@ -23,7 +23,7 @@ private val ZP=Color(0xFFB65CFF); private val ZPK=Color(0xFFFF5AA5); private val
 private val ZT=Color(0xFFF1F1F4); private val ZM=Color(0xFF8D8F9A)
 
 @Composable
-fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit){
+fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit,onExport:()->Unit){
  var page by remember{mutableIntStateOf(0)}
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
@@ -42,7 +42,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
   }
   Box(Modifier.weight(1f).fillMaxWidth()){
-   when(page){0->EqPage(vm,punch);1->DynPage(vm);2->AutoEqPage(vm)}
+   when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm)}
   }
   Row(Modifier.fillMaxWidth().padding(top=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{onToggleEngine()})
@@ -62,14 +62,16 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Row(verticalAlignment=Alignment.CenterVertically){Text("Procesamiento de audio",modifier=Modifier.weight(1f));Switch(checked=vm.isEngineRunning,onCheckedChange={onToggleEngine()})}
     Text("EQ, FFT, Punch, Dynamics y Limiter mantienen sus parámetros actuales.",fontSize=10.sp,color=ZM)
     Text("Interfaz: vertical / 3 páginas",fontSize=10.sp,color=ZM)
+    Text("Configuraciones: JSON compatible para exportación",fontSize=10.sp,color=ZM)
+    Text("EXPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onExport()}.padding(8.dp))
    }},confirmButton={TextButton(onClick={showSettings=false}){Text("Cerrar")}})
   }
  }
 }
 
-@Composable private fun EqPage(vm:EqViewModel,punch:PunchViewModel){
+@Composable private fun EqPage(vm:EqViewModel,punch:PunchViewModel,onGoDynamics:()->Unit){
  val cfg=LocalConfiguration.current
- if(cfg.screenHeightDp > cfg.screenWidthDp) { EqPagePortrait(vm,punch) } else { EqPageLandscape(vm,punch) }
+ if(cfg.screenHeightDp > cfg.screenWidthDp) { EqPagePortrait(vm,punch,onGoDynamics) } else { EqPageLandscape(vm,punch) }
 }
 
 @Composable private fun EqPageLandscape(vm:EqViewModel,punch:PunchViewModel){
@@ -79,7 +81,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Column(Modifier.weight(1f)){Text("SPECTRUM / EQ CURVE",color=ZT,fontSize=11.sp,fontWeight=FontWeight.Bold);Text("18 Hz  •  20 kHz  •  REAL-TIME",color=ZM,fontSize=7.sp)}
     Text("+ BANDA",color=Color.White,fontSize=8.sp,modifier=Modifier.background(ZP,RoundedCornerShape(5.dp)).clickable{vm.addBand()}.padding(horizontal=8.dp,vertical=5.dp))
    }
-   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().height(390.dp))
+   EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().height(390.dp))
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
@@ -102,7 +104,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  }
 }
 
-@Composable private fun EqPagePortrait(vm:EqViewModel,punch:PunchViewModel){
+@Composable private fun EqPagePortrait(vm:EqViewModel,punch:PunchViewModel,onGoDynamics:()->Unit){
  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
   Card("SPECTRUM / EQ CURVE"){
    Row(verticalAlignment=Alignment.CenterVertically){
@@ -170,8 +172,8 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   }
 
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-   Text("MBC",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{}.padding(8.dp),textAlign=TextAlign.Center)
-   Text("VER BANDAS  →",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1.4f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).padding(8.dp),textAlign=TextAlign.Center)
+   Text("MBC",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{onGoDynamics()}.padding(8.dp),textAlign=TextAlign.Center)
+   Text("VER BANDAS  →",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1.4f).background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(vm.selectedBandIndex)}.padding(8.dp),textAlign=TextAlign.Center)
   }
 
   Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.fillMaxWidth().padding(vertical=2.dp))
@@ -211,6 +213,25 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
      DropdownMenu(expanded=typeMenu,onDismissRequest={typeMenu=false}){
       DropdownMenuItem(text={Text("Todos los tipos")},onClick={typeMenu=false;type=""})
       types.take(40).forEach{t->DropdownMenuItem(text={Text(t)},onClick={typeMenu=false;type=t})}
+     }
+    }
+   }
+  }
+  Card("TARGETS DE REFERENCIA") {
+   val targets = remember { AutoEqRepository.targetModels(ctx) }
+   var targetType by remember { mutableStateOf("Todos") }
+   val targetTypes = remember(targets) { listOf("Todos") + targets.map { it.type }.distinct().sorted() }
+   val visibleTargets = remember(targets, targetType) { if(targetType=="Todos") targets else targets.filter { it.type==targetType } }
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp),verticalAlignment=Alignment.CenterVertically) {
+    Text("TARGET ACTIVO: " + vm.selectedTargetName,color=ZG,fontSize=9.sp,modifier=Modifier.weight(1f))
+    Text(targetType,color=ZT,fontSize=8.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(5.dp)).clickable{targetType=if(targetType=="Todos" && targetTypes.size>1) targetTypes[1] else "Todos"}.padding(6.dp))
+   }
+   Column(Modifier.heightIn(max=260.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(3.dp)) {
+    visibleTargets.forEach { target ->
+     Row(Modifier.fillMaxWidth().background(if(vm.selectedTargetName==target.name)Color(0xFF1C1530) else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,if(vm.selectedTargetName==target.name)ZP else ZBR,RoundedCornerShape(6.dp)).clickable{vm.selectTarget(ctx,target)}.padding(7.dp),verticalAlignment=Alignment.CenterVertically) {
+      Text(target.name,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+      Text(target.type,color=ZM,fontSize=8.sp)
+      if(vm.selectedTargetName==target.name) Text("✓",color=ZG,fontSize=11.sp)
      }
     }
    }
