@@ -7,17 +7,53 @@ android {
     namespace 'com.zeus.v2'
     compileSdk 34
 
+    // versionCode estable y creciente. En CI se pasa VERSION_CODE con el numero
+    // de corrida de Actions para que cada APK sea distinguible e instalable
+    // encima del anterior.
+    def buildVersionCode = (System.getenv("VERSION_CODE") ?: "21").toInteger()
+
     defaultConfig {
         applicationId "com.zeus.v2"
         minSdk 28   // DynamicsProcessing requires API 28+
         targetSdk 34
-        versionCode 21
-        versionName "2.1-fixed"
+        versionCode buildVersionCode
+        versionName "2.2-punch.${buildVersionCode}"
+    }
+
+    // Clave de firma estable. El keystore NO vive en el repositorio: en CI se
+    // reconstruye desde el secreto DEBUG_KEYSTORE_B64 y en local puedes colocar
+    // tu propio archivo en la raiz del proyecto.
+    //
+    // Sin una clave estable, cada runner de CI genera un debug.keystore nuevo y
+    // dos APK consecutivos quedan firmados con claves distintas, lo que provoca
+    // "conflicto con el paquete" (INSTALL_FAILED_UPDATE_INCOMPATIBLE) al instalar
+    // una build encima de otra.
+    def signingKeystore = rootProject.file(System.getenv("KEYSTORE_FILE") ?: 'zeus-debug.keystore')
+    def hasSigningKeystore = signingKeystore.exists()
+
+    signingConfigs {
+        if (hasSigningKeystore) {
+            debugFixed {
+                storeFile signingKeystore
+                storePassword System.getenv("KEYSTORE_PASSWORD") ?: 'android'
+                keyAlias System.getenv("KEY_ALIAS") ?: 'androiddebugkey'
+                keyPassword System.getenv("KEY_PASSWORD") ?: 'android'
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            // Si no hay keystore propio se usa la firma debug por defecto de Gradle.
+            if (hasSigningKeystore) {
+                signingConfig signingConfigs.debugFixed
+            }
+        }
         release {
             minifyEnabled false
+            if (hasSigningKeystore) {
+                signingConfig signingConfigs.debugFixed
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

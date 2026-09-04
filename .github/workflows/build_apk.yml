@@ -1,8 +1,11 @@
 name: Build Zeus-V2 APK
+
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:   # Poder ejecutarlo manualmente desde la pestaña Actions
+    branches: [ main, master, fix/punch-v2 ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,27 +25,71 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-        with: 
-              validate-wrappers: 'false'
+        with:
+          validate-wrappers: 'false'
 
-      - name: Generate Gradle Wrapper
+      - name: Generate Gradle Wrapper if missing
         run: |
           if [ ! -f "./gradlew" ]; then
             echo "Generando Gradle Wrapper..."
-            gradle wrapper --gradle-version 8.7 || true
+            gradle wrapper --gradle-version 8.7
           fi
-          chmod +x ./gradlew 2>/dev/null || true
+          chmod +x ./gradlew
+
+      - name: Prepare AutoEQ catalog for build
+        run: |
+          rm -rf /tmp/AutoEq
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
+          cd /tmp/AutoEq
+          git sparse-checkout set results targets
+          cd -
+          mkdir -p app/src/main/assets/autoeq app/src/main/assets/targets
+          python3 - <<'PY'
+          import json, pathlib, shutil
+          src=pathlib.Path('/tmp/AutoEq/results')
+          dst=pathlib.Path('app/src/main/assets/autoeq')
+          rows=[]
+          for p in src.rglob('*ParametricEQ.txt'):
+              rel=p.relative_to(src).as_posix()
+              parts=p.parts
+              rows.append({'n':p.stem.replace(' ParametricEQ',''),'s':parts[0] if parts else '','t':'','r':'','p':rel})
+          (dst/'index.json').write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
+          print('AutoEQ catalog entries:',len(rows))
+          PY
+          # Do not bundle thousands of profile files into the APK: they exceed Android's ZIP entry limit.
+          # The catalog remains available for the UI; profiles will be fetched on demand in a later step.
+          cp -R /tmp/AutoEq/targets/. app/src/main/assets/targets/
+
+      - name: Restore signing keystore
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_B64" ]; then
+            echo "$DEBUG_KEYSTORE_B64" | base64 -d > zeus-debug.keystore
+            echo "Keystore estable restaurado desde el secreto."
+          else
+            echo "::warning::Falta el secreto DEBUG_KEYSTORE_B64. El APK se firmara con una clave debug aleatoria y NO podra instalarse encima de una build anterior."
+          fi
 
       - name: Build Debug APK
+        env:
+          # versionCode creciente: 100 + numero de corrida. Junto con la clave de
+          # firma estable restaurada desde el secreto, permite instalar cada APK encima del anterior.
+          VERSION_CODE: ${{ 100 + github.run_number }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Verify APK signature
         run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug --stacktrace --no-daemon
-          else
-            gradle assembleDebug --stacktrace --no-daemon
-          fi
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          echo "APK: $APK"
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | grep -i "SHA-1\|Signer"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeus-V2-debug
+          name: Zeus-V2-debug-v${{ 100 + github.run_number }}
           path: app/build/outputs/apk/debug/*.apk

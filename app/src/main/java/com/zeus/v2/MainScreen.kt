@@ -181,10 +181,10 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
         ) {
             EqGraph(
                 bands = viewModel.bands,
-                selectedIndex = viewModel.selectedBandIndex,
+                selectedBandIndex = viewModel.selectedBandIndex,
                 spectrum = viewModel.spectrum,
-                onBandSelected = { viewModel.selectBand(it) },
-                onBandMoved = { idx, freq, gain ->
+                onSelect = { viewModel.selectBand(it) },
+                onMove = { idx, freq, gain ->
                     viewModel.selectBand(idx)
                     viewModel.updateSelectedBand(frequency = freq, gain = gain)
                 },

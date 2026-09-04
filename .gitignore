@@ -1,0 +1,4 @@
+
+# Claves de firma: nunca deben entrar al repositorio
+*.keystore
+*.jks

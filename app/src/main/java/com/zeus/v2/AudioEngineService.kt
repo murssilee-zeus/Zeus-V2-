@@ -9,6 +9,8 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 
 class AudioEngineService : Service() {
@@ -19,8 +21,11 @@ class AudioEngineService : Service() {
     }
 
     private val binder = LocalBinder()
+    @Volatile
     var audioEngine: AudioEngine? = null
         private set
+    private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile private var initializing = false
 
     inner class LocalBinder : Binder() {
         fun getService(): AudioEngineService = this@AudioEngineService
@@ -28,19 +33,32 @@ class AudioEngineService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        try {
-            createNotificationChannel()
-        val engine = AudioEngine(this)
-        EqPrefs.load(this)?.let { engine.settings = it }
-        engine.attachToMediaSession()
-            audioEngine = engine
-        } catch (e: Throwable) {
-            android.util.Log.e("ZeusSvc", "onCreate: ${android.util.Log.getStackTraceString(e)}")
-        }
+        createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildNotification())
+        if (!initializing && audioEngine == null) {
+            initializing = true
+            Thread({
+                try {
+                    val engine = AudioEngine(this)
+                    EqPrefs.load(this)?.let { engine.settings = it }
+                    val ok = engine.attachToMediaSession()
+                    if (ok) {
+                        audioEngine = engine
+                        mainHandler.post { updateNotification("Motor de audio activo") }
+                    } else {
+                        engine.release()
+                        mainHandler.post { updateNotification("Motor de audio no disponible") }
+                    }
+                } catch (e: Throwable) {
+                    android.util.Log.e("ZeusSvc", "init: " + android.util.Log.getStackTraceString(e))
+                } finally {
+                    initializing = false
+                }
+            }, "ZeusAudioInit").start()
+        }
         return START_STICKY
     }
 

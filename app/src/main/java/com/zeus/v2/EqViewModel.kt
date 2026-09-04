@@ -19,7 +19,7 @@ enum class EqSection {
 class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
-        const val MAX_BANDS = 18
+        const val MAX_BANDS = 32
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -38,6 +38,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     var preamp by mutableFloatStateOf(-6.0f)
+    /** Manual safety trim used by the Punch/Headroom UI; 0 dB preserves the existing DSP behavior. */
+    var headroomTrim by mutableFloatStateOf(0f)
     var subBoost by mutableFloatStateOf(0f)
 
     var limiterEnabled by mutableStateOf(true)
@@ -54,6 +56,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var highShelfEnabled by mutableStateOf(true)
     var compressorMultibandEnabled by mutableStateOf(true)
     var selectedAudioSession by mutableStateOf("0: LOAD - Audio TX Output (Float)")
+    var selectedTargetName by mutableStateOf("Flat")
+    var targetCurve by mutableStateOf<List<TargetPoint>>(emptyList())
 
     var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)
 
@@ -239,23 +243,6 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun applyPresetJazz() {
-        applyPresetFlat()
-        preamp = -4f
-        bands.forEachIndexed { i,b -> val g = when { b.frequency in 80f..180f -> 1.5f; b.frequency in 400f..900f -> -1f; b.frequency in 2000f..5000f -> 1.5f; b.frequency > 7000f -> 1f; else -> 0f }; bands[i]=b.copy(gain=g) }
-    }
-
-    fun applyPresetBassTreble() {
-        applyPresetFlat()
-        preamp = -5f
-        bands.forEachIndexed { i,b -> val g = when { b.frequency < 120f -> 5f; b.frequency > 7000f -> 3f; b.frequency in 300f..3000f -> -1.5f; else -> 0f }; bands[i]=b.copy(gain=g) }
-    }
-
-    fun applyPresetAcoustic() {
-        applyPresetFlat()
-        preamp = -5f
-        bands.forEachIndexed { i,b -> val g = when { b.frequency < 100f -> 5.5f; b.frequency in 100f..250f -> 2f; b.frequency in 1500f..4000f -> 2.5f; b.frequency in 7000f..12000f -> 2f; b.frequency > 14000f -> 1f; else -> 0f }; bands[i]=b.copy(gain=g) }
-    }
     fun applyPresetVocalClear() {
         preamp = -3f
         subBoost = 0f
@@ -287,6 +274,82 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         limiterRatio = 8f
         limiterAttack = 1f
         limiterRelease = 100f
+    }
+
+    fun applyPresetJazz() {
+        preamp = -4f
+        subBoost = 0.5f
+        bands.clear()
+        listOf(
+            60f to -1.0f, 120f to 0.5f, 250f to -0.5f, 500f to 0.0f,
+            1000f to 1.0f, 2200f to 1.5f, 4500f to 1.0f, 8000f to 0.5f,
+            12000f to 1.0f
+        ).forEachIndexed { i, (freq, gain) ->
+            bands.add(createNewBand(i, freq).copy(gain = gain, q = if (freq in 1800f..5000f) 1.15f else 1.0f, enabled = true))
+        }
+        selectedBandIndex = 4
+        compressorMultibandEnabled = true
+        limiterEnabled = true
+        limiterThreshold = -2f
+        limiterRatio = 5f
+        limiterAttack = 8f
+        limiterRelease = 120f
+    }
+
+    fun applyPresetBassTreble() {
+        preamp = -5f
+        subBoost = 2f
+        bands.clear()
+        listOf(
+            45f to 3.5f, 100f to 2.5f, 250f to 0f, 500f to -0.5f,
+            1000f to 0f, 2500f to -0.5f, 5000f to 2.0f, 10000f to 3.0f,
+            16000f to 3.5f
+        ).forEachIndexed { i, (freq, gain) ->
+            val type = when (i) {
+                0 -> EqBand.FilterType.LOW_SHELF
+                8 -> EqBand.FilterType.HIGH_SHELF
+                else -> EqBand.FilterType.PEAK
+            }
+            bands.add(createNewBand(i, freq).copy(gain = gain, q = 0.95f, filterType = type, enabled = true))
+        }
+        selectedBandIndex = 0
+        compressorMultibandEnabled = true
+        limiterEnabled = true
+        limiterThreshold = -1.5f
+        limiterRatio = 6f
+        limiterAttack = 2f
+        limiterRelease = 110f
+    }
+
+    fun applyPresetAcoustic() {
+        // Acoustic: graves profundos, voces presentes y agudos finos, sin volver áspera la zona alta.
+        preamp = -5.5f
+        subBoost = 2.5f
+        bands.clear()
+        listOf(
+            32f to 2.8f, 70f to 3.2f, 140f to 1.2f, 280f to -0.8f,
+            900f to 0.8f, 1800f to 1.8f, 3200f to 2.2f, 6500f to 1.5f,
+            10000f to 1.8f, 14500f to 1.2f, 18000f to 0.8f
+        ).forEachIndexed { i, (freq, gain) ->
+            val type = when {
+                i == 0 -> EqBand.FilterType.LOW_SHELF
+                i == 10 -> EqBand.FilterType.HIGH_SHELF
+                else -> EqBand.FilterType.PEAK
+            }
+            val q = when {
+                freq in 1500f..4000f -> 1.05f
+                freq >= 6000f -> 0.8f
+                else -> 1.0f
+            }
+            bands.add(createNewBand(i, freq).copy(gain = gain, q = q, filterType = type, enabled = true))
+        }
+        selectedBandIndex = 5
+        compressorMultibandEnabled = true
+        limiterEnabled = true
+        limiterThreshold = -1.8f
+        limiterRatio = 5f
+        limiterAttack = 3f
+        limiterRelease = 120f
     }
 
     // ===================== PERSISTENCIA =====================
@@ -392,8 +455,36 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         selectedAudioSession = s.selectedAudioSession
     }
 
+    fun saveNamedPreset(name: String) {
+        val clean = name.trim()
+        if (clean.isNotEmpty()) { val settings=toSettings(); EqPrefs.saveNamed(getApplication(), clean, settings); ConfigFileRepository.saveNamed(getApplication(), clean, settings) }
+    }
+
+    fun loadNamedPreset(name: String) {
+        EqPrefs.loadNamed(getApplication(), name)?.let { loadFrom(it) }
+    }
+
+    fun deleteNamedPreset(name: String) { EqPrefs.deleteNamed(getApplication(), name) }
+
+    fun namedPresetNames(): List<String> = EqPrefs.listNamed(getApplication())
+
+    fun selectTarget(context: android.content.Context, target: TargetModel) {
+        selectedTargetName = target.name
+        targetCurve = AutoEqRepository.loadTarget(context, target)
+    }
+
+    fun applyAutoEqProfile(profile: AutoEqProfile) {
+        preamp = profile.preamp
+        bands.clear()
+        profile.filters.take(MAX_BANDS).forEachIndexed { i, f ->
+            bands.add(createNewBand(i, f.frequency).copy(gain=f.gain, q=f.q, filterType=f.type, enabled=true))
+        }
+        if (bands.isEmpty()) bands.add(createNewBand(0, 1000f))
+        selectedBandIndex = 0
+        limiterEnabled = true
+    }
     fun saveSettings() {
-        EqPrefs.save(getApplication(), toSettings())
+        val settings=toSettings(); EqPrefs.save(getApplication(), settings); ConfigFileRepository.saveLatest(getApplication(), settings)
     }
 
     fun loadSavedIfAny() {
