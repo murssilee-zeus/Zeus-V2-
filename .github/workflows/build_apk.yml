@@ -60,11 +60,36 @@ jobs:
           # The catalog remains available for the UI; profiles will be fetched on demand in a later step.
           cp -R /tmp/AutoEq/targets/. app/src/main/assets/targets/
 
+      - name: Restore signing keystore
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_B64" ]; then
+            echo "$DEBUG_KEYSTORE_B64" | base64 -d > zeus-debug.keystore
+            echo "Keystore estable restaurado desde el secreto."
+          else
+            echo "::warning::Falta el secreto DEBUG_KEYSTORE_B64. El APK se firmara con una clave debug aleatoria y NO podra instalarse encima de una build anterior."
+          fi
+
       - name: Build Debug APK
+        env:
+          # versionCode creciente: 100 + numero de corrida. Junto con la clave de
+          # firma estable restaurada desde el secreto, permite instalar cada APK encima del anterior.
+          VERSION_CODE: ${{ 100 + github.run_number }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Verify APK signature
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          echo "APK: $APK"
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | grep -i "SHA-1\|Signer"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Zeus-V2-debug-${{ github.sha }}
+          name: Zeus-V2-debug-v${{ 100 + github.run_number }}
           path: app/build/outputs/apk/debug/*.apk
