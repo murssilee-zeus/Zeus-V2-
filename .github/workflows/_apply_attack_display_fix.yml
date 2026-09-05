@@ -1,0 +1,37 @@
+name: Apply Attack Display Fix
+
+on:
+  push:
+    branches: [ fix/punch-v2 ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix Attack precision display
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/zeus/v2/MainScreen.kt')
+          s = p.read_text()
+          old = 'format = { String.format("%.1f", it) },\n                    accent = LIM_PURPLE_DIM,\n                    onValueChange = { viewModel.limiterAttack = it },'
+          new = 'format = { if (it < 1f) String.format("%.2f", it) else String.format("%.1f", it) },\n                    accent = LIM_PURPLE_DIM,\n                    onValueChange = { viewModel.limiterAttack = it },'
+          if old not in s:
+              raise SystemExit('Attack display pattern not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          if git diff --quiet -- app/src/main/java/com/zeus/v2/MainScreen.kt; then
+            echo 'No change needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/MainScreen.kt
+          git commit -m 'Fix limiter Attack precision display'
+          git push
