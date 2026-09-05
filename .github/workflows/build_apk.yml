@@ -16,60 +16,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply adaptive EQ surgery once
-        shell: python
-        run: |
-          from pathlib import Path
-          import re, subprocess
-          p = Path('app/src/main/java/com/zeus/v2/AudioEngine.kt')
-          s = p.read_text()
-          if 'private const val TARGET_PRE_EQ_BANDS = 128' in s:
-              print('Adaptive EQ surgery already present.')
-          else:
-              s = s.replace('private const val TARGET_PRE_EQ_BANDS = 64', 'private const val TARGET_PRE_EQ_BANDS = 128')
-              s = s.replace('private const val FALLBACK_PRE_EQ_BANDS = 48', 'private const val FALLBACK_PRE_EQ_BANDS = 127')
-              s = s.replace('private const val MIN_PRE_EQ_BANDS = 32', 'private const val MIN_PRE_EQ_BANDS = 64')
-              s = s.replace('private const val MIN_FREQ = 20f', 'private const val MIN_FREQ = 10f')
-              s = s.replace('val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 18)', 'val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 48, 32, 18)')
-              new_apply = '''    private fun applyEq() {
-        val dp = dynamicsProcessing ?: return
-
-        try {
-            val s = settings
-            val converted = ParametricToDpConverter.convert(
-                bands = s.bands,
-                sampleRate = deviceSampleRate,
-                bandCount = preEqBandCount,
-                lowShelfEnabled = lowShelfTag,
-                peakEnabled = peakTag,
-                highShelfEnabled = highShelfTag,
-                subBoost = s.subBoost
-            )
-
-            val count = minOf(preEqBandCount, converted.cutoffs.size)
-            for (i in 0 until count) {
-                dp.setPreEqBandAllChannelsTo(
-                    i,
-                    DynamicsProcessing.EqBand(true, converted.cutoffs[i], converted.gains[i])
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "eq: " + e.message)
-        }
-    }
-
-'''
-              s2, n = re.subn(r'    private fun applyEq\(\) \{.*?\n    \}\n\n    private fun tagAllowed', new_apply + '    private fun tagAllowed', s, count=1, flags=re.S)
-              if n != 1:
-                  raise SystemExit('applyEq block not found')
-              p.write_text(s2)
-              subprocess.run(['git','config','user.name','github-actions[bot]'],check=True)
-              subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'],check=True)
-              subprocess.run(['git','add',str(p)],check=True)
-              subprocess.run(['git','commit','-m','Use adaptive 128-band EQ conversion'],check=True)
-              subprocess.run(['git','push','origin','HEAD:fix/punch-v2'],check=True)
-              print('Adaptive EQ surgery committed and pushed.')
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -101,7 +47,7 @@ jobs:
           cd -
           mkdir -p app/src/main/assets/autoeq app/src/main/assets/targets
           python3 - <<'PY'
-          import json, pathlib, shutil
+          import json, pathlib
           src=pathlib.Path('/tmp/AutoEq/results')
           dst=pathlib.Path('app/src/main/assets/autoeq')
           rows=[]
