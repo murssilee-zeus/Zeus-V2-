@@ -333,13 +333,6 @@ class AudioEngine(private val context: Context) {
                     totalDb += subBoost * (0.35f + 0.65f * t * t)
                 }
 
-                when {
-                    freq <= 10f -> totalDb -= 18f
-                    freq <= 14f -> totalDb -= 10f
-                    freq <= 16f -> totalDb -= 6f
-                    freq < 20f -> totalDb -= 2f
-                }
-
                 val gain = totalDb.coerceIn(-30f, 30f)
                 dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, freq, gain))
             }
