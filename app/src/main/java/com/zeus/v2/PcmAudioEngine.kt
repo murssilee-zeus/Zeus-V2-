@@ -5,11 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import kotlin.math.max
 
-/**
- * Direct PCM output stage for Zeus' in-app audio route.
- * Source supplies interleaved stereo Float PCM; Zeus processes it through the
- * real PCM DSP chain and AudioTrack renders the result.
- */
+/** Direct PCM output stage for Zeus' in-app audio route. */
 class PcmAudioEngine {
     private var audioTrack: AudioTrack? = null
     private var sampleRate = 48000
@@ -17,31 +13,27 @@ class PcmAudioEngine {
     private var configuredSettings: EqSettings? = null
 
     var enabled: Boolean = true
-        set(value) {
-            field = value
-            dsp.enabled = value
-        }
+        set(value) { field = value; dsp.enabled = value }
+
+    var bassMono: Boolean = true
+        set(value) { field = value }
 
     var bassAmount: Float = 0f
         set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(field, punchAmount, harmonicAmount) }
-
     var harmonicAmount: Float = 0f
         set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(bassAmount, punchAmount, field) }
-
     var punchAmount: Float = 0f
         set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(bassAmount, field, harmonicAmount) }
 
     @Synchronized
     fun configure(settings: EqSettings) {
         configuredSettings = settings
+        bassMono = settings.bassMono
+        bassAmount = settings.bassAmount
+        punchAmount = settings.bassPunch
+        harmonicAmount = settings.bassHarmonics
         dsp.configure(sampleRate, settings)
         dsp.setBass(bassAmount, punchAmount, harmonicAmount)
-        dsp.limiterEnabled = settings.limiterEnabled
-        dsp.limiterThresholdDb = settings.limiterThreshold
-        dsp.limiterAttackMs = settings.limiterAttack
-        dsp.limiterReleaseMs = settings.limiterRelease
-        dsp.limiterRatio = settings.limiterRatio
-        dsp.limiterPostGainDb = settings.limiterPostGain
     }
 
     /** Creates the PCM sink. Safe to call again when the sample rate changes. */
@@ -65,19 +57,12 @@ class PcmAudioEngine {
             .build()
         val minBytes = AudioTrack.getMinBufferSize(sr, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_FLOAT)
         val bufferBytes = max(minBytes, sr * 2 * 4 / 10)
-
         val track = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
             .setAudioFormat(format)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .setBufferSizeInBytes(bufferBytes)
             .build()
-
         check(track.state == AudioTrack.STATE_INITIALIZED) { "No se pudo inicializar AudioTrack PCM" }
         audioTrack = track
         track.play()
@@ -94,20 +79,11 @@ class PcmAudioEngine {
         return audioTrack?.write(samples, safeOffset, safeFrames * 2, AudioTrack.WRITE_BLOCKING) ?: 0
     }
 
-    @Synchronized
-    fun flush() {
-        audioTrack?.pause()
-        audioTrack?.flush()
-        dsp.reset()
-    }
+    @Synchronized fun flush() { audioTrack?.pause(); audioTrack?.flush(); dsp.reset() }
 
     @Synchronized
     fun stop() {
-        audioTrack?.let { track ->
-            runCatching { track.pause() }
-            runCatching { track.flush() }
-            runCatching { track.release() }
-        }
+        audioTrack?.let { track -> runCatching { track.pause() }; runCatching { track.flush() }; runCatching { track.release() } }
         audioTrack = null
         dsp.reset()
     }
