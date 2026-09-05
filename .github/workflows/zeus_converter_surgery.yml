@@ -1,0 +1,84 @@
+name: Zeus converter surgery
+
+on:
+  push:
+    branches: [fix/punch-v2]
+
+permissions:
+  contents: write
+
+jobs:
+  surgery:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+          fetch-depth: 0
+
+      - name: Apply converter surgery
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path('app/src/main/java/com/zeus/v2/AudioEngine.kt')
+          s = p.read_text()
+
+          s = s.replace('private const val TARGET_PRE_EQ_BANDS = 64', 'private const val TARGET_PRE_EQ_BANDS = 128')
+          s = s.replace('private const val FALLBACK_PRE_EQ_BANDS = 48', 'private const val FALLBACK_PRE_EQ_BANDS = 127')
+          s = s.replace('private const val MIN_PRE_EQ_BANDS = 32', 'private const val MIN_PRE_EQ_BANDS = 64')
+          s = s.replace('private const val MIN_FREQ = 20f', 'private const val MIN_FREQ = 10f')
+          s = s.replace(
+              'val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 18)',
+              'val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 48, 32, 18)'
+          )
+
+          new_apply = '''    private fun applyEq() {
+        val dp = dynamicsProcessing ?: return
+
+        try {
+            val s = settings
+            val converted = ParametricToDpConverter.convert(
+                bands = s.bands,
+                sampleRate = deviceSampleRate,
+                bandCount = preEqBandCount,
+                lowShelfEnabled = lowShelfTag,
+                peakEnabled = peakTag,
+                highShelfEnabled = highShelfTag,
+                subBoost = s.subBoost
+            )
+
+            val count = minOf(preEqBandCount, converted.cutoffs.size)
+            for (i in 0 until count) {
+                dp.setPreEqBandAllChannelsTo(
+                    i,
+                    DynamicsProcessing.EqBand(true, converted.cutoffs[i], converted.gains[i])
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "eq: " + e.message)
+        }
+    }
+
+'''
+          s2, n = re.subn(
+              r'    private fun applyEq\(\) \{.*?\n    \}\n\n    private fun tagAllowed',
+              new_apply + '    private fun tagAllowed',
+              s,
+              count=1,
+              flags=re.S
+          )
+          if n != 1:
+              raise SystemExit('applyEq block not found, aborting')
+          p.write_text(s2)
+
+      - name: Commit surgery and remove temporary workflow
+        run: |
+          rm -f .github/workflows/zeus_converter_surgery.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/zeus/v2/AudioEngine.kt .github/workflows/zeus_converter_surgery.yml
+          git diff --cached --quiet || git commit -m "Use adaptive 128-band EQ conversion"
+          git push origin fix/punch-v2
