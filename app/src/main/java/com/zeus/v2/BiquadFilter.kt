@@ -3,9 +3,13 @@ package com.zeus.v2
 import kotlin.math.*
 
 /**
- * Biquad de 2º orden para calcular respuesta en frecuencia real.
- * Usado solo para generar la curva objetivo que luego se mapea
- * a las bandas Peak de DynamicsProcessing.
+ * Robust RBJ biquad used to calculate the real target response that is
+ * subsequently sampled into Android DynamicsProcessing EQ bands.
+ *
+ * This keeps Zeus' current DP audio architecture intact, while borrowing the
+ * stronger numerical implementation from the supplied DSP: safe coefficient
+ * normalization, explicit sample-rate handling, 1st/2nd order-ready structure,
+ * and response evaluation from the same coefficients used by the filter.
  */
 class BiquadFilter(
     frequency: Float,
@@ -25,14 +29,16 @@ class BiquadFilter(
     }
 
     fun calculate(frequency: Float, gainDb: Float, q: Float, type: EqBand.FilterType) {
-        val fc = frequency.coerceIn(10f, sampleRate * 0.45f)
+        val sr = sampleRate.coerceIn(8000f, 384000f).toDouble()
+        val fc = frequency.coerceIn(1f, (sr.toFloat() * 0.49f)).toDouble()
         val qSafe = q.coerceIn(0.1f, 40f).toDouble()
-        val A = 10.0.pow(gainDb / 40.0)
-        val omega = 2.0 * PI * fc / sampleRate
+        val omega = 2.0 * PI * fc / sr
         val sn = sin(omega)
         val cs = cos(omega)
         val alpha = sn / (2.0 * qSafe)
-        val beta = sqrt(A) / qSafe
+        val A = 10.0.pow(gainDb.coerceIn(-60f, 60f) / 40.0)
+        val sqrtA = sqrt(A)
+        val beta = sqrtA / qSafe
 
         when (type) {
             EqBand.FilterType.PEAK -> {
@@ -42,25 +48,25 @@ class BiquadFilter(
                 val a0 = 1.0 + alpha / A
                 a1 = -2.0 * cs
                 a2 = 1.0 - alpha / A
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                normalize(a0)
             }
             EqBand.FilterType.LOW_SHELF -> {
-                b0 = A * ((A + 1) - (A - 1) * cs + beta * sn)
-                b1 = 2.0 * A * ((A - 1) - (A + 1) * cs)
-                b2 = A * ((A + 1) - (A - 1) * cs - beta * sn)
-                val a0 = (A + 1) + (A - 1) * cs + beta * sn
-                a1 = -2.0 * ((A - 1) + (A + 1) * cs)
-                a2 = (A + 1) + (A - 1) * cs - beta * sn
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                b0 = A * ((A + 1.0) - (A - 1.0) * cs + beta * sn)
+                b1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cs)
+                b2 = A * ((A + 1.0) - (A - 1.0) * cs - beta * sn)
+                val a0 = (A + 1.0) + (A - 1.0) * cs + beta * sn
+                a1 = -2.0 * ((A - 1.0) + (A + 1.0) * cs)
+                a2 = (A + 1.0) + (A - 1.0) * cs - beta * sn
+                normalize(a0)
             }
             EqBand.FilterType.HIGH_SHELF -> {
-                b0 = A * ((A + 1) + (A - 1) * cs + beta * sn)
-                b1 = -2.0 * A * ((A - 1) + (A + 1) * cs)
-                b2 = A * ((A + 1) + (A - 1) * cs - beta * sn)
-                val a0 = (A + 1) - (A - 1) * cs + beta * sn
-                a1 = 2.0 * ((A - 1) - (A + 1) * cs)
-                a2 = (A + 1) - (A - 1) * cs - beta * sn
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                b0 = A * ((A + 1.0) + (A - 1.0) * cs + beta * sn)
+                b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cs)
+                b2 = A * ((A + 1.0) + (A - 1.0) * cs - beta * sn)
+                val a0 = (A + 1.0) - (A - 1.0) * cs + beta * sn
+                a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cs)
+                a2 = (A + 1.0) - (A - 1.0) * cs - beta * sn
+                normalize(a0)
             }
             EqBand.FilterType.LOW_PASS -> {
                 b0 = (1.0 - cs) / 2.0
@@ -69,7 +75,7 @@ class BiquadFilter(
                 val a0 = 1.0 + alpha
                 a1 = -2.0 * cs
                 a2 = 1.0 - alpha
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                normalize(a0)
             }
             EqBand.FilterType.HIGH_PASS -> {
                 b0 = (1.0 + cs) / 2.0
@@ -78,7 +84,7 @@ class BiquadFilter(
                 val a0 = 1.0 + alpha
                 a1 = -2.0 * cs
                 a2 = 1.0 - alpha
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                normalize(a0)
             }
             EqBand.FilterType.NOTCH -> {
                 b0 = 1.0
@@ -87,7 +93,7 @@ class BiquadFilter(
                 val a0 = 1.0 + alpha
                 a1 = -2.0 * cs
                 a2 = 1.0 - alpha
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                normalize(a0)
             }
             EqBand.FilterType.BAND_PASS -> {
                 b0 = alpha
@@ -96,35 +102,49 @@ class BiquadFilter(
                 val a0 = 1.0 + alpha
                 a1 = -2.0 * cs
                 a2 = 1.0 - alpha
-                b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0
+                normalize(a0)
             }
             EqBand.FilterType.BYPASS -> {
-                b0 = 1.0; b1 = 0.0; b2 = 0.0
-                a1 = 0.0; a2 = 0.0
+                b0 = 1.0
+                b1 = 0.0
+                b2 = 0.0
+                a1 = 0.0
+                a2 = 0.0
             }
         }
     }
 
-    /**
-     * Devuelve la magnitud de la respuesta en dB a la frecuencia dada.
-     */
+    private fun normalize(a0: Double) {
+        if (!a0.isFinite() || abs(a0) < 1e-12) {
+            b0 = 1.0; b1 = 0.0; b2 = 0.0
+            a1 = 0.0; a2 = 0.0
+            return
+        }
+        b0 /= a0
+        b1 /= a0
+        b2 /= a0
+        a1 /= a0
+        a2 /= a0
+    }
+
+    /** Magnitude in dB at [freq], using the exact normalized coefficients. */
     fun responseDb(freq: Float): Float {
-        val w = 2.0 * PI * freq / sampleRate
-        val cosw = cos(w)
-        val cos2w = cos(2.0 * w)
-        val sinw = sin(w)
-        val sin2w = sin(2.0 * w)
+        val f = freq.coerceAtLeast(0.01f).toDouble()
+        val w = 2.0 * PI * f / sampleRate.coerceAtLeast(8000f)
+        val c = cos(w)
+        val s = sin(w)
+        val c2 = cos(2.0 * w)
+        val s2 = sin(2.0 * w)
 
-        val numRe = b0 + b1 * cosw + b2 * cos2w
-        val numIm = b1 * sinw + b2 * sin2w
-        val denRe = 1.0 + a1 * cosw + a2 * cos2w
-        val denIm = a1 * sinw + a2 * sin2w
+        val numRe = b0 + b1 * c + b2 * c2
+        val numIm = b1 * s + b2 * s2
+        val denRe = 1.0 + a1 * c + a2 * c2
+        val denIm = a1 * s + a2 * s2
+        val num2 = numRe * numRe + numIm * numIm
+        val den2 = denRe * denRe + denIm * denIm
 
-        val numMag2 = numRe * numRe + numIm * numIm
-        val denMag2 = denRe * denRe + denIm * denIm
-
-        if (denMag2 < 1e-20) return 0f
-        val mag = sqrt(numMag2 / denMag2)
-        return (20.0 * log10(mag.coerceAtLeast(1e-10))).toFloat()
+        if (!num2.isFinite() || !den2.isFinite() || den2 < 1e-24) return 0f
+        val mag = sqrt((num2 / den2).coerceAtLeast(1e-20))
+        return (20.0 * log10(mag)).toFloat().coerceIn(-80f, 80f)
     }
 }
