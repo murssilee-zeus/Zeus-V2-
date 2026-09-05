@@ -9,6 +9,7 @@ class BassEngine(sampleRate: Float = 48000f) {
     private var currentSampleRate = sampleRate.coerceIn(8000f, 192000f)
 
     var enabled: Boolean = true
+    var bassMono: Boolean = true
     var bassAmount: Float = 0f
         set(value) { field = value.coerceIn(0f, 100f) }
     var harmonicAmount: Float = 0f
@@ -56,8 +57,8 @@ class BassEngine(sampleRate: Float = 48000f) {
 
         var i = offset
         while (i + 1 < end) {
-            val l = buffer[i].coerceIn(-1f, 1f)
-            val r = buffer[i + 1].coerceIn(-1f, 1f)
+            val l = buffer[i]
+            val r = buffer[i + 1]
             lowL += lowA * (l - lowL)
             lowR += lowA * (r - lowR)
             val monoBass = (lowL + lowR) * 0.5f
@@ -77,9 +78,13 @@ class BassEngine(sampleRate: Float = 48000f) {
             val even = evenRaw - dcHarm
             val harmonic = harmonics * (0.20f * odd + 0.06f * even)
 
-            val add = bassBoost + harmonic
-            buffer[i] = safeSoftLimit(l + add)
-            buffer[i + 1] = safeSoftLimit(r + add)
+            if (bassMono) {
+                buffer[i] = l + bassBoost + harmonic
+                buffer[i + 1] = r + bassBoost + harmonic
+            } else {
+                buffer[i] = l + lowL * amount * (0.18f + 0.82f * punchGain) + harmonic
+                buffer[i + 1] = r + lowR * amount * (0.18f + 0.82f * punchGain) + harmonic
+            }
             i += 2
         }
     }
@@ -87,11 +92,5 @@ class BassEngine(sampleRate: Float = 48000f) {
     private fun onePoleCoeff(cutoff: Float): Float {
         val x = (2f * Math.PI.toFloat() * cutoff / currentSampleRate).coerceIn(0.0001f, 0.45f)
         return x / (1f + x)
-    }
-
-    private fun safeSoftLimit(x: Float): Float {
-        val ax = abs(x)
-        if (ax <= 0.92f) return x
-        return (0.92f + 0.08f * tanh(((ax - 0.92f) / 0.08f).toDouble()).toFloat()) * if (x < 0f) -1f else 1f
     }
 }
