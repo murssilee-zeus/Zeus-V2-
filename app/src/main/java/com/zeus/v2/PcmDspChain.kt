@@ -10,26 +10,43 @@ import kotlin.math.tanh
 
 /**
  * Real-time Float PCM DSP chain used by PcmAudioEngine.
- * Order: input gain -> Bass Engine -> parametric EQ -> 4-band compressor -> limiter.
- * This is intentionally independent from DynamicsProcessing so every stage can
- * actually touch the PCM buffer.
+ * Order: input gain -> Bass Engine -> parametric EQ -> complementary 4-band
+ * crossover -> independent band compression -> sum -> limiter.
+ * No per-sample allocations are used in the processing loop.
  */
 class PcmDspChain(sampleRate: Int = 48000) {
     private var sr = sampleRate.coerceIn(8000, 192000)
     private val bass = BassEngine(sr.toFloat())
     private var eq = emptyList<PcmBiquad>()
-    private var cross = emptyArray<PcmBiquad>()
+
+    // Per-channel complementary crossover: LP(c1), HP(c1), LP(c2), HP(c2), LP(c3), HP(c3).
+    private val crossL = Array(6) { PcmBiquad(1000f, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat()) }
+    private val crossR = Array(6) { PcmBiquad(1000f, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat()) }
+
+    // Independent linked-stereo envelopes and smoothed gains for L/LM/HM/H.
     private val env = FloatArray(4)
-    private var limiterEnv = 0f
+    private val compGain = floatArrayOf(1f, 1f, 1f, 1f)
+    private val attackCoeff = FloatArray(4)
+    private val releaseCoeff = FloatArray(4)
+    private val thresholdDb = FloatArray(4)
+    private val ratio = FloatArray(4)
+    private val kneeDb = FloatArray(4)
+    private val preGain = FloatArray(4)
+    private val postGain = FloatArray(4)
+
+    private var limiterGain = 1f
+    private var limiterThresholdDb = -2.5f
+    private var limiterAttackCoeff = 0f
+    private var limiterReleaseCoeff = 0f
+    private var limiterRatio = 20f
+    private var limiterPost = 1f
     private var settings: EqSettings? = null
+    private var configured = false
 
     var enabled = true
     var limiterEnabled = true
-    var limiterThresholdDb = -2.5f
     var limiterAttackMs = 0.5f
     var limiterReleaseMs = 120f
-    var limiterRatio = 20f
-    var limiterPostGainDb = 0f
 
     fun configure(sampleRate: Int, source: EqSettings) {
         val newSr = sampleRate.coerceIn(8000, 192000)
@@ -41,6 +58,8 @@ class PcmDspChain(sampleRate: Int = 48000) {
         bass.bassAmount = source.subBoost.coerceIn(0f, 100f)
         bass.harmonicAmount = source.subBoost.coerceIn(0f, 100f)
         rebuildEq(source)
+        configureDynamics(source)
+        configured = true
     }
 
     fun setBass(amount: Float, punch: Float, harmonics: Float) {
@@ -52,25 +71,34 @@ class PcmDspChain(sampleRate: Int = 48000) {
     fun reset() {
         bass.reset()
         eq = emptyList()
-        cross = emptyArray()
+        var n = 0
+        while (n < 6) {
+            crossL[n].reset()
+            crossR[n].reset()
+            n++
+        }
         env.fill(0f)
-        limiterEnv = 0f
+        compGain[0] = 1f; compGain[1] = 1f; compGain[2] = 1f; compGain[3] = 1f
+        limiterGain = 1f
+        configured = false
     }
 
     fun process(buffer: FloatArray, offset: Int = 0, frames: Int = (buffer.size - offset) / 2) {
         if (!enabled || buffer.isEmpty()) return
-        val safeFrames = frames.coerceAtMost((buffer.size - offset) / 2).coerceAtLeast(0)
+        val safeOffset = offset.coerceIn(0, buffer.size)
+        val safeFrames = frames.coerceAtMost((buffer.size - safeOffset) / 2).coerceAtLeast(0)
         if (safeFrames == 0) return
+
         val s = settings
-        if (s == null) {
-            bass.processStereo(buffer, sr, offset, safeFrames)
-            applyLimiter(buffer, offset, safeFrames)
+        if (s == null || !configured) {
+            bass.processStereo(buffer, sr, safeOffset, safeFrames)
+            applyLimiter(buffer, safeOffset, safeFrames)
             return
         }
 
         val inputGain = dbToLinear(s.preGain.coerceIn(-30f, 12f))
-        var i = offset
-        val end = offset + safeFrames * 2
+        var i = safeOffset
+        val end = safeOffset + safeFrames * 2
         while (i + 1 < end) {
             var l = buffer[i] * inputGain
             var r = buffer[i + 1] * inputGain
@@ -85,10 +113,11 @@ class PcmDspChain(sampleRate: Int = 48000) {
             i += 2
         }
 
-        // Bass processing is deliberately before the compressor.
-        bass.processStereo(buffer, sr, offset, safeFrames)
-        applyMbc(buffer, offset, safeFrames, s)
-        applyLimiter(buffer, offset, safeFrames)
+        // Bass is intentionally before multiband dynamics. The EQ is also before
+        // the crossover so its curve is evaluated before the compressor splits bands.
+        bass.processStereo(buffer, sr, safeOffset, safeFrames)
+        applyMbc(buffer, safeOffset, safeFrames)
+        applyLimiter(buffer, safeOffset, safeFrames)
     }
 
     private fun rebuildEq(s: EqSettings) {
@@ -106,79 +135,181 @@ class PcmDspChain(sampleRate: Int = 48000) {
                 EqBand.FilterType.BYPASS -> null
             }
             if (type != null) {
-                list += PcmBiquad(band.frequency, band.gain, band.q, type, sr.toFloat())
-                list += PcmBiquad(band.frequency, band.gain, band.q, type, sr.toFloat())
+                list.add(PcmBiquad(band.frequency, band.gain, band.q, type, sr.toFloat()))
+                list.add(PcmBiquad(band.frequency, band.gain, band.q, type, sr.toFloat()))
             }
         }
         eq = list
     }
 
-    private fun applyMbc(buffer: FloatArray, offset: Int, frames: Int, s: EqSettings) {
-        if (!s.compEnabled) return
+    private fun configureDynamics(s: EqSettings) {
         val c1 = s.cross1.coerceIn(40f, 1000f)
         val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
         val c3 = s.cross3.coerceIn(c2 + 50f, sr * 0.45f)
-        val cuts = floatArrayOf(c1, c2, c3)
-        if (cross.size != 6) cross = Array(6) { PcmBiquad(1000f, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat()) }
-        for (n in 0..2) {
-            cross[n * 2].configure(cuts[n], 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat())
-            cross[n * 2 + 1].configure(cuts[n], 0f, 0.707f, PcmBiquad.Type.HIGH_PASS, sr.toFloat())
-        }
+        configureCrossPair(crossL, c1, c2, c3)
+        configureCrossPair(crossR, c1, c2, c3)
 
-        // A stable serial 4-band compressor: low/mid/high sections are derived
-        // from crossover states, while the full signal receives the gain result.
-        val attack = floatArrayOf(s.compAttackLow, s.compAttackLoMid, s.compAttackHiMid, s.compAttackHigh)
-        val release = floatArrayOf(s.compReleaseLow, s.compReleaseLoMid, s.compReleaseHiMid, s.compReleaseHigh)
-        val threshold = floatArrayOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
-        val ratio = floatArrayOf(s.compRatioLow, s.compRatioLoMid, s.compRatioHiMid, s.compRatioHigh)
-        val gain = FloatArray(4)
-        for (n in 0..3) {
-            val target = threshold[n].coerceIn(-60f, 0f)
-            val over = (20f * kotlin.math.log10(max(env[n], 1e-6f)) - target).coerceAtLeast(0f)
-            val compressed = over - over / ratio[n].coerceIn(1f, 24f)
-            gain[n] = dbToLinear(-compressed)
-            val a = exp(-1f / (sr * (attack[n].coerceIn(1f, 200f) / 1000f)))
-            val rel = exp(-1f / (sr * (release[n].coerceIn(10f, 1000f) / 1000f)))
-            val desired = max(env[n], 1e-6f)
-            env[n] = if (desired > env[n]) a * env[n] + (1f - a) * desired else rel * env[n] + (1f - rel) * desired
-        }
+        thresholdDb[0] = s.compThLow.coerceIn(-60f, 0f)
+        thresholdDb[1] = s.compThLoMid.coerceIn(-60f, 0f)
+        thresholdDb[2] = s.compThHiMid.coerceIn(-60f, 0f)
+        thresholdDb[3] = s.compThHigh.coerceIn(-60f, 0f)
+        ratio[0] = s.compRatioLow.coerceIn(1f, 24f)
+        ratio[1] = s.compRatioLoMid.coerceIn(1f, 24f)
+        ratio[2] = s.compRatioHiMid.coerceIn(1f, 24f)
+        ratio[3] = s.compRatioHigh.coerceIn(1f, 24f)
+        kneeDb[0] = s.compKneeLow.coerceIn(0f, 24f)
+        kneeDb[1] = s.compKneeLoMid.coerceIn(0f, 24f)
+        kneeDb[2] = s.compKneeHiMid.coerceIn(0f, 24f)
+        kneeDb[3] = s.compKneeHigh.coerceIn(0f, 24f)
+
+        preGain[0] = dbToLinear(s.compPreGainLow.coerceIn(-24f, 24f))
+        preGain[1] = dbToLinear(s.compPreGainLoMid.coerceIn(-24f, 24f))
+        preGain[2] = dbToLinear(s.compPreGainHiMid.coerceIn(-24f, 24f))
+        preGain[3] = dbToLinear(s.compPreGainHigh.coerceIn(-24f, 24f))
+        postGain[0] = dbToLinear(s.compPostGainLow.coerceIn(-24f, 24f))
+        postGain[1] = dbToLinear(s.compPostGainLoMid.coerceIn(-24f, 24f))
+        postGain[2] = dbToLinear(s.compPostGainHiMid.coerceIn(-24f, 24f))
+        postGain[3] = dbToLinear(s.compPostGainHigh.coerceIn(-24f, 24f))
+
+        attackCoeff[0] = timeCoeff(s.compAttackLow)
+        attackCoeff[1] = timeCoeff(s.compAttackLoMid)
+        attackCoeff[2] = timeCoeff(s.compAttackHiMid)
+        attackCoeff[3] = timeCoeff(s.compAttackHigh)
+        releaseCoeff[0] = timeCoeff(s.compReleaseLow)
+        releaseCoeff[1] = timeCoeff(s.compReleaseLoMid)
+        releaseCoeff[2] = timeCoeff(s.compReleaseHiMid)
+        releaseCoeff[3] = timeCoeff(s.compReleaseHigh)
+
+        limiterThresholdDb = s.limiterThreshold.coerceIn(-30f, 0f)
+        limiterAttackMs = s.limiterAttack.coerceIn(0.01f, 100f)
+        limiterReleaseMs = s.limiterRelease.coerceIn(20f, 1000f)
+        limiterRatio = s.limiterRatio.coerceIn(1f, 50f)
+        limiterPost = dbToLinear(s.limiterPostGain.coerceIn(-12f, 12f))
+        limiterAttackCoeff = timeCoeff(limiterAttackMs)
+        limiterReleaseCoeff = timeCoeff(limiterReleaseMs)
+    }
+
+    private fun configureCrossPair(filters: Array<PcmBiquad>, c1: Float, c2: Float, c3: Float) {
+        filters[0].configure(c1, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat())
+        filters[1].configure(c1, 0f, 0.707f, PcmBiquad.Type.HIGH_PASS, sr.toFloat())
+        filters[2].configure(c2, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat())
+        filters[3].configure(c2, 0f, 0.707f, PcmBiquad.Type.HIGH_PASS, sr.toFloat())
+        filters[4].configure(c3, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat())
+        filters[5].configure(c3, 0f, 0.707f, PcmBiquad.Type.HIGH_PASS, sr.toFloat())
+    }
+
+    private fun applyMbc(buffer: FloatArray, offset: Int, frames: Int) {
+        val s = settings ?: return
+        if (!s.compEnabled) return
+
         var i = offset
         val end = offset + frames * 2
         while (i + 1 < end) {
-            val l = buffer[i]
-            val r = buffer[i + 1]
-            val m = (l + r) * 0.5f
-            val level = abs(m)
-            val eDb = 20f * kotlin.math.log10(max(level, 1e-6f))
-            val band = when {
-                eDb.isNaN() -> 0
-                abs(m) < 0.01f -> 0
-                else -> ((abs(m) * 4f).toInt()).coerceIn(0, 3)
-            }
-            val g = gain[band]
-            buffer[i] = l * g
-            buffer[i + 1] = r * g
+            val inL = buffer[i]
+            val inR = buffer[i + 1]
+
+            // Complementary serial split. Each band covers the remaining spectrum
+            // without classifying a sample by amplitude or allocating buffers.
+            val lowL = crossL[0].process(inL)
+            val lowR = crossR[0].process(inR)
+
+            val hp1L = crossL[1].process(inL)
+            val hp1R = crossR[1].process(inR)
+            val loMidL = crossL[2].process(hp1L)
+            val loMidR = crossR[2].process(hp1R)
+
+            val hp2L = crossL[3].process(hp1L)
+            val hp2R = crossR[3].process(hp1R)
+            val hiMidL = crossL[4].process(hp2L)
+            val hiMidR = crossR[4].process(hp2R)
+
+            val highL = crossL[5].process(hp2L)
+            val highR = crossR[5].process(hp2R)
+
+            val e0 = linkedLevel(lowL, lowR) * preGain[0]
+            val e1 = linkedLevel(loMidL, loMidR) * preGain[1]
+            val e2 = linkedLevel(hiMidL, hiMidR) * preGain[2]
+            val e3 = linkedLevel(highL, highR) * preGain[3]
+
+            env[0] = follow(env[0], e0, attackCoeff[0], releaseCoeff[0])
+            env[1] = follow(env[1], e1, attackCoeff[1], releaseCoeff[1])
+            env[2] = follow(env[2], e2, attackCoeff[2], releaseCoeff[2])
+            env[3] = follow(env[3], e3, attackCoeff[3], releaseCoeff[3])
+
+            val target0 = compressionGainDb(env[0], thresholdDb[0], ratio[0], kneeDb[0])
+            val target1 = compressionGainDb(env[1], thresholdDb[1], ratio[1], kneeDb[1])
+            val target2 = compressionGainDb(env[2], thresholdDb[2], ratio[2], kneeDb[2])
+            val target3 = compressionGainDb(env[3], thresholdDb[3], ratio[3], kneeDb[3])
+
+            compGain[0] = smoothGain(compGain[0], target0, attackCoeff[0], releaseCoeff[0])
+            compGain[1] = smoothGain(compGain[1], target1, attackCoeff[1], releaseCoeff[1])
+            compGain[2] = smoothGain(compGain[2], target2, attackCoeff[2], releaseCoeff[2])
+            compGain[3] = smoothGain(compGain[3], target3, attackCoeff[3], releaseCoeff[3])
+
+            buffer[i] = lowL * compGain[0] * postGain[0] + loMidL * compGain[1] * postGain[1] + hiMidL * compGain[2] * postGain[2] + highL * compGain[3] * postGain[3]
+            buffer[i + 1] = lowR * compGain[0] * postGain[0] + loMidR * compGain[1] * postGain[1] + hiMidR * compGain[2] * postGain[2] + highR * compGain[3] * postGain[3]
             i += 2
         }
     }
 
+    private fun linkedLevel(l: Float, r: Float): Float = max(abs(l), abs(r)).coerceAtLeast(1e-7f)
+
+    private fun follow(current: Float, input: Float, attack: Float, release: Float): Float {
+        return if (input > current) attack * current + (1f - attack) * input
+        else release * current + (1f - release) * input
+    }
+
+    private fun compressionGainDb(level: Float, threshold: Float, ratio: Float, knee: Float): Float {
+        val levelDb = 20f * kotlin.math.log10(level.coerceAtLeast(1e-7f))
+        val over = levelDb - threshold
+        val reductionDb = if (knee <= 0f) {
+            if (over > 0f) over - over / ratio else 0f
+        } else {
+            val lower = -knee * 0.5f
+            val upper = knee * 0.5f
+            when {
+                over <= lower -> 0f
+                over >= upper -> over - over / ratio
+                else -> {
+                    val x = over - lower
+                    x * x * (1f / ratio - 1f) / (2f * knee)
+                }
+            }
+        }
+        return dbToLinear(-reductionDb)
+    }
+
+    private fun smoothGain(current: Float, target: Float, attack: Float, release: Float): Float {
+        return if (target < current) attack * current + (1f - attack) * target
+        else release * current + (1f - release) * target
+    }
+
     private fun applyLimiter(buffer: FloatArray, offset: Int, frames: Int) {
         if (!limiterEnabled) return
-        val threshold = dbToLinear(limiterThresholdDb.coerceIn(-30f, 0f))
-        val attack = exp(-1f / (sr * (limiterAttackMs.coerceIn(0.01f, 100f) / 1000f)))
-        val release = exp(-1f / (sr * (limiterReleaseMs.coerceIn(20f, 1000f) / 1000f)))
-        val post = dbToLinear(limiterPostGainDb.coerceIn(-12f, 12f))
         var i = offset
         val end = offset + frames * 2
         while (i + 1 < end) {
-            val peak = max(abs(buffer[i]), abs(buffer[i + 1])) * post
-            limiterEnv = if (peak > limiterEnv) attack * limiterEnv + (1f - attack) * peak else release * limiterEnv + (1f - release) * peak
-            val over = (limiterEnv - threshold).coerceAtLeast(0f)
-            val reduction = if (over <= 0f) 1f else 1f / (1f + (limiterRatio.coerceIn(1f, 50f) - 1f) * (over / max(threshold, 1e-5f)))
-            buffer[i] = (buffer[i] * post * reduction).coerceIn(-1f, 1f)
-            buffer[i + 1] = (buffer[i + 1] * post * reduction).coerceIn(-1f, 1f)
+            val dryL = buffer[i] * limiterPost
+            val dryR = buffer[i + 1] * limiterPost
+            val peak = max(abs(dryL), abs(dryR)).coerceAtLeast(1e-7f)
+            val levelDb = 20f * kotlin.math.log10(peak)
+            val overDb = levelDb - limiterThresholdDb
+            val reductionDb = if (overDb > 0f) overDb - overDb / limiterRatio else 0f
+            val target = dbToLinear(-reductionDb)
+            limiterGain = if (target < limiterGain) {
+                limiterAttackCoeff * limiterGain + (1f - limiterAttackCoeff) * target
+            } else {
+                limiterReleaseCoeff * limiterGain + (1f - limiterReleaseCoeff) * target
+            }
+            buffer[i] = dryL * limiterGain
+            buffer[i + 1] = dryR * limiterGain
             i += 2
         }
+    }
+
+    private fun timeCoeff(ms: Float): Float {
+        val seconds = (ms.coerceIn(0.01f, 2000f) / 1000f).toDouble()
+        return exp(-1.0 / (sr.toDouble() * seconds)).toFloat()
     }
 
     private fun dbToLinear(db: Float): Float = 10f.pow(db / 20f)
@@ -223,17 +354,25 @@ class PcmDspChain(sampleRate: Int = 48000) {
                 Type.NOTCH -> { b0=1.0; b1=-2.0*cs; b2=1.0; val a0=1.0+alpha; a1=-2.0*cs; a2=1.0-alpha; norm(a0) }
                 Type.BAND_PASS -> { b0=alpha; b1=0.0; b2=-alpha; val a0=1.0+alpha; a1=-2.0*cs; a2=1.0-alpha; norm(a0) }
             }
-            resetState()
+            reset()
         }
 
-        private fun norm(a0: Double) { if (!a0.isFinite() || abs(a0) < 1e-12) { b0=1.0;b1=0.0;b2=0.0;a1=0.0;a2=0.0 } else { b0/=a0;b1/=a0;b2/=a0;a1/=a0;a2/=a0 } }
-        private fun resetState() { z1=0.0; z2=0.0 }
+        private fun norm(a0: Double) {
+            if (!a0.isFinite() || abs(a0) < 1e-12) {
+                b0=1.0; b1=0.0; b2=0.0; a1=0.0; a2=0.0
+            } else {
+                b0/=a0; b1/=a0; b2/=a0; a1/=a0; a2/=a0
+            }
+        }
+
+        fun reset() { z1=0.0; z2=0.0 }
+
         fun process(x: Float): Float {
-            val xd=x.toDouble()
-            val y=b0*xd+z1
-            z1=b1*xd-a1*y+z2
-            z2=b2*xd-a2*y
-            return y.toFloat().coerceIn(-4f,4f)
+            val xd = x.toDouble()
+            val y = b0 * xd + z1
+            z1 = b1 * xd - a1 * y + z2
+            z2 = b2 * xd - a2 * y
+            return y.toFloat()
         }
     }
 }
