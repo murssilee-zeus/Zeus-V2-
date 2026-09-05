@@ -6,10 +6,11 @@ import kotlin.math.*
  * Robust RBJ biquad used to calculate the real target response that is
  * subsequently sampled into Android DynamicsProcessing EQ bands.
  *
- * This keeps Zeus' current DP audio architecture intact, while borrowing the
- * stronger numerical implementation from the supplied DSP: safe coefficient
- * normalization, explicit sample-rate handling, 1st/2nd order-ready structure,
- * and response evaluation from the same coefficients used by the filter.
+ * Shelf filters use the RBJ shelf-slope equation. The previous implementation
+ * substituted sqrt(A) / Q for the shelf alpha term, which is not the RBJ
+ * shelf equation and caused LOW_SHELF/HIGH_SHELF curves to have the wrong
+ * shape and gain. Peak, pass, notch and band-pass filters keep their standard
+ * RBJ equations.
  */
 class BiquadFilter(
     frequency: Float,
@@ -38,7 +39,16 @@ class BiquadFilter(
         val alpha = sn / (2.0 * qSafe)
         val A = 10.0.pow(gainDb.coerceIn(-60f, 60f) / 40.0)
         val sqrtA = sqrt(A)
-        val beta = sqrtA / qSafe
+
+        // For RBJ shelf filters the fourth parameter is shelf slope S,
+        // not the PEAK Q. EqBand already exposes a Q-like control, so use it
+        // as S here. This gives stable, predictable shelf transitions while
+        // preserving the existing UI and preset data.
+        val shelfSlope = qSafe.coerceIn(0.1, 10.0)
+        val shelfAlpha = (sn / 2.0) * sqrt(
+            (A + 1.0 / A) * (1.0 / shelfSlope - 1.0) + 2.0
+        )
+        val shelfTwoSqrtAAlpha = 2.0 * sqrtA * shelfAlpha
 
         when (type) {
             EqBand.FilterType.PEAK -> {
@@ -51,21 +61,21 @@ class BiquadFilter(
                 normalize(a0)
             }
             EqBand.FilterType.LOW_SHELF -> {
-                b0 = A * ((A + 1.0) - (A - 1.0) * cs + beta * sn)
+                b0 = A * ((A + 1.0) - (A - 1.0) * cs + shelfTwoSqrtAAlpha)
                 b1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cs)
-                b2 = A * ((A + 1.0) - (A - 1.0) * cs - beta * sn)
-                val a0 = (A + 1.0) + (A - 1.0) * cs + beta * sn
+                b2 = A * ((A + 1.0) - (A - 1.0) * cs - shelfTwoSqrtAAlpha)
+                val a0 = (A + 1.0) + (A - 1.0) * cs + shelfTwoSqrtAAlpha
                 a1 = -2.0 * ((A - 1.0) + (A + 1.0) * cs)
-                a2 = (A + 1.0) + (A - 1.0) * cs - beta * sn
+                a2 = (A + 1.0) + (A - 1.0) * cs - shelfTwoSqrtAAlpha
                 normalize(a0)
             }
             EqBand.FilterType.HIGH_SHELF -> {
-                b0 = A * ((A + 1.0) + (A - 1.0) * cs + beta * sn)
+                b0 = A * ((A + 1.0) + (A - 1.0) * cs + shelfTwoSqrtAAlpha)
                 b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cs)
-                b2 = A * ((A + 1.0) + (A - 1.0) * cs - beta * sn)
-                val a0 = (A + 1.0) - (A - 1.0) * cs + beta * sn
+                b2 = A * ((A + 1.0) + (A - 1.0) * cs - shelfTwoSqrtAAlpha)
+                val a0 = (A + 1.0) - (A - 1.0) * cs + shelfTwoSqrtAAlpha
                 a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cs)
-                a2 = (A + 1.0) - (A - 1.0) * cs - beta * sn
+                a2 = (A + 1.0) - (A - 1.0) * cs - shelfTwoSqrtAAlpha
                 normalize(a0)
             }
             EqBand.FilterType.LOW_PASS -> {
