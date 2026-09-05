@@ -215,13 +215,13 @@ class PcmDspChain(sampleRate: Int = 48000) {
             val sa = sn / 2.0 * sqrt((A + 1.0 / A) * (1.0 / S - 1.0) + 2.0)
             val two = 2.0 * sqrtA * sa
             when (type) {
-                Type.PEAK -> { b0=1+alpha*A; b1=-2*cs; b2=1-alpha*A; val a0=1+alpha/A; a1=-2*cs; a2=1-alpha/A; norm(a0) }
-                Type.LOW_SHELF -> { b0=A*((A+1)-(A-1)*cs+two); b1=2*A*((A-1)-(A+1)*cs); b2=A*((A+1)-(A-1)*cs-two); val a0=(A+1)+(A-1)*cs+two; a1=-2*((A-1)+(A+1)*cs); a2=(A+1)+(A-1)*cs-two; norm(a0) }
-                Type.HIGH_SHELF -> { b0=A*((A+1)+(A-1)*cs+two); b1=-2*A*((A-1)+(A+1)*cs); b2=A*((A+1)+(A-1)*cs-two); val a0=(A+1)-(A-1)*cs+two; a1=2*((A-1)-(A+1)*cs); a2=(A+1)-(A-1)*cs-two; norm(a0) }
-                Type.LOW_PASS -> { b0=(1-cs)/2; b1=1-cs; b2=(1-cs)/2; val a0=1+alpha; a1=-2*cs; a2=1-alpha; norm(a0) }
-                Type.HIGH_PASS -> { b0=(1+cs)/2; b1=-(1+cs); b2=(1+cs)/2; val a0=1+alpha; a1=-2*cs; a2=1-alpha; norm(a0) }
-                Type.NOTCH -> { b0=1; b1=-2*cs; b2=1; val a0=1+alpha; a1=-2*cs; a2=1-alpha; norm(a0) }
-                Type.BAND_PASS -> { b0=alpha; b1=0; b2=-alpha; val a0=1+alpha; a1=-2*cs; a2=1-alpha; norm(a0) }
+                Type.PEAK -> { b0=1.0+alpha*A; b1=-2.0*cs; b2=1.0-alpha*A; val a0=1.0+alpha/A; a1=-2.0*cs; a2=1.0-alpha/A; norm(a0) }
+                Type.LOW_SHELF -> { b0=A*((A+1.0)-(A-1.0)*cs+two); b1=2.0*A*((A-1.0)-(A+1.0)*cs); b2=A*((A+1.0)-(A-1.0)*cs-two); val a0=(A+1.0)+(A-1.0)*cs+two; a1=-2.0*((A-1.0)+(A+1.0)*cs); a2=(A+1.0)+(A-1.0)*cs-two; norm(a0) }
+                Type.HIGH_SHELF -> { b0=A*((A+1.0)+(A-1.0)*cs+two); b1=-2.0*A*((A-1.0)+(A+1.0)*cs); b2=A*((A+1.0)+(A-1.0)*cs-two); val a0=(A+1.0)-(A-1.0)*cs+two; a1=2.0*((A-1.0)-(A+1.0)*cs); a2=(A+1.0)-(A-1.0)*cs-two; norm(a0) }
+                Type.LOW_PASS -> { b0=(1.0-cs)/2.0; b1=1.0-cs; b2=(1.0-cs)/2.0; val a0=1.0+alpha; a1=-2.0*cs; a2=1.0-alpha; norm(a0) }
+                Type.HIGH_PASS -> { b0=(1.0+cs)/2.0; b1=-(1.0+cs); b2=(1.0+cs)/2.0; val a0=1.0+alpha; a1=-2.0*cs; a2=1.0-alpha; norm(a0) }
+                Type.NOTCH -> { b0=1.0; b1=-2.0*cs; b2=1.0; val a0=1.0+alpha; a1=-2.0*cs; a2=1.0-alpha; norm(a0) }
+                Type.BAND_PASS -> { b0=alpha; b1=0.0; b2=-alpha; val a0=1.0+alpha; a1=-2.0*cs; a2=1.0-alpha; norm(a0) }
             }
             resetState()
         }
