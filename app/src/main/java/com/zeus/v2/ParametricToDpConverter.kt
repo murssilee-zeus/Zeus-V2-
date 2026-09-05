@@ -6,20 +6,14 @@ import kotlin.math.sqrt
 
 /**
  * Converts Zeus' parametric bands into the cutoff/gain staircase used by
- * Android DynamicsProcessing. It keeps the existing DP audio path, but gives
- * it many more intelligently placed bands instead of sampling a fixed log grid.
- *
- * The important part is that enabled parametric-band centres are preserved as
- * anchors. Remaining cutoffs are distributed in the areas where the requested
- * response changes most, so narrow peaks/notches and shelf transitions survive
- * the DP approximation much better.
+ * Android DynamicsProcessing. Band centres are kept as anchors and the
+ * remaining steps are concentrated where the target response changes fastest.
  */
 object ParametricToDpConverter {
     private const val MIN_FREQ = 10f
-    private const val MAX_FREQ = 20000f
     private const val GRID_SIZE = 256
     private const val REFINEMENT_ITERS = 24
-    private const val SAMPLES_PER_STAIR = 4
+    private const val SAMPLES_PER_STAIR = 6
 
     data class ConvertedBands(val cutoffs: FloatArray, val gains: FloatArray)
 
@@ -33,6 +27,8 @@ object ParametricToDpConverter {
         subBoost: Float
     ): ConvertedBands {
         val count = bandCount.coerceAtLeast(1)
+        val sr = sampleRate.coerceIn(8000f, 384000f)
+        val maxFreq = minOf(20000f, sr * 0.47f).coerceAtLeast(MIN_FREQ * 2f)
         val active = bands.asSequence()
             .filter { it.enabled && it.filterType != EqBand.FilterType.BYPASS }
             .filter {
@@ -43,9 +39,7 @@ object ParametricToDpConverter {
                     EqBand.FilterType.BYPASS -> false
                 }
             }
-            .map {
-                BiquadFilter(it.frequency, it.gain, it.q, it.filterType, sampleRate)
-            }
+            .map { BiquadFilter(it.frequency, it.gain, it.q, it.filterType, sr) }
             .toList()
 
         fun response(freq: Float): Float {
@@ -58,9 +52,9 @@ object ParametricToDpConverter {
             return db.coerceIn(-30f, 30f)
         }
 
-        val logSpan = ln(MAX_FREQ / MIN_FREQ)
+        val logSpan = ln(maxFreq / MIN_FREQ)
         fun toIndex(freq: Float): Int =
-            ((ln(freq.coerceIn(MIN_FREQ, MAX_FREQ) / MIN_FREQ) / logSpan) * (GRID_SIZE - 1))
+            ((ln(freq.coerceIn(MIN_FREQ, maxFreq) / MIN_FREQ) / logSpan) * (GRID_SIZE - 1))
                 .toInt().coerceIn(0, GRID_SIZE - 1)
         fun gridFreq(index: Int): Float =
             (MIN_FREQ * exp(logSpan * index / (GRID_SIZE - 1).toFloat())).toFloat()
@@ -68,23 +62,21 @@ object ParametricToDpConverter {
         val grid = FloatArray(GRID_SIZE) { response(gridFreq(it)) }
         val candidates = ArrayList<Pair<Float, Boolean>>(count + active.size + 8)
 
-        // Two explicit low-end rungs prevent the first DP stair from swallowing
-        // the entire infrasonic/sub-bass region on devices with coarse FFT bins.
-        candidates += 5f to false
-        candidates += 15f to false
+        // Keep the low end from being swallowed by the first staircase step.
+        candidates += MIN_FREQ to true
+        candidates += 15f.coerceAtMost(maxFreq) to false
+
         for (b in bands) {
-            if (b.enabled && b.filterType != EqBand.FilterType.BYPASS) {
-                val allowed = when (b.filterType) {
-                    EqBand.FilterType.LOW_SHELF, EqBand.FilterType.LOW_PASS -> lowShelfEnabled
-                    EqBand.FilterType.HIGH_SHELF, EqBand.FilterType.HIGH_PASS -> highShelfEnabled
-                    EqBand.FilterType.PEAK, EqBand.FilterType.NOTCH, EqBand.FilterType.BAND_PASS -> peakEnabled
-                    EqBand.FilterType.BYPASS -> false
-                }
-                if (allowed) candidates += b.frequency.coerceIn(MIN_FREQ, MAX_FREQ) to true
+            if (!b.enabled || b.filterType == EqBand.FilterType.BYPASS) continue
+            val allowed = when (b.filterType) {
+                EqBand.FilterType.LOW_SHELF, EqBand.FilterType.LOW_PASS -> lowShelfEnabled
+                EqBand.FilterType.HIGH_SHELF, EqBand.FilterType.HIGH_PASS -> highShelfEnabled
+                EqBand.FilterType.PEAK, EqBand.FilterType.NOTCH, EqBand.FilterType.BAND_PASS -> peakEnabled
+                EqBand.FilterType.BYPASS -> false
             }
+            if (allowed) candidates += b.frequency.coerceIn(MIN_FREQ, maxFreq) to true
         }
 
-        // Start with log spacing, then allow anchors to replace nearby points.
         for (i in 0 until count) {
             val t = if (count == 1) 1f else i.toFloat() / (count - 1)
             candidates += (MIN_FREQ * exp(logSpan * t)).toFloat() to false
@@ -94,7 +86,7 @@ object ParametricToDpConverter {
         val cut = ArrayList<Float>(count)
         val anchor = ArrayList<Boolean>(count)
         for ((f0, a) in candidates) {
-            val f = f0.coerceIn(MIN_FREQ, MAX_FREQ)
+            val f = f0.coerceIn(MIN_FREQ, maxFreq)
             val last = cut.lastOrNull()
             if (last == null || f - last > last * 0.0025f) {
                 cut += f
@@ -112,19 +104,14 @@ object ParametricToDpConverter {
                 if (anchor[i]) continue
                 val left = toIndex(cut[i - 1])
                 val right = toIndex(cut[i + 1])
-                val cost = if (right > left) {
-                    var mn = Float.MAX_VALUE
-                    var mx = -Float.MAX_VALUE
-                    for (k in left..right) {
-                        mn = minOf(mn, grid[k])
-                        mx = maxOf(mx, grid[k])
-                    }
-                    mx - mn
-                } else 0f
-                if (cost < cheapest) {
-                    cheapest = cost
-                    best = i
+                var mn = Float.MAX_VALUE
+                var mx = -Float.MAX_VALUE
+                for (k in left..right) {
+                    mn = minOf(mn, grid[k])
+                    mx = maxOf(mx, grid[k])
                 }
+                val cost = mx - mn
+                if (cost < cheapest) { cheapest = cost; best = i }
             }
             if (best < 0) break
             cut.removeAt(best)
@@ -136,10 +123,7 @@ object ParametricToDpConverter {
             var bestGapSize = 0f
             for (i in 0 until cut.lastIndex) {
                 val gap = ln(cut[i + 1] / cut[i])
-                if (gap > bestGapSize) {
-                    bestGapSize = gap
-                    bestGap = i
-                }
+                if (gap > bestGapSize) { bestGapSize = gap; bestGap = i }
             }
             if (bestGap < 0) break
             val mid = sqrt(cut[bestGap] * cut[bestGap + 1])
@@ -147,9 +131,6 @@ object ParametricToDpConverter {
             anchor.add(bestGap + 1, false)
         }
 
-        // Move non-anchor boundaries toward the steepest remaining response
-        // segment. This is intentionally bounded, because human sliders should
-        // not turn into a CPU benchmark every time a finger moves 1 px.
         repeat(REFINEMENT_ITERS) {
             var worst = -1
             var worstVariation = 0f
@@ -159,14 +140,8 @@ object ParametricToDpConverter {
                 if (hi <= lo) continue
                 var mn = Float.MAX_VALUE
                 var mx = -Float.MAX_VALUE
-                for (k in lo..hi) {
-                    mn = minOf(mn, grid[k])
-                    mx = maxOf(mx, grid[k])
-                }
-                if (mx - mn > worstVariation) {
-                    worstVariation = mx - mn
-                    worst = i
-                }
+                for (k in lo..hi) { mn = minOf(mn, grid[k]); mx = maxOf(mx, grid[k]) }
+                if (mx - mn > worstVariation) { worstVariation = mx - mn; worst = i }
             }
             if (worst < 0 || worstVariation < 0.05f) return@repeat
 
@@ -178,15 +153,9 @@ object ParametricToDpConverter {
                 val hi = toIndex(cut[i + 1])
                 var mn = Float.MAX_VALUE
                 var mx = -Float.MAX_VALUE
-                for (k in lo..hi) {
-                    mn = minOf(mn, grid[k])
-                    mx = maxOf(mx, grid[k])
-                }
+                for (k in lo..hi) { mn = minOf(mn, grid[k]); mx = maxOf(mx, grid[k]) }
                 val cost = mx - mn
-                if (cost < cheapest) {
-                    cheapest = cost
-                    remove = i
-                }
+                if (cost < cheapest) { cheapest = cost; remove = i }
             }
             if (remove < 0) return@repeat
             val mid = sqrt(cut[worst] * cut[worst + 1])
