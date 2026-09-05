@@ -6,41 +6,43 @@ import android.media.AudioTrack
 import kotlin.math.max
 
 /**
- * Direct PCM output stage for Zeus' future in-app audio route.
- *
- * This class is deliberately source-agnostic: a decoder/player supplies
- * interleaved stereo Float PCM, Zeus processes it, and AudioTrack renders it.
- * It does not claim to replace audio from other apps, which Android does not
- * expose as an arbitrary PCM callback to a normal application.
+ * Direct PCM output stage for Zeus' in-app audio route.
+ * Source supplies interleaved stereo Float PCM; Zeus processes it through the
+ * real PCM DSP chain and AudioTrack renders the result.
  */
 class PcmAudioEngine {
     private var audioTrack: AudioTrack? = null
     private var sampleRate = 48000
-    private val bass = BassEngine(sampleRate.toFloat())
+    private var dsp = PcmDspChain(sampleRate)
+    private var configuredSettings: EqSettings? = null
 
     var enabled: Boolean = true
         set(value) {
             field = value
-            bass.enabled = value
+            dsp.enabled = value
         }
 
     var bassAmount: Float = 0f
-        set(value) {
-            field = value.coerceIn(0f, 100f)
-            bass.bassAmount = field
-        }
+        set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(field, punchAmount, harmonicAmount) }
 
     var harmonicAmount: Float = 0f
-        set(value) {
-            field = value.coerceIn(0f, 100f)
-            bass.harmonicAmount = field
-        }
+        set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(bassAmount, punchAmount, field) }
 
     var punchAmount: Float = 0f
-        set(value) {
-            field = value.coerceIn(0f, 100f)
-            bass.punchAmount = field
-        }
+        set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(bassAmount, field, harmonicAmount) }
+
+    @Synchronized
+    fun configure(settings: EqSettings) {
+        configuredSettings = settings
+        dsp.configure(sampleRate, settings)
+        dsp.setBass(bassAmount, punchAmount, harmonicAmount)
+        dsp.limiterEnabled = settings.limiterEnabled
+        dsp.limiterThresholdDb = settings.limiterThreshold
+        dsp.limiterAttackMs = settings.limiterAttack
+        dsp.limiterReleaseMs = settings.limiterRelease
+        dsp.limiterRatio = settings.limiterRatio
+        dsp.limiterPostGainDb = settings.limiterPostGain
+    }
 
     /** Creates the PCM sink. Safe to call again when the sample rate changes. */
     @Synchronized
@@ -52,18 +54,16 @@ class PcmAudioEngine {
         }
         stop()
         this.sampleRate = sr
-        bass.reset()
+        dsp = PcmDspChain(sr)
+        configuredSettings?.let { configure(it) }
+        dsp.setBass(bassAmount, punchAmount, harmonicAmount)
 
         val format = AudioFormat.Builder()
             .setSampleRate(sr)
             .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
             .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
             .build()
-        val minBytes = AudioTrack.getMinBufferSize(
-            sr,
-            AudioFormat.CHANNEL_OUT_STEREO,
-            AudioFormat.ENCODING_PCM_FLOAT
-        )
+        val minBytes = AudioTrack.getMinBufferSize(sr, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_FLOAT)
         val bufferBytes = max(minBytes, sr * 2 * 4 / 10)
 
         val track = AudioTrack.Builder()
@@ -87,17 +87,18 @@ class PcmAudioEngine {
     @Synchronized
     fun write(samples: FloatArray, offset: Int = 0, frames: Int = (samples.size - offset) / 2): Int {
         if (!enabled || samples.isEmpty() || audioTrack == null) return 0
-        val safeFrames = frames.coerceAtLeast(0).coerceAtMost((samples.size - offset) / 2)
+        val safeOffset = offset.coerceIn(0, samples.size)
+        val safeFrames = frames.coerceAtLeast(0).coerceAtMost((samples.size - safeOffset) / 2)
         if (safeFrames == 0) return 0
-        bass.processStereo(samples, sampleRate, offset, safeFrames)
-        return audioTrack?.write(samples, offset, safeFrames * 2, AudioTrack.WRITE_BLOCKING) ?: 0
+        dsp.process(samples, safeOffset, safeFrames)
+        return audioTrack?.write(samples, safeOffset, safeFrames * 2, AudioTrack.WRITE_BLOCKING) ?: 0
     }
 
     @Synchronized
     fun flush() {
         audioTrack?.pause()
         audioTrack?.flush()
-        bass.reset()
+        dsp.reset()
     }
 
     @Synchronized
@@ -108,5 +109,6 @@ class PcmAudioEngine {
             runCatching { track.release() }
         }
         audioTrack = null
+        dsp.reset()
     }
 }
