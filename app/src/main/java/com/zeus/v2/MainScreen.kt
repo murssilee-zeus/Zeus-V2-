@@ -897,7 +897,7 @@ private fun LimiterScreen(viewModel: EqViewModel, modifier: Modifier = Modifier)
                 value = viewModel.limiterAttack,
                 unit = "ms",
                 range = 0.01f..100f,
-                format = { String.format("%.1f", it) },
+                format = { if (it < 1f) String.format("%.2f", it) else String.format("%.1f", it) },
                 accent = LIM_PURPLE_DIM,
                 onValueChange = { viewModel.limiterAttack = it },
                 modifier = Modifier.weight(1f)
