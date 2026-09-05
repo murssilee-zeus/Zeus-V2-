@@ -1,0 +1,56 @@
+name: Adjust limiter attack range
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  adjust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+          fetch-depth: 0
+      - name: Apply limiter attack range
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          edits = {
+              "app/src/main/java/com/zeus/v2/AudioEngine.kt": [
+                  ("s.limiterAttack.coerceIn(0.5f, 80f)", "s.limiterAttack.coerceIn(0.01f, 100f)"),
+              ],
+              "app/src/main/java/com/zeus/v2/MainScreen.kt": [
+                  ("range = 0.5f..50f,", "range = 0.01f..100f,"),
+              ],
+          }
+
+          for name, replacements in edits.items():
+              p = Path(name)
+              text = p.read_text(encoding="utf-8")
+              original = text
+              for old, new in replacements:
+                  if old not in text:
+                      raise SystemExit(f"Expected text not found in {name}: {old}")
+                  text = text.replace(old, new, 1)
+              if text == original:
+                  raise SystemExit(f"No change made to {name}")
+              p.write_text(text, encoding="utf-8")
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/zeus/v2/AudioEngine.kt app/src/main/java/com/zeus/v2/MainScreen.kt .github/workflows/adjust_limiter_attack_fix.yml
+          git commit -m "Set limiter attack range to 0.01-100 ms"
+          git push origin HEAD:fix/punch-v2
+
+          # Remove this one-shot helper from the same branch after it has done its job.
+          git rm .github/workflows/adjust_limiter_attack_fix.yml
+          git commit -m "Remove one-shot limiter attack workflow"
+          git push origin HEAD:fix/punch-v2
