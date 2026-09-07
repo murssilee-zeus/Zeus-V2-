@@ -35,7 +35,7 @@ class PcmAudioEngine {
         dsp.setBass(bassAmount, punchAmount, harmonicAmount)
     }
 
-    /** Creates the PCM sink. Safe to call again when the sample rate changes. */
+    /** Creates the PCM sink with a bounded low-latency buffer. */
     @Synchronized
     fun start(sampleRate: Int = 48000) {
         val sr = sampleRate.coerceIn(8000, 192000)
@@ -55,7 +55,13 @@ class PcmAudioEngine {
             .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
             .build()
         val minBytes = AudioTrack.getMinBufferSize(sr, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_FLOAT)
-        val bufferBytes = max(minBytes, sr * 2 * 4 / 10)
+        if (minBytes <= 0) error("AudioTrack no soporta PCM_FLOAT")
+
+        // Target about 20 ms instead of the previous 100 ms. Android may
+        // enforce a larger device minimum, but we no longer request a huge
+        // latency buffer ourselves.
+        val targetBytes = sr * 2 * 4 / 50
+        val bufferBytes = max(minBytes, targetBytes)
         val track = AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
             .setAudioFormat(format)
