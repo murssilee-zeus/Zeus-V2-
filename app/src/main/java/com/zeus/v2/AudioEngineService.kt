@@ -24,6 +24,7 @@ class AudioEngineService : Service() {
     @Volatile
     var audioEngine: AudioEngine? = null
         private set
+    private val pcmEngine = PcmAudioEngine()
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var initializing = false
 
@@ -43,11 +44,18 @@ class AudioEngineService : Service() {
             Thread({
                 try {
                     val engine = AudioEngine(this)
-                    EqPrefs.load(this)?.let { engine.settings = it }
+                    val saved = EqPrefs.load(this)
+                    saved?.let {
+                        engine.settings = it
+                        pcmEngine.configure(it)
+                    }
                     val ok = engine.attachToMediaSession()
                     if (ok) {
                         audioEngine = engine
-                        mainHandler.post { updateNotification("Zeus activo • procesamiento PCM 16-bit • DSP en tiempo real") }
+                        if (saved == null) pcmEngine.configure(engine.settings)
+                        mainHandler.post {
+                            updateNotification("Zeus activo • DSP en tiempo real • ruta externa + PCM")
+                        }
                     } else {
                         engine.release()
                         mainHandler.post { updateNotification("Zeus activo • motor de audio no disponible") }
@@ -68,7 +76,18 @@ class AudioEngineService : Service() {
     override fun onDestroy() {
         audioEngine?.release()
         audioEngine = null
+        pcmEngine.stop()
         super.onDestroy()
+    }
+
+    /** Updates the direct PCM DSP route with the same settings used by Zeus. */
+    fun configurePcm(settings: EqSettings) {
+        pcmEngine.configure(settings)
+    }
+
+    /** Processes an interleaved stereo Float PCM block in-place. */
+    fun processPcm(buffer: FloatArray, offset: Int = 0, frames: Int = (buffer.size - offset) / 2) {
+        pcmEngine.write(buffer, offset, frames)
     }
 
     private fun createNotificationChannel() {
