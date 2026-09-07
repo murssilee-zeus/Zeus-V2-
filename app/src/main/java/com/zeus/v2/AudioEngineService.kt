@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
+import androidx.core.app.ServiceCompat
 import androidx.core.app.NotificationCompat
 
 class AudioEngineService : Service() {
@@ -18,6 +19,9 @@ class AudioEngineService : Service() {
     companion object {
         const val CHANNEL_ID = "zeus_eq_channel"
         const val NOTIFICATION_ID = 1801
+        const val ACTION_START_PCM = "com.zeus.v2.action.START_PCM"
+        const val ACTION_STOP_PCM = "com.zeus.v2.action.STOP_PCM"
+        const val EXTRA_MEDIA_PROJECTION_DATA = "com.zeus.v2.extra.MEDIA_PROJECTION_DATA"
     }
 
     private val binder = LocalBinder()
@@ -25,6 +29,7 @@ class AudioEngineService : Service() {
     var audioEngine: AudioEngine? = null
         private set
     private val pcmEngine = PcmAudioEngine()
+    private var pcmCapture: PcmCaptureEngine? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var initializing = false
 
@@ -38,7 +43,27 @@ class AudioEngineService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification("Zeus activo • iniciando DSP"))
+        val projectionData = intent?.let { readProjectionData(it) }
+        val wantsPcm = intent?.action == ACTION_START_PCM && projectionData != null
+        val notification = buildNotification(if (wantsPcm) "Zeus activo • iniciando captura PCM" else "Zeus activo • iniciando DSP")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val type = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
+                if (wantsPcm) android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION else 0
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+
+        if (intent?.action == ACTION_STOP_PCM) {
+            pcmCapture?.stop()
+            pcmCapture = null
+            updateNotification("Zeus activo • DSP en tiempo real • ruta externa")
+        }
+
+        if (wantsPcm && projectionData != null) {
+            startPcmCapture(projectionData)
+        }
+
         if (!initializing && audioEngine == null) {
             initializing = true
             Thread({
@@ -54,7 +79,11 @@ class AudioEngineService : Service() {
                         audioEngine = engine
                         if (saved == null) pcmEngine.configure(engine.settings)
                         mainHandler.post {
-                            updateNotification("Zeus activo • DSP en tiempo real • ruta externa + PCM")
+                            updateNotification(if (pcmCapture?.running == true) {
+                                "Zeus activo • PCM real • DSP en tiempo real"
+                            } else {
+                                "Zeus activo • DSP en tiempo real • ruta externa"
+                            })
                         }
                     } else {
                         engine.release()
@@ -71,24 +100,49 @@ class AudioEngineService : Service() {
         return START_STICKY
     }
 
+    private fun startPcmCapture(resultData: Intent) {
+        if (pcmCapture?.running == true) return
+        val capture = PcmCaptureEngine(this)
+        val settings = audioEngine?.settings ?: EqPrefs.load(this) ?: EqSettings()
+        if (capture.start(resultData, settings)) {
+            pcmCapture = capture
+            updateNotification("Zeus activo • PCM real • captura + DSP")
+        } else {
+            updateNotification("Zeus activo • PCM no disponible • ruta externa")
+            android.util.Log.e("ZeusSvc", "PCM capture failed: ${capture.lastError}")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun readProjectionData(intent: Intent): Intent? {
+        return if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(EXTRA_MEDIA_PROJECTION_DATA, Intent::class.java)
+        } else {
+            intent.getParcelableExtra(EXTRA_MEDIA_PROJECTION_DATA)
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
+        pcmCapture?.stop()
+        pcmCapture = null
         audioEngine?.release()
         audioEngine = null
         pcmEngine.stop()
         super.onDestroy()
     }
 
-    /** Updates the direct PCM DSP route with the same settings used by Zeus. */
     fun configurePcm(settings: EqSettings) {
         pcmEngine.configure(settings)
+        pcmCapture?.configure(settings)
     }
 
-    /** Processes an interleaved stereo Float PCM block in-place. */
     fun processPcm(buffer: FloatArray, offset: Int = 0, frames: Int = (buffer.size - offset) / 2) {
         pcmEngine.write(buffer, offset, frames)
     }
+
+    fun isPcmCaptureRunning(): Boolean = pcmCapture?.running == true
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
