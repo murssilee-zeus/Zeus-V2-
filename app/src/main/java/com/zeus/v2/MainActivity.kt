@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -30,7 +29,6 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private var audioService: AudioEngineService? = null
     private var bound = false
-    private var pendingPcmStart = false
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -49,19 +47,6 @@ class MainActivity : ComponentActivity() {
     ) { p ->
         if (!p.values.all { it }) {
             Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento real", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private val mediaProjectionLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val data = result.data
-        if (result.resultCode == RESULT_OK && data != null && pendingPcmStart) {
-            pendingPcmStart = false
-            startZeusService(data)
-        } else if (pendingPcmStart) {
-            pendingPcmStart = false
-            Toast.makeText(this, "Captura PCM cancelada; Zeus no se inició", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -105,25 +90,20 @@ class MainActivity : ComponentActivity() {
                 e.setPunch(punch.amount)
                 e.applyAll()
             }
-            audioService?.configurePcm(vm.toSettings())
         }
         LaunchedEffect(vm.bands.toList(), vm.subBoost, punch.amount) {
             audioService?.audioEngine?.setBands(vm.bands.toList())
             audioService?.audioEngine?.setSubBoost(vm.subBoost)
             audioService?.audioEngine?.setPunch(punch.amount)
-            audioService?.configurePcm(vm.toSettings())
         }
         LaunchedEffect(vm.preamp, vm.headroomTrim) {
             audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim)
-            audioService?.configurePcm(vm.toSettings())
         }
         LaunchedEffect(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) {
             audioService?.audioEngine?.setPipelineTags(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled)
-            audioService?.configurePcm(vm.toSettings())
         }
         LaunchedEffect(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) {
             audioService?.audioEngine?.setLimiter(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain)
-            audioService?.configurePcm(vm.toSettings())
         }
         LaunchedEffect(
             vm.compressorMultibandEnabled, vm.crossoverFrequencies.toList(),
@@ -146,7 +126,6 @@ class MainActivity : ComponentActivity() {
                 releaseLow = vm.compMbReleaseLow, releaseLoMid = vm.compMbReleaseLoMid, releaseHiMid = vm.compMbReleaseHiMid, releaseHigh = vm.compMbReleaseHigh,
                 postGainLow = vm.compMbPostGainLow, postGainLoMid = vm.compMbPostGainLoMid, postGainHiMid = vm.compMbPostGainHiMid, postGainHigh = vm.compMbPostGainHigh
             )
-            audioService?.configurePcm(vm.toSettings())
         }
 
         MaterialTheme(colorScheme = darkColorScheme(
@@ -181,34 +160,21 @@ class MainActivity : ComponentActivity() {
             audioService = null
             vm.isEngineRunning = false
         } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val projectionManager = getSystemService(MediaProjectionManager::class.java)
-                pendingPcmStart = true
-                mediaProjectionLauncher.launch(projectionManager.createScreenCaptureIntent())
-            } else {
-                startZeusService(null)
+            val intent = Intent(this, AudioEngineService::class.java)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+                bindService(intent, connection, Context.BIND_AUTO_CREATE)
+                vm.isEngineRunning = true
+                Toast.makeText(this, "Zeus EQ Pro18 activado", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                vm.isEngineRunning = false
+                Toast.makeText(this, "No se pudo iniciar el motor: ${e.message}", Toast.LENGTH_LONG).show()
             }
-        }
-    }
-
-    private fun startZeusService(projectionData: Intent?) {
-        val intent = Intent(this, AudioEngineService::class.java).apply {
-            if (projectionData != null) {
-                action = AudioEngineService.ACTION_START_PCM
-                putExtra(AudioEngineService.EXTRA_MEDIA_PROJECTION_DATA, projectionData)
-            }
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-            bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            Toast.makeText(this, if (projectionData != null) "Zeus PCM experimental activado" else "Zeus EQ Pro18 activado", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "No se pudo iniciar el motor: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun requestNeededPermissions() {
-        val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS)
+        val permissions = mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         val toRequest = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (toRequest.isNotEmpty()) requestPermissionLauncher.launch(toRequest.toTypedArray())
