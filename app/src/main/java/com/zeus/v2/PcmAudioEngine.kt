@@ -16,7 +16,6 @@ class PcmAudioEngine {
         set(value) { field = value; dsp.enabled = value }
 
     var bassMono: Boolean = true
-        set(value) { field = value; dsp.setBassMono(value) }
 
     var bassAmount: Float = 0f
         set(value) { field = value.coerceIn(0f, 100f); dsp.setBass(field, punchAmount, harmonicAmount) }
