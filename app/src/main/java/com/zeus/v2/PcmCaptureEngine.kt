@@ -20,7 +20,10 @@ class PcmCaptureEngine(private val context: Context) {
         const val SAMPLE_RATE = 48000
         const val CHANNEL_MASK = AudioFormat.CHANNEL_IN_STEREO
         const val CHANNEL_COUNT = 2
-        const val BLOCK_FRAMES = 960 // 20 ms at 48 kHz
+
+        // 10 ms blocks keep capture-to-playback latency low while avoiding
+        // excessively small AudioRecord reads on normal Android devices.
+        const val BLOCK_FRAMES = 480
     }
 
     @Volatile var running: Boolean = false
@@ -71,7 +74,11 @@ class PcmCaptureEngine(private val context: Context) {
                 AudioFormat.ENCODING_PCM_FLOAT
             )
             if (minBuffer <= 0) throw IllegalStateException("AudioRecord no soporta PCM_FLOAT")
-            val bufferBytes = maxOf(minBuffer, BLOCK_FRAMES * CHANNEL_COUNT * 4 * 4)
+
+            // Keep the capture queue bounded. Four 10-ms blocks provide enough
+            // scheduling tolerance without the old 80-ms capture buffer.
+            val blockBytes = BLOCK_FRAMES * CHANNEL_COUNT * 4
+            val bufferBytes = maxOf(minBuffer, blockBytes * 4)
             val ar = AudioRecord.Builder()
                 .setAudioFormat(format)
                 .setBufferSizeInBytes(bufferBytes)
@@ -88,6 +95,7 @@ class PcmCaptureEngine(private val context: Context) {
             stopRequested.set(false)
             running = true
             worker = Thread({ captureLoop(ar) }, "ZeusPcmCapture")
+            worker?.priority = Thread.MAX_PRIORITY
             worker?.start()
             true
         } catch (t: Throwable) {
