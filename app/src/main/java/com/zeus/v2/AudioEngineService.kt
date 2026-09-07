@@ -37,7 +37,7 @@ class AudioEngineService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForeground(NOTIFICATION_ID, buildNotification("Zeus activo • iniciando DSP"))
         if (!initializing && audioEngine == null) {
             initializing = true
             Thread({
@@ -47,13 +47,14 @@ class AudioEngineService : Service() {
                     val ok = engine.attachToMediaSession()
                     if (ok) {
                         audioEngine = engine
-                        mainHandler.post { updateNotification("Motor de audio activo") }
+                        mainHandler.post { updateNotification("Zeus activo • procesamiento PCM 16-bit • DSP en tiempo real") }
                     } else {
                         engine.release()
-                        mainHandler.post { updateNotification("Motor de audio no disponible") }
+                        mainHandler.post { updateNotification("Zeus activo • motor de audio no disponible") }
                     }
                 } catch (e: Throwable) {
                     android.util.Log.e("ZeusSvc", "init: " + android.util.Log.getStackTraceString(e))
+                    mainHandler.post { updateNotification("Zeus activo • error al iniciar DSP") }
                 } finally {
                     initializing = false
                 }
@@ -77,14 +78,14 @@ class AudioEngineService : Service() {
                 "Zeus EQ",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Mantiene el motor de audio de Zeus EQ activo"
+                description = "Estado del procesamiento de audio de Zeus EQ"
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
         }
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(text: String): Notification {
         val openIntent = Intent(this, MainActivity::class.java)
         val pending = PendingIntent.getActivity(
             this, 0, openIntent,
@@ -93,22 +94,18 @@ class AudioEngineService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Zeus EQ Pro18")
-            .setContentText("Motor de audio activo")
+            .setContentText(text)
             .setSmallIcon(R.drawable.ic_eq_tile)
             .setContentIntent(pending)
             .setOngoing(true)
             .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
     }
 
     fun updateNotification(text: String) {
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Zeus EQ Pro18")
-            .setContentText(text)
-            .setSmallIcon(R.drawable.ic_eq_tile)
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
+        val notification = buildNotification(text)
         val manager = getSystemService(NotificationManager::class.java)
         manager?.notify(NOTIFICATION_ID, notification)
     }
