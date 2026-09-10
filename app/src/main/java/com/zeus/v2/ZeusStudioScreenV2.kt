@@ -288,18 +288,31 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 
 @Composable private fun SubSismoCard(vm:EqViewModel){
  Card("SUB / SISMO (18Hz - 90Hz)"){
-  Text("Realce independiente de Punch · graves profundos",color=ZM,fontSize=9.sp)
-  S("Power",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
-  Text("18 Hz foundation · protected by Headroom + Limiter",color=ZM,fontSize=9.sp)
+  Text("Graves profundos · frecuencia independiente",color=ZM,fontSize=9.sp)
+  S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
+  S("FREQ",vm.subFrequencyHz,18f..90f," Hz"){vm.subFrequencyHz=it}
+  Text("SUB/SISMO → MBC → PUNCH → LIMITER",color=ZM,fontSize=8.sp)
  }
 }
 
-@Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){Card("PUNCH (35Hz - 65Hz)"){Text("Post-MBC · 18 Hz stays independent",color=ZM,fontSize=9.sp)
+@Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){
+ Card("BASS / PUNCH") {
+  Text("Bass controls · Audio Framework / DynamicsProcessing",color=ZM,fontSize=9.sp)
+  S("BASS AMOUNT",p.bassAmount,0f..100f," %"){p.updateBassAmount(it)}
+  S("BASS FREQ",p.bassFrequencyHz,25f..120f," Hz"){p.updateBassFrequency(it)}
+  Row(verticalAlignment=Alignment.CenterVertically){
+   Text("BASS MONO",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+   Switch(checked=p.bassMono,onCheckedChange=p::updateBassMono)
+  }
+  S("HARMONICS",p.bassHarmonics,0f..100f," %"){p.updateBassHarmonics(it)}
+  Spacer(Modifier.height(2.dp))
+  Text("PUNCH",color=ZP,fontSize=11.sp,fontWeight=FontWeight.Bold)
   S("Amount",p.amount,0f..100f," %"){p.updatePunchAmount(it)}
   S("Center",p.centerHz,35f..65f," Hz"){p.updatePunchCenter(it)}
   S("Q",p.q,.5f..3f){p.updatePunchQ(it)}
   S("Headroom trim",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
-  Text("Punch center and Q are now manual. 18 Hz remains independent.",color=ZM,fontSize=9.sp)}}
+ }
+}
 
 @Composable private fun CompCard(vm:EqViewModel){
  var b by remember{mutableIntStateOf(0)}
