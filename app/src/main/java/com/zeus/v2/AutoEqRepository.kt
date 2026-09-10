@@ -4,6 +4,8 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import java.net.URLEncoder
+import java.net.URL
 import java.util.Locale
 
 data class AutoEqProfile(val preamp: Float, val filters: List<AutoEqFilter>)
@@ -24,11 +26,21 @@ object AutoEqRepository {
 
     private fun readIndex(context: Context): List<AutoEqModel> = runCatching {
         val json = context.assets.open("autoeq/index.json").bufferedReader().use { it.readText() }
-        val arr = JSONArray(json)
+        val root = org.json.JSONTokener(json).nextValue()
+        val arr = when (root) {
+            is JSONArray -> root
+            is org.json.JSONObject -> root.optJSONArray("entries") ?: JSONArray()
+            else -> JSONArray()
+        }
         buildList {
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                add(AutoEqModel(o.optString("n"), o.optString("s"), o.optString("t"), o.optString("p")))
+                add(AutoEqModel(
+                    o.optString("n", o.optString("name")),
+                    o.optString("s", o.optString("source")),
+                    o.optString("t", o.optString("target")),
+                    o.optString("p", o.optString("path"))
+                ))
             }
         }
     }.getOrDefault(emptyList())
@@ -91,7 +103,18 @@ object AutoEqRepository {
 
     suspend fun load(context: Context, model: AutoEqModel): AutoEqProfile = withContext(Dispatchers.IO) {
         require(model.path.isNotBlank()) { "Perfil AutoEQ no disponible" }
-        val text = context.assets.open("autoeq/profiles/" + model.path).bufferedReader().use { it.readText() }
+        val text = runCatching {
+            context.assets.open("autoeq/profiles/" + model.path).bufferedReader().use { it.readText() }
+        }.getOrElse {
+            val encoded = model.path.split('/').joinToString("/") {
+                URLEncoder.encode(it, "UTF-8").replace("+", "%20")
+            }
+            val connection = URL("https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/$encoded").openConnection()
+            connection.connectTimeout = 15000
+            connection.readTimeout = 30000
+            connection.setRequestProperty("User-Agent", "Zeus-V2-AutoEQ/1.0")
+            connection.getInputStream().bufferedReader().use { it.readText() }
+        }
         parse(text)
     }
 
@@ -120,5 +143,4 @@ object AutoEqRepository {
         }
         return AutoEqProfile(preamp.coerceIn(-30f, 12f), filters)
     }
-
 }
