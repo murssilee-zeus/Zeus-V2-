@@ -1,6 +1,7 @@
 name: Page 1 layout fix
 on:
-  workflow_dispatch:
+  push:
+    branches: [fix/punch-v2]
 permissions:
   contents: write
 jobs:
@@ -26,9 +27,3 @@ jobs:
           git add app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
           git commit -m 'Arrange bass controls below sub-sismo' || exit 0
           git push origin HEAD:fix/punch-v2
-      - name: Remove temporary workflow
-        run: |
-          rm -f .github/workflows/page1-layout-fix.yml
-          git add .github/workflows/page1-layout-fix.yml
-          git commit -m 'Remove temporary page layout workflow' || true
-          git push origin HEAD:fix/punch-v2 || true
