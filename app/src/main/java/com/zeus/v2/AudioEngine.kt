@@ -18,11 +18,9 @@ class AudioEngine(private val context: Context) {
         private const val POSTEQ_BANDS = 4
         private const val MAX_FREQ = 20000f
     }
-
     var settings = EqSettings()
     var punch: Float = PunchPreset.DEFAULT
         private set
-
     private var dynamicsProcessing: DynamicsProcessing? = null
     private var visualizer: Visualizer? = null
     private var audioSessionId = 0
@@ -33,126 +31,55 @@ class AudioEngine(private val context: Context) {
     private var peakTag = true
     private var highShelfTag = true
     private var deviceSampleRate = 48000f
-
-    @Volatile
-    var spectrumData: FloatArray = FloatArray(128) { 0f }
+    private var bassFrequencyHz = 45f
+    private var subFrequencyHz = 60f
+    @Volatile var spectrumData: FloatArray = FloatArray(128) { 0f }
         private set
-    @Volatile
-    var isEnabled = false
+    @Volatile var isEnabled = false
         private set
 
-    fun attachToMediaSession(sessionId: Int = 0): Boolean {
-        audioSessionId = sessionId
-        return initialize(sessionId)
-    }
-
+    fun attachToMediaSession(sessionId: Int = 0): Boolean { audioSessionId = sessionId; return initialize(sessionId) }
     fun initialize(sessionId: Int = 0): Boolean {
-        release()
-        audioSessionId = sessionId
-        deviceSampleRate = resolveSampleRate()
+        release(); audioSessionId = sessionId; deviceSampleRate = resolveSampleRate()
         val candidates = listOf(TARGET_PRE_EQ_BANDS, FALLBACK_PRE_EQ_BANDS, MIN_PRE_EQ_BANDS, 48, 32, 18)
         var lastError: Exception? = null
-
         for (bands in candidates) {
-            var mbcCount = MBC_BANDS
-            var mbcUse = true
+            var mbcCount = MBC_BANDS; var mbcUse = true
             while (true) {
                 try {
-                    val config = DynamicsProcessing.Config.Builder(
-                        DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
-                        CHANNEL_COUNT,
-                        true, bands,
-                        mbcUse, mbcCount,
-                        true, POSTEQ_BANDS,
-                        true
-                    ).build()
+                    val config = DynamicsProcessing.Config.Builder(DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION, CHANNEL_COUNT, true, bands, mbcUse, mbcCount, true, POSTEQ_BANDS, true).build()
                     val dp = DynamicsProcessing(0, sessionId, config)
-                    dynamicsProcessing = dp
-                    preEqBandCount = bands
-                    mbcBandCount = if (mbcUse) mbcCount else 0
-                    applyAll()
-                    startVisualizer()
-                    dp.enabled = true
-                    isEnabled = true
+                    dynamicsProcessing = dp; preEqBandCount = bands; mbcBandCount = if (mbcUse) mbcCount else 0
+                    applyAll(); startVisualizer(); dp.enabled = true; isEnabled = true
                     Log.i(TAG, "Engine ON PreEq=$bands MBC=$mbcCount sr=${deviceSampleRate.toInt()} session=$sessionId")
                     return true
                 } catch (e: Exception) {
-                    lastError = e
-                    try { dynamicsProcessing?.release() } catch (_: Exception) {}
-                    dynamicsProcessing = null
+                    lastError = e; try { dynamicsProcessing?.release() } catch (_: Exception) {}; dynamicsProcessing = null
                     if (mbcUse && mbcCount > 1) { mbcCount--; continue }
                     if (mbcUse) { mbcUse = false; mbcCount = 1; continue }
                     break
                 }
             }
         }
-        Log.e(TAG, "Fallo al inicializar: ${lastError?.message ?: "unknown"}")
-        release()
-        return false
+        Log.e(TAG, "Fallo al inicializar: ${lastError?.message ?: "unknown"}"); release(); return false
     }
-
-    private fun resolveSampleRate(): Float = try {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val sr = am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull()
-        (sr?.toFloat() ?: 48000f).coerceIn(44100f, 192000f)
-    } catch (_: Exception) { 48000f }
-
-    fun release() {
-        try { visualizer?.enabled = false; visualizer?.release() } catch (_: Exception) {}
-        visualizer = null
-        try { dynamicsProcessing?.release() } catch (_: Exception) {}
-        dynamicsProcessing = null
-        isEnabled = false
-    }
-
-    fun setEnabled(enabled: Boolean) {
-        try { dynamicsProcessing?.enabled = enabled; isEnabled = enabled }
-        catch (e: Exception) { Log.e(TAG, "setEnabled: ${e.message}") }
-    }
-
+    private fun resolveSampleRate(): Float = try { val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager; val sr = am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull(); (sr?.toFloat() ?: 48000f).coerceIn(44100f, 192000f) } catch (_: Exception) { 48000f }
+    fun release() { try { visualizer?.enabled = false; visualizer?.release() } catch (_: Exception) {}; visualizer = null; try { dynamicsProcessing?.release() } catch (_: Exception) {}; dynamicsProcessing = null; isEnabled = false }
+    fun setEnabled(enabled: Boolean) { try { dynamicsProcessing?.enabled = enabled; isEnabled = enabled } catch (e: Exception) { Log.e(TAG, "setEnabled: ${e.message}") } }
     fun setPreGain(v: Float) { settings.preGain = v; applyInputGain() }
     fun setSubBoost(v: Float) { settings.subBoost = v; applyEq(); applyPostEq() }
+    fun setSubFrequency(v: Float) { subFrequencyHz = v.coerceIn(18f, 90f); applyEq(); applyPostEq() }
     fun setPunch(v: Float) { punch = v.coerceIn(0f, 100f); settings.bassPunch = punch; applyInputGain(); applyPostEq() }
-    fun setBassControls(amount: Float, mono: Boolean, harmonics: Float) {
-        settings.bassAmount = amount.coerceIn(0f, 100f)
-        settings.bassMono = mono
-        settings.bassHarmonics = harmonics.coerceIn(0f, 100f)
-        applyInputGain()
-        applyPostEq()
-        Log.i(TAG, "Bass controls amount=${settings.bassAmount} mono=${settings.bassMono} harmonics=${settings.bassHarmonics}")
+    fun setBassControls(amount: Float, mono: Boolean, harmonics: Float, frequency: Float = bassFrequencyHz) {
+        settings.bassAmount = amount.coerceIn(0f, 100f); settings.bassMono = mono; settings.bassHarmonics = harmonics.coerceIn(0f, 100f)
+        bassFrequencyHz = frequency.coerceIn(25f, 120f); applyInputGain(); applyPostEq()
+        Log.i(TAG, "Bass controls amount=${settings.bassAmount} frequency=$bassFrequencyHz mono=${settings.bassMono} harmonics=${settings.bassHarmonics}")
     }
     fun setBands(list: List<EqBand>) { settings.bands = list; applyEq(); applyPostEq() }
-
-    fun setPipelineTags(pipeline: Boolean, lowShelf: Boolean, peak: Boolean, highShelf: Boolean) {
-        pipelineEnabled = pipeline
-        lowShelfTag = lowShelf
-        peakTag = peak
-        highShelfTag = highShelf
-        applyEq(); applyMbc(); applyPostEq()
-    }
-
-    fun setLimiter(enabled: Boolean, threshold: Float, attack: Float, release: Float, ratio: Float, postGain: Float) {
-        settings.limiterEnabled = enabled
-        settings.limiterThreshold = threshold
-        settings.limiterAttack = attack
-        settings.limiterRelease = release
-        settings.limiterRatio = ratio
-        settings.limiterPostGain = postGain
-        applyLimiter()
-    }
-
-    fun setCompressor(
-        enabled: Boolean, cross1: Float, cross2: Float, cross3: Float,
-        thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float,
-        ratioLow: Float, ratioLoMid: Float, ratioHiMid: Float, ratioHigh: Float,
-        kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float,
-        attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float,
-        releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float,
-        postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float,
-        preGainLow: Float = 0f, preGainLoMid: Float = 0f, preGainHiMid: Float = 0f, preGainHigh: Float = 0f
-    ) {
-        settings.compEnabled = enabled
-        settings.cross1 = cross1; settings.cross2 = cross2; settings.cross3 = cross3
+    fun setPipelineTags(pipeline: Boolean, lowShelf: Boolean, peak: Boolean, highShelf: Boolean) { pipelineEnabled = pipeline; lowShelfTag = lowShelf; peakTag = peak; highShelfTag = highShelf; applyEq(); applyMbc(); applyPostEq() }
+    fun setLimiter(enabled: Boolean, threshold: Float, attack: Float, release: Float, ratio: Float, postGain: Float) { settings.limiterEnabled = enabled; settings.limiterThreshold = threshold; settings.limiterAttack = attack; settings.limiterRelease = release; settings.limiterRatio = ratio; settings.limiterPostGain = postGain; applyLimiter() }
+    fun setCompressor(enabled: Boolean, cross1: Float, cross2: Float, cross3: Float, thLow: Float, thLoMid: Float, thHiMid: Float, thHigh: Float, ratioLow: Float, ratioLoMid: Float, ratioHiMid: Float, ratioHigh: Float, kneeLow: Float, kneeLoMid: Float, kneeHiMid: Float, kneeHigh: Float, attackLow: Float, attackLoMid: Float, attackHiMid: Float, attackHigh: Float, releaseLow: Float, releaseLoMid: Float, releaseHiMid: Float, releaseHigh: Float, postGainLow: Float, postGainLoMid: Float, postGainHiMid: Float, postGainHigh: Float, preGainLow: Float = 0f, preGainLoMid: Float = 0f, preGainHiMid: Float = 0f, preGainHigh: Float = 0f) {
+        settings.compEnabled = enabled; settings.cross1 = cross1; settings.cross2 = cross2; settings.cross3 = cross3
         settings.compThLow = thLow; settings.compThLoMid = thLoMid; settings.compThHiMid = thHiMid; settings.compThHigh = thHigh
         settings.compRatioLow = ratioLow; settings.compRatioLoMid = ratioLoMid; settings.compRatioHiMid = ratioHiMid; settings.compRatioHigh = ratioHigh
         settings.compKneeLow = kneeLow; settings.compKneeLoMid = kneeLoMid; settings.compKneeHiMid = kneeHiMid; settings.compKneeHigh = kneeHigh
@@ -162,167 +89,38 @@ class AudioEngine(private val context: Context) {
         settings.compPreGainLow = preGainLow; settings.compPreGainLoMid = preGainLoMid; settings.compPreGainHiMid = preGainHiMid; settings.compPreGainHigh = preGainHigh
         applyMbc(); applyPostEq()
     }
-
     fun applyAll() { applyInputGain(); applyEq(); applyMbc(); applyPostEq(); applyLimiter() }
-
     private fun applyInputGain() {
         val dp = dynamicsProcessing ?: return
-        try {
-            val punchReserve = PunchControl.midBassGain(punch) * 0.65f
-            val bassReserve = settings.bassAmount.coerceIn(0f, 100f) * 0.018f +
-                settings.bassHarmonics.coerceIn(0f, 100f) * 0.008f
-            val reserve = punchReserve + bassReserve
-            dp.setInputGainAllChannelsTo((settings.preGain - reserve).coerceIn(-30f, 12f))
-        } catch (e: Exception) { Log.e(TAG, "inputGain: ${e.message}") }
+        try { val punchReserve = PunchControl.midBassGain(punch) * 0.65f; val bassReserve = settings.bassAmount.coerceIn(0f,100f)*0.018f + settings.bassHarmonics.coerceIn(0f,100f)*0.008f; dp.setInputGainAllChannelsTo((settings.preGain - punchReserve - bassReserve).coerceIn(-30f,12f)) } catch (e: Exception) { Log.e(TAG, "inputGain: ${e.message}") }
     }
-
     private fun applyEq() {
         val dp = dynamicsProcessing ?: return
         try {
-            val converted = ParametricToDpConverter.convert(
-                bands = settings.bands,
-                sampleRate = deviceSampleRate,
-                bandCount = preEqBandCount,
-                lowShelfEnabled = lowShelfTag,
-                peakEnabled = peakTag,
-                highShelfEnabled = highShelfTag,
-                subBoost = settings.subBoost
-            )
+            val converted = ParametricToDpConverter.convert(settings.bands, deviceSampleRate, preEqBandCount, lowShelfTag, peakTag, highShelfTag, settings.subBoost, subFrequencyHz)
             val n = minOf(preEqBandCount, converted.cutoffs.size, converted.gains.size)
-            for (i in 0 until n) {
-                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, converted.cutoffs[i], converted.gains[i]))
-            }
-            for (i in n until preEqBandCount) {
-                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(false, 1000f, 0f))
-            }
+            for (i in 0 until n) dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, converted.cutoffs[i], converted.gains[i]))
+            for (i in n until preEqBandCount) dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(false,1000f,0f))
         } catch (e: Exception) { Log.e(TAG, "eq mapper: ${e.message}") }
     }
-
     private fun applyMbc() {
-        val dp = dynamicsProcessing ?: return
-        if (mbcBandCount == 0) return
-        try {
-            val s = settings
-            val active = s.compEnabled && pipelineEnabled
-            val c1 = s.cross1.coerceIn(40f, 1000f)
-            val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
-            val c3 = s.cross3.coerceIn(c2 + 50f, 19500f)
-            val cuts = listOf(c1, c2, c3, MAX_FREQ)
-            val thresholds = listOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
-            val ratios = listOf(s.compRatioLow, s.compRatioLoMid, s.compRatioHiMid, s.compRatioHigh)
-            val knees = listOf(s.compKneeLow, s.compKneeLoMid, s.compKneeHiMid, s.compKneeHigh)
-            val attacks = listOf(s.compAttackLow, s.compAttackLoMid, s.compAttackHiMid, s.compAttackHigh)
-            val releases = listOf(s.compReleaseLow, s.compReleaseLoMid, s.compReleaseHiMid, s.compReleaseHigh)
-            val postGains = listOf(s.compPostGainLow, s.compPostGainLoMid, s.compPostGainHiMid, s.compPostGainHigh)
-            val preGains = listOf(s.compPreGainLow, s.compPreGainLoMid, s.compPreGainHiMid, s.compPreGainHigh)
-            for (i in 0 until mbcBandCount) {
-                dp.setMbcBandAllChannelsTo(i, DynamicsProcessing.MbcBand(
-                    active, cuts[i], attacks[i].coerceIn(1f, 200f), releases[i].coerceIn(10f, 1000f),
-                    ratios[i].coerceIn(1f, 24f), thresholds[i].coerceIn(-60f, 0f), knees[i].coerceIn(0f, 20f),
-                    -80f, 1f, preGains[i].coerceIn(-12f, 12f), postGains[i].coerceIn(-12f, 12f)
-                ))
-            }
-        } catch (e: Exception) { Log.e(TAG, "mbc: ${e.message}") }
+        val dp=dynamicsProcessing ?: return; if(mbcBandCount==0)return
+        try { val s=settings; val active=s.compEnabled&&pipelineEnabled; val c1=s.cross1.coerceIn(40f,1000f); val c2=s.cross2.coerceIn(c1+50f,8000f); val c3=s.cross3.coerceIn(c2+50f,19500f); val cuts=listOf(c1,c2,c3,MAX_FREQ); val thresholds=listOf(s.compThLow,s.compThLoMid,s.compThHiMid,s.compThHigh); val ratios=listOf(s.compRatioLow,s.compRatioLoMid,s.compRatioHiMid,s.compRatioHigh); val knees=listOf(s.compKneeLow,s.compKneeLoMid,s.compKneeHiMid,s.compKneeHigh); val attacks=listOf(s.compAttackLow,s.compAttackLoMid,s.compAttackHiMid,s.compAttackHigh); val releases=listOf(s.compReleaseLow,s.compReleaseLoMid,s.compReleaseHiMid,s.compReleaseHigh); val postGains=listOf(s.compPostGainLow,s.compPostGainLoMid,s.compPostGainHiMid,s.compPostGainHigh); val preGains=listOf(s.compPreGainLow,s.compPreGainLoMid,s.compPreGainHiMid,s.compPreGainHigh); for(i in 0 until mbcBandCount) dp.setMbcBandAllChannelsTo(i,DynamicsProcessing.MbcBand(active,cuts[i],attacks[i].coerceIn(1f,200f),releases[i].coerceIn(10f,1000f),ratios[i].coerceIn(1f,24f),thresholds[i].coerceIn(-60f,0f),knees[i].coerceIn(0f,20f),-80f,1f,preGains[i].coerceIn(-12f,12f),postGains[i].coerceIn(-12f,12f))) } catch(e:Exception){Log.e(TAG,"mbc: ${e.message}")}
     }
-
     private fun applyPostEq() {
-        val dp = dynamicsProcessing ?: return
+        val dp=dynamicsProcessing ?: return
         try {
-            val amount = settings.bassAmount.coerceIn(0f, 100f) / 100f
-            val bassPunch = settings.bassPunch.coerceIn(0f, 100f)
-            val harmonics = settings.bassHarmonics.coerceIn(0f, 100f) / 100f
-            val center = PunchControl.punchCenter(bassPunch)
-            val q = PunchControl.punchQ(bassPunch)
-
-            // POST-EQ is the real Audio Framework bass path. All bands are
-            // applied to both channels, so the normal bass boost remains
-            // phase-consistent without introducing a second PCM route.
-            val lowShelf = amount * 5.5f
-            val punchGain = PunchControl.midBassGain(bassPunch) * 1.15f
-            val harmonic2 = harmonics * 1.8f
-            val harmonic3 = harmonics * 1.35f
-            val harmonic4 = harmonics * 0.9f
-
-            val center2 = (center * 2f).coerceAtMost(18000f)
-            val center3 = (center * 3f).coerceAtMost(18000f)
-            val center4 = (center * 4f).coerceAtMost(19000f)
-
-            dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(
-                lowShelf > 0.05f, 45f, lowShelf
-            ))
-            dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(
-                punchGain > 0.05f, center, punchGain
-            ))
-            dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(
-                harmonic2 > 0.05f, center2, harmonic2
-            ))
-            dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(
-                harmonic3 > 0.05f, center3, harmonic3
-            ))
-
-            // Fold the fourth harmonic into the first two controls when the
-            // framework exposes only four post-EQ bands. This keeps the effect
-            // audible without stealing the punch band.
-            if (harmonic4 > 0.05f) {
-                val blendedPunch = punchGain + harmonic4 * 0.35f
-                dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(true, center, blendedPunch))
-            }
-
-            if (amount <= 0f && bassPunch <= 0f && harmonics <= 0f) {
-                for (i in 0..3) {
-                    dp.setPostEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(false, 1000f, 0f))
-                }
-            }
-        } catch (e: Exception) { Log.e(TAG, "postEq bass: ${e.message}") }
+            val amount=settings.bassAmount.coerceIn(0f,100f)/100f; val bassPunch=settings.bassPunch.coerceIn(0f,100f); val harmonics=settings.bassHarmonics.coerceIn(0f,100f)/100f; val center=PunchControl.punchCenter(bassPunch); val q=PunchControl.punchQ(bassPunch)
+            val lowShelf=amount*5.5f; val punchGain=PunchControl.midBassGain(bassPunch)*1.15f; val harmonic2=harmonics*1.8f; val harmonic3=harmonics*1.35f; val harmonic4=harmonics*0.9f
+            val center2=(center*2f).coerceAtMost(18000f); val center3=(center*3f).coerceAtMost(18000f)
+            dp.setPostEqBandAllChannelsTo(0,DynamicsProcessing.EqBand(lowShelf>0.05f,bassFrequencyHz,lowShelf))
+            dp.setPostEqBandAllChannelsTo(1,DynamicsProcessing.EqBand(punchGain>0.05f,center,punchGain))
+            dp.setPostEqBandAllChannelsTo(2,DynamicsProcessing.EqBand(harmonic2>0.05f,center2,harmonic2))
+            dp.setPostEqBandAllChannelsTo(3,DynamicsProcessing.EqBand(harmonic3>0.05f,center3,harmonic3))
+            if(harmonic4>0.05f) dp.setPostEqBandAllChannelsTo(1,DynamicsProcessing.EqBand(true,center,punchGain+harmonic4*0.35f))
+            if(amount<=0f&&bassPunch<=0f&&harmonics<=0f) for(i in 0..3) dp.setPostEqBandAllChannelsTo(i,DynamicsProcessing.EqBand(false,1000f,0f))
+        } catch(e:Exception){Log.e(TAG,"postEq bass: ${e.message}")}
     }
-
-    private fun applyLimiter() {
-        val dp = dynamicsProcessing ?: return
-        try {
-            val s = settings
-            dp.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(
-                true, s.limiterEnabled, 0,
-                s.limiterAttack.coerceIn(0.01f, 100f),
-                s.limiterRelease.coerceIn(20f, 1000f),
-                s.limiterRatio.coerceIn(1f, 50f),
-                s.limiterThreshold.coerceIn(-30f, 0f),
-                s.limiterPostGain.coerceIn(-12f, 12f)
-            ))
-        } catch (e: Exception) { Log.e(TAG, "limiter: ${e.message}") }
-    }
-
-    private fun startVisualizer() {
-        try {
-            val v = Visualizer(audioSessionId)
-            v.captureSize = 1024
-            val envelope = FloatArray(128) { -80f }
-            v.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                override fun onWaveFormDataCapture(visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int) = Unit
-                override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-                    if (fft == null || fft.size < 4) return
-                    val bins = fft.size / 2
-                    val sampleRateHz = (samplingRate / 1000f).coerceAtLeast(1000f)
-                    val raw = FloatArray(bins) { -80f }
-                    for (b in 1 until bins) {
-                        val re = fft[b * 2].toInt()
-                        val im = fft[b * 2 + 1].toInt()
-                        val mag = sqrt((re * re + im * im).toFloat()).coerceAtLeast(1f)
-                        raw[b] = (20f * log10(mag / 128f)).coerceIn(-80f, 6f)
-                    }
-                    val out = FloatArray(128)
-                    for (i in out.indices) {
-                        val t = i.toFloat() / out.lastIndex
-                        val freq = 18.0 * Math.pow(20000.0 / 18.0, t.toDouble())
-                        val bin = (freq / sampleRateHz * (bins * 2)).toInt().coerceIn(1, bins - 1)
-                        val db = raw[bin]
-                        envelope[i] = if (db > envelope[i]) envelope[i] + (db - envelope[i]) * 0.70f else envelope[i] + (db - envelope[i]) * 0.14f
-                        out[i] = envelope[i].coerceIn(-80f, 6f)
-                    }
-                    spectrumData = out
-                }
-            }, Visualizer.getMaxCaptureRate(), false, true)
-            v.enabled = true
-            visualizer = v
-        } catch (e: Exception) { Log.w(TAG, "Visualizer no disponible: ${e.message}") }
-    }
+    private fun applyLimiter(){val dp=dynamicsProcessing?:return;try{val s=settings;dp.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true,s.limiterEnabled,0,s.limiterAttack.coerceIn(0.01f,100f),s.limiterRelease.coerceIn(20f,1000f),s.limiterRatio.coerceIn(1f,50f),s.limiterThreshold.coerceIn(-30f,0f),s.limiterPostGain.coerceIn(-12f,12f)))}catch(e:Exception){Log.e(TAG,"limiter: ${e.message}")}}
+    private fun startVisualizer(){try{val v=Visualizer(audioSessionId);v.captureSize=1024;val envelope=FloatArray(128){-80f};v.setDataCaptureListener(object:Visualizer.OnDataCaptureListener{override fun onWaveFormDataCapture(visualizer:Visualizer?,waveform:ByteArray?,samplingRate:Int)=Unit;override fun onFftDataCapture(visualizer:Visualizer?,fft:ByteArray?,samplingRate:Int){if(fft==null||fft.size<4)return;val bins=fft.size/2;val sampleRateHz=(samplingRate/1000f).coerceAtLeast(1000f);val raw=FloatArray(bins){-80f};for(b in 1 until bins){val re=fft[b*2].toInt();val im=fft[b*2+1].toInt();val mag=sqrt((re*re+im*im).toFloat()).coerceAtLeast(1f);raw[b]=(20f*log10(mag/128f)).coerceIn(-80f,6f)};val out=FloatArray(128);for(i in out.indices){val t=i.toFloat()/out.lastIndex;val freq=18.0*Math.pow(20000.0/18.0,t.toDouble());val bin=(freq/sampleRateHz*(bins*2)).toInt().coerceIn(1,bins-1);val db=raw[bin];envelope[i]=if(db>envelope[i])envelope[i]+(db-envelope[i])*0.70f else envelope[i]+(db-envelope[i])*0.14f;out[i]=envelope[i].coerceIn(-80f,6f)};spectrumData=out}},Visualizer.getMaxCaptureRate(),false,true);v.enabled=true;visualizer=v}catch(e:Exception){Log.w(TAG,"Visualizer no disponible: ${e.message}")}}
 }
