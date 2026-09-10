@@ -141,21 +141,22 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 
   Bands(vm)
 
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){
-   Column(Modifier.weight(1f)){ Card("SUB / SISMO (18 — 90 Hz)"){
-    Text("Realce independiente de PUNCH",color=ZM,fontSize=9.sp)
-    S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
-   } }
-   Column(Modifier.weight(1.15f)){ Card("PUNCH (35 — 65 Hz)"){
-    Row(verticalAlignment=Alignment.CenterVertically){
-     Text("PUNCH",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
-     Text("●",color=ZG,fontSize=11.sp)
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.Top){
+   Column(Modifier.weight(1f)){
+    SubSismoCard(vm)
+    Card("BASS") {
+     Text("Bass controls",color=ZM,fontSize=9.sp)
+     S("BASS AMOUNT",punch.bassAmount,0f..100f," %"){punch.updateBassAmount(it)}
+     S("BASS FREQ",punch.bassFrequencyHz,25f..120f," Hz"){punch.updateBassFrequency(it)}
+     Row(verticalAlignment=Alignment.CenterVertically){
+      Text("BASS MONO",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+      Switch(checked=punch.bassMono,onCheckedChange=punch::updateBassMono)
+     }
+     S("HARMONICS",punch.bassHarmonics,0f..100f," %"){punch.updateBassHarmonics(it)}
     }
-    S("Hz",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)}
-    S("Q",punch.q,.5f..3f){punch.updatePunchQ(it)}
-    S("AMOUNT",punch.amount,0f..100f," %"){punch.updatePunchAmount(it)}
-   } }
-   Column(Modifier.weight(.9f)){ Card("HEADROOM"){
+   }
+   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm) }
+   Column(Modifier.weight(.9f)){ Card("HEADROOM") {
     S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
     Text("Protección de salida",color=ZM,fontSize=8.sp)
    } }
