@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
             audioService = binder.getService()
             bound = true
         }
-        override fun onServiceDisconnected(name: ComponentName?, service: IBinder?) {
+        override fun onServiceDisconnected(name: ComponentName?) {
             audioService = null
             bound = false
         }
