@@ -112,7 +112,15 @@ class AudioEngine(private val context: Context) {
 
     fun setPreGain(v: Float) { settings.preGain = v; applyInputGain() }
     fun setSubBoost(v: Float) { settings.subBoost = v; applyEq(); applyPostEq() }
-    fun setPunch(v: Float) { punch = v.coerceIn(0f, 100f); applyInputGain(); applyPostEq() }
+    fun setPunch(v: Float) { punch = v.coerceIn(0f, 100f); settings.bassPunch = punch; applyInputGain(); applyPostEq() }
+    fun setBassControls(amount: Float, mono: Boolean, harmonics: Float) {
+        settings.bassAmount = amount.coerceIn(0f, 100f)
+        settings.bassMono = mono
+        settings.bassHarmonics = harmonics.coerceIn(0f, 100f)
+        applyInputGain()
+        applyPostEq()
+        Log.i(TAG, "Bass controls amount=${settings.bassAmount} mono=${settings.bassMono} harmonics=${settings.bassHarmonics}")
+    }
     fun setBands(list: List<EqBand>) { settings.bands = list; applyEq(); applyPostEq() }
 
     fun setPipelineTags(pipeline: Boolean, lowShelf: Boolean, peak: Boolean, highShelf: Boolean) {
@@ -160,18 +168,14 @@ class AudioEngine(private val context: Context) {
     private fun applyInputGain() {
         val dp = dynamicsProcessing ?: return
         try {
-            val reserve = PunchControl.midBassGain(punch) * 0.65f
+            val punchReserve = PunchControl.midBassGain(punch) * 0.65f
+            val bassReserve = settings.bassAmount.coerceIn(0f, 100f) * 0.018f +
+                settings.bassHarmonics.coerceIn(0f, 100f) * 0.008f
+            val reserve = punchReserve + bassReserve
             dp.setInputGainAllChannelsTo((settings.preGain - reserve).coerceIn(-30f, 12f))
         } catch (e: Exception) { Log.e(TAG, "inputGain: ${e.message}") }
     }
 
-    /**
-     * Phase 2 curve mapper. The parametric curve is evaluated with real RBJ
-     * responses, then converted to an adaptive 128/96/64-band DP staircase.
-     * Band centres are anchors, while the remaining cutoffs are concentrated
-     * around steep response changes. This is much closer to the requested
-     * Peak/Shelf/LP/HP/Notch/Band-Pass curve than a fixed log grid.
-     */
     private fun applyEq() {
         val dp = dynamicsProcessing ?: return
         try {
@@ -186,10 +190,7 @@ class AudioEngine(private val context: Context) {
             )
             val n = minOf(preEqBandCount, converted.cutoffs.size, converted.gains.size)
             for (i in 0 until n) {
-                dp.setPreEqBandAllChannelsTo(
-                    i,
-                    DynamicsProcessing.EqBand(true, converted.cutoffs[i], converted.gains[i])
-                )
+                dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, converted.cutoffs[i], converted.gains[i]))
             }
             for (i in n until preEqBandCount) {
                 dp.setPreEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(false, 1000f, 0f))
@@ -227,25 +228,52 @@ class AudioEngine(private val context: Context) {
     private fun applyPostEq() {
         val dp = dynamicsProcessing ?: return
         try {
-            val sub = settings.subBoost.coerceIn(0f, 12f)
-            val center = PunchControl.punchCenter(punch)
-            val q = PunchControl.punchQ(punch)
-            val sigma = 0.55f / q
-            fun punchAt(freq: Float): Float {
-                val x = ln((freq / center).coerceAtLeast(0.001f)).toFloat()
-                return PunchControl.midBassGain(punch) * exp(-(x * x) / (2f * sigma * sigma))
+            val amount = settings.bassAmount.coerceIn(0f, 100f) / 100f
+            val bassPunch = settings.bassPunch.coerceIn(0f, 100f)
+            val harmonics = settings.bassHarmonics.coerceIn(0f, 100f) / 100f
+            val center = PunchControl.punchCenter(bassPunch)
+            val q = PunchControl.punchQ(bassPunch)
+
+            // POST-EQ is the real Audio Framework bass path. All bands are
+            // applied to both channels, so the normal bass boost remains
+            // phase-consistent without introducing a second PCM route.
+            val lowShelf = amount * 5.5f
+            val punchGain = PunchControl.midBassGain(bassPunch) * 1.15f
+            val harmonic2 = harmonics * 1.8f
+            val harmonic3 = harmonics * 1.35f
+            val harmonic4 = harmonics * 0.9f
+
+            val center2 = (center * 2f).coerceAtMost(18000f)
+            val center3 = (center * 3f).coerceAtMost(18000f)
+            val center4 = (center * 4f).coerceAtMost(19000f)
+
+            dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(
+                lowShelf > 0.05f, 45f, lowShelf
+            ))
+            dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(
+                punchGain > 0.05f, center, punchGain
+            ))
+            dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(
+                harmonic2 > 0.05f, center2, harmonic2
+            ))
+            dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(
+                harmonic3 > 0.05f, center3, harmonic3
+            ))
+
+            // Fold the fourth harmonic into the first two controls when the
+            // framework exposes only four post-EQ bands. This keeps the effect
+            // audible without stealing the punch band.
+            if (harmonic4 > 0.05f) {
+                val blendedPunch = punchGain + harmonic4 * 0.35f
+                dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(true, center, blendedPunch))
             }
-            val g31 = sub * 0.55f + punchAt(31.5f) * 0.55f
-            val g63 = sub * 0.35f + punchAt(63f)
-            dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(g31 > 0.1f, 31.5f, g31))
-            dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(g63 > 0.1f, 63f, g63))
-            dp.setPostEqBandAllChannelsTo(2, DynamicsProcessing.EqBand(false, 250f, 0f))
-            dp.setPostEqBandAllChannelsTo(3, DynamicsProcessing.EqBand(false, 1000f, 0f))
-            if (punch <= 0f && sub <= 0f) {
-                dp.setPostEqBandAllChannelsTo(0, DynamicsProcessing.EqBand(false, 31.5f, 0f))
-                dp.setPostEqBandAllChannelsTo(1, DynamicsProcessing.EqBand(false, 63f, 0f))
+
+            if (amount <= 0f && bassPunch <= 0f && harmonics <= 0f) {
+                for (i in 0..3) {
+                    dp.setPostEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(false, 1000f, 0f))
+                }
             }
-        } catch (e: Exception) { Log.e(TAG, "postEq: ${e.message}") }
+        } catch (e: Exception) { Log.e(TAG, "postEq bass: ${e.message}") }
     }
 
     private fun applyLimiter() {
