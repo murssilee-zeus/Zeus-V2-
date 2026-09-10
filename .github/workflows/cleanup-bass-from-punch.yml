@@ -1,0 +1,54 @@
+name: Cleanup bass from punch panel
+on:
+  push:
+    branches: [fix/punch-v2]
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+      - name: Remove duplicated bass controls from PunchCard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt')
+          s = p.read_text()
+          old = '''@Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){
+ Card("BASS / PUNCH") {
+  Text("Bass controls · Audio Framework / DynamicsProcessing",color=ZM,fontSize=9.sp)
+  S("BASS AMOUNT",p.bassAmount,0f..100f," %"){p.updateBassAmount(it)}
+  S("BASS FREQ",p.bassFrequencyHz,25f..120f," Hz"){p.updateBassFrequency(it)}
+  Row(verticalAlignment=Alignment.CenterVertically){
+   Text("BASS MONO",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+   Switch(checked=p.bassMono,onCheckedChange=p::updateBassMono)
+  }
+  S("HARMONICS",p.bassHarmonics,0f..100f," %"){p.updateBassHarmonics(it)}
+  Spacer(Modifier.height(2.dp))
+  Text("PUNCH",color=ZP,fontSize=11.sp,fontWeight=FontWeight.Bold)
+  S("Amount",p.amount,0f..100f," %"){p.updatePunchAmount(it)}
+  S("Center",p.centerHz,35f..65f," Hz"){p.updatePunchCenter(it)}
+  S("Q",p.q,.5f..3f){p.updatePunchQ(it)}
+  S("Headroom trim",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
+ }
+}'''
+          new = '''@Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){
+ Card("PUNCH") {
+  Text("Punch control · Audio Framework / DynamicsProcessing",color=ZM,fontSize=9.sp)
+  S("AMOUNT",p.amount,0f..100f," %"){p.updatePunchAmount(it)}
+  S("CENTER",p.centerHz,35f..65f," Hz"){p.updatePunchCenter(it)}
+  S("Q",p.q,.5f..3f){p.updatePunchQ(it)}
+ }
+}'''
+          if old not in s:
+              raise SystemExit('PunchCard block not found; refusing unsafe edit')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
+          git commit -m 'Keep bass controls only below sub-sismo' || exit 0
+          git push origin HEAD:fix/punch-v2
