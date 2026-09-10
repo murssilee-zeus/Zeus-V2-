@@ -1,0 +1,32 @@
+name: AutoEQ UI interpolation fix
+on:
+  push:
+    branches:
+      - fix/punch-v2
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+      - name: Fix literal error placeholder
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt')
+          s = p.read_text()
+          s2 = s.replace(r'\${it.message}', '${it.message ?: "Error desconocido"}')
+          if s2 != s:
+              p.write_text(s2)
+              print('Fixed AutoEQ error interpolation')
+          else:
+              print('No literal placeholder found')
+          PY
+          git config user.name 'zeus-autoeq-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
+          git diff --cached --quiet || git commit -m 'Fix AutoEQ error message interpolation'
+          git push origin HEAD:fix/punch-v2
