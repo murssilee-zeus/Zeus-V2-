@@ -1,0 +1,34 @@
+name: Page 1 layout fix
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+      - name: Update portrait layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt')
+          s=p.read_text()
+          start=s.index('  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){\n   Column(Modifier.weight(1f)){ Card("SUB / SISMO (18 — 90 Hz)")')
+          end=s.index('\n\n  Card("MBC  →  PUNCH  →  LIMITER")', start)
+          replacement='''  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.Top){\n   Column(Modifier.weight(1f)){\n    SubSismoCard(vm)\n    Card("BASS") {\n     Text("Bass controls",color=ZM,fontSize=9.sp)\n     S("BASS AMOUNT",punch.bassAmount,0f..100f," %"){punch.updateBassAmount(it)}\n     S("BASS FREQ",punch.bassFrequencyHz,25f..120f," Hz"){punch.updateBassFrequency(it)}\n     Row(verticalAlignment=Alignment.CenterVertically){\n      Text("BASS MONO",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))\n      Switch(checked=punch.bassMono,onCheckedChange=punch::updateBassMono)\n     }\n     S("HARMONICS",punch.bassHarmonics,0f..100f," %"){punch.updateBassHarmonics(it)}\n    }\n   }\n   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm) }\n   Column(Modifier.weight(.9f)){ Card("HEADROOM") {\n    S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}\n    Text("Protección de salida",color=ZM,fontSize=8.sp)\n   } }\n  }'''
+          p.write_text(s[:start]+replacement+s[end:])
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
+          git commit -m 'Arrange bass controls below sub-sismo' || exit 0
+          git push origin HEAD:fix/punch-v2
+      - name: Remove temporary workflow
+        run: |
+          rm -f .github/workflows/page1-layout-fix.yml
+          git add .github/workflows/page1-layout-fix.yml
+          git commit -m 'Remove temporary page layout workflow' || true
+          git push origin HEAD:fix/punch-v2 || true
