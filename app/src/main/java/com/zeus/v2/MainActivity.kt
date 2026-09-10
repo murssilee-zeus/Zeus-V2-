@@ -88,13 +88,15 @@ class MainActivity : ComponentActivity() {
             audioService?.audioEngine?.let { e ->
                 e.settings = vm.toSettings()
                 e.setPunch(punch.amount)
+                e.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics)
                 e.applyAll()
             }
         }
-        LaunchedEffect(vm.bands.toList(), vm.subBoost, punch.amount) {
+        LaunchedEffect(vm.bands.toList(), vm.subBoost, punch.amount, punch.bassAmount, punch.bassMono, punch.bassHarmonics) {
             audioService?.audioEngine?.setBands(vm.bands.toList())
             audioService?.audioEngine?.setSubBoost(vm.subBoost)
             audioService?.audioEngine?.setPunch(punch.amount)
+            audioService?.audioEngine?.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics)
         }
         LaunchedEffect(vm.preamp, vm.headroomTrim) {
             audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim)
