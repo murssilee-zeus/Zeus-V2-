@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { p ->
-        if (!p.values.all { it }) Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento real", Toast.LENGTH_LONG).show()
+        if (!p.values.all { it }) Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento y Spectrum en tiempo real", Toast.LENGTH_LONG).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
             catch(e:Exception){vm.isEngineRunning=false;Toast.makeText(this,"No se pudo iniciar el motor: ${e.message}",Toast.LENGTH_LONG).show()}
         }
     }
-    private fun requestNeededPermissions(){val permissions=mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU)permissions.add(Manifest.permission.POST_NOTIFICATIONS);val toRequest=permissions.filter{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED};if(toRequest.isNotEmpty())requestPermissionLauncher.launch(toRequest.toTypedArray())}
+    private fun requestNeededPermissions(){val permissions=mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS,Manifest.permission.RECORD_AUDIO);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU)permissions.add(Manifest.permission.POST_NOTIFICATIONS);val toRequest=permissions.filter{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED};if(toRequest.isNotEmpty())requestPermissionLauncher.launch(toRequest.toTypedArray())}
     override fun onStart(){super.onStart()}
     override fun onStop(){super.onStop();if(bound){try{unbindService(connection)}catch(_:Exception){};bound=false}}
 }
