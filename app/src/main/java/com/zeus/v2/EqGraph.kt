@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -40,19 +40,15 @@ fun EqGraph(
         val hi = ln(20000f)
         return exp(lo + (x / width).coerceIn(0f, 1f) * (hi - lo))
     }
-    fun dbToY(db: Float, height: Float): Float =
-        height - ((db.coerceIn(-30f, 30f) + 30f) / 60f * height)
-    fun yToDb(y: Float, height: Float): Float =
-        30f - (y / height).coerceIn(0f, 1f) * 60f
+    fun dbToY(db: Float, height: Float): Float = height - ((db.coerceIn(-30f, 30f) + 30f) / 60f * height)
+    fun yToDb(y: Float, height: Float): Float = 30f - (y / height).coerceIn(0f, 1f) * 60f
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(bands, selectedBandIndex) {
                 detectTapGestures { pos ->
-                    val hit = bands.indices.minByOrNull { i ->
-                        abs(freqToX(bands[i].frequency, size.width.toFloat()) - pos.x)
-                    }
+                    val hit = bands.indices.minByOrNull { i -> abs(freqToX(bands[i].frequency, size.width.toFloat()) - pos.x) }
                     if (hit != null && abs(freqToX(bands[hit].frequency, size.width.toFloat()) - pos.x) < 48f) onSelect(hit)
                 }
             }
@@ -80,19 +76,19 @@ fun EqGraph(
         val h = size.height
         drawRect(Color(0xFF07090D))
 
+        // Reference-style technical grid: dark, thin and deliberately secondary to the audio data.
         val dbLines = intArrayOf(-30, -24, -18, -12, -6, 0, 6, 12)
         dbLines.forEach { db ->
             val y = dbToY(db.toFloat(), h)
-            drawLine(if (db == 0) Color(0xFF4A5261) else Color(0xFF18212B), Offset(0f, y), Offset(w, y), if (db == 0) 1.4f else 1f)
+            drawLine(if (db == 0) Color(0xFF46505D) else Color(0xFF18212B), Offset(0f, y), Offset(w, y), if (db == 0) 1.4f else 1f)
         }
-
         val frequencies = floatArrayOf(18f, 31f, 62f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f, 20000f)
         frequencies.forEach { frequency ->
             val x = freqToX(frequency, w)
-            drawLine(Color(0xFF151E27), Offset(x, 0f), Offset(x, h), 1f)
+            drawLine(Color(0xFF151D26), Offset(x, 0f), Offset(x, h), 1f)
         }
 
-        // Reference-style colored response zones behind the master EQ curve.
+        // Colored band envelopes, kept soft so they explain the EQ without hiding the RTA.
         bands.forEach { band ->
             if (!band.enabled || abs(band.gain) < .05f) return@forEach
             val zone = Path()
@@ -109,20 +105,31 @@ fun EqGraph(
             }
             zone.lineTo(w, dbToY(0f, h))
             zone.close()
-            drawPath(zone, band.color.copy(alpha = .13f))
+            drawPath(zone, band.color.copy(alpha = .11f))
         }
 
-        // Real-time RTA. AudioEngine supplies this data; the graph never changes the audio signal.
+        // Real-time RTA. The incoming spectrum is displayed as a neutral trace so it never competes with the EQ curve.
         if (spectrum.size > 1) {
-            val spectrumPath = Path()
+            val raw = ArrayList<Offset>(spectrum.size)
             spectrum.forEachIndexed { index, value ->
                 val t = index.toFloat() / (spectrum.size - 1)
                 val frequency = 18f * (20000f / 18f).pow(t)
                 val x = freqToX(frequency, w)
                 val displayDb = ((value + 72f) * 0.55f - 30f).coerceIn(-30f, 30f)
-                val y = dbToY(displayDb, h)
-                if (index == 0) spectrumPath.moveTo(x, y) else spectrumPath.lineTo(x, y)
+                raw.add(Offset(x, dbToY(displayDb, h)))
             }
+
+            // Catmull-like quadratic smoothing. The RTA remains responsive but loses the harsh digital sawtooth look.
+            val spectrumPath = Path()
+            spectrumPath.moveTo(raw.first().x, raw.first().y)
+            for (i in 1 until raw.size) {
+                val previous = raw[i - 1]
+                val current = raw[i]
+                val midpoint = Offset((previous.x + current.x) * .5f, (previous.y + current.y) * .5f)
+                spectrumPath.quadraticBezierTo(previous.x, previous.y, midpoint.x, midpoint.y)
+            }
+            val last = raw.last()
+            spectrumPath.lineTo(last.x, last.y)
 
             val fill = Path().apply {
                 addPath(spectrumPath)
@@ -130,18 +137,13 @@ fun EqGraph(
                 lineTo(0f, h)
                 close()
             }
-            drawPath(
-                fill,
-                Brush.verticalGradient(
-                    0f to Color(0xFF69727F).copy(alpha = .10f),
-                    h * .60f to Color(0xFF3D4652).copy(alpha = .06f),
-                    h to Color.Transparent
-                )
-            )
-
-            // Thin neutral RTA trace like the reference. The EQ response remains colored and dominant.
-            drawPath(spectrumPath, Color(0xFF8B949E).copy(alpha = .22f), style = Stroke(width = 4.5f, cap = StrokeCap.Round))
-            drawPath(spectrumPath, Color(0xFF7E8792).copy(alpha = .78f), style = Stroke(width = 1.15f, cap = StrokeCap.Round))
+            drawPath(fill, Brush.verticalGradient(
+                0f to Color(0xFF788493).copy(alpha = .12f),
+                h * .55f to Color(0xFF4B5563).copy(alpha = .045f),
+                h to Color.Transparent
+            ))
+            drawPath(spectrumPath, Color(0xFF89939F).copy(alpha = .15f), style = Stroke(width = 4.8f, cap = StrokeCap.Round))
+            drawPath(spectrumPath, Color(0xFF87919D).copy(alpha = .78f), style = Stroke(width = 1.15f, cap = StrokeCap.Round))
         }
 
         if (targetCurve.size > 1) {
@@ -150,10 +152,10 @@ fun EqGraph(
                 val p = Offset(freqToX(point.frequency, w), dbToY(point.gain, h))
                 if (index == 0) targetPath.moveTo(p.x, p.y) else targetPath.lineTo(p.x, p.y)
             }
-            drawPath(targetPath, Color(0xFFFFC857).copy(alpha = .80f), style = Stroke(width = 2f, cap = StrokeCap.Round))
+            drawPath(targetPath, Color(0xFFFFC857).copy(alpha = .78f), style = Stroke(width = 1.8f, cap = StrokeCap.Round))
         }
 
-        // Master parametric response.
+        // Master EQ curve: bright, smooth and visually dominant like the supplied references.
         val response = Path()
         val samples = 360
         for (index in 0 until samples) {
@@ -169,12 +171,9 @@ fun EqGraph(
             val point = Offset(freqToX(frequency, w), dbToY(gain, h))
             if (index == 0) response.moveTo(point.x, point.y) else response.lineTo(point.x, point.y)
         }
-
-        drawPath(response, Color(0xFFB45CFF).copy(alpha = .22f), style = Stroke(width = 9f, cap = StrokeCap.Round))
+        drawPath(response, Color(0xFFD06CFF).copy(alpha = .18f), style = Stroke(width = 10f, cap = StrokeCap.Round))
         drawPath(response, Color(0xFFD06CFF), style = Stroke(width = 2.8f, cap = StrokeCap.Round))
-
-        val zeroY = dbToY(0f, h)
-        drawLine(Color(0xFF65707D).copy(alpha = .55f), Offset(0f, zeroY), Offset(w, zeroY), 1f)
+        drawLine(Color(0xFF65707D).copy(alpha = .50f), Offset(0f, dbToY(0f, h)), Offset(w, dbToY(0f, h)), 1f)
 
         val labels = listOf(18f to "18", 31f to "31", 62f to "62", 125f to "125", 250f to "250", 500f to "500", 1000f to "1k", 2000f to "2k", 4000f to "4k", 8000f to "8k", 16000f to "16k", 20000f to "20k")
         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -186,13 +185,12 @@ fun EqGraph(
         paint.textAlign = android.graphics.Paint.Align.LEFT
         dbLines.forEach { db -> drawIntoCanvas { canvas -> canvas.nativeCanvas.drawText(if (db > 0) "+$db" else db.toString(), 5f, dbToY(db.toFloat(), h) - 4f, paint) } }
 
-        // Interactive band nodes.
         bands.forEachIndexed { index, band ->
             if (!band.enabled) return@forEachIndexed
             val point = Offset(freqToX(band.frequency, w), dbToY(band.gain, h))
             val selected = index == selectedBandIndex
             if (selected) {
-                drawCircle(band.color.copy(alpha = .20f), 15f, point)
+                drawCircle(band.color.copy(alpha = .22f), 16f, point)
                 drawCircle(Color.White.copy(alpha = .90f), 10f, point, style = Stroke(width = 1.5f))
             }
             drawCircle(band.color, if (selected) 7.5f else 6f, point)
