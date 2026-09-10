@@ -14,14 +14,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Alignment
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
@@ -36,7 +43,7 @@ class MainActivity : ComponentActivity() {
             audioService = binder.getService()
             bound = true
         }
-        override fun onServiceDisconnected(name: ComponentName?) {
+        override fun onServiceDisconnected(name: ComponentName?, service: IBinder?) {
             audioService = null
             bound = false
         }
@@ -65,6 +72,7 @@ class MainActivity : ComponentActivity() {
     private fun ComposeRoot() {
         val vm: EqViewModel = viewModel(factory = EqViewModel.Factory)
         val punch: PunchViewModel = viewModel()
+        var showBassControls by remember { mutableStateOf(false) }
         val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
             if (uri != null) runCatching {
                 contentResolver.openOutputStream(uri)?.use { it.write(vm.toSettings().toJson().toByteArray(Charsets.UTF_8)) }
@@ -146,6 +154,25 @@ class MainActivity : ComponentActivity() {
                         },
                         { exportLauncher.launch(ConfigFileRepository.fileNameForExport()) }
                     )
+
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 8.dp, bottom = 42.dp)
+                            .widthIn(max = 330.dp)
+                    ) {
+                        Text(
+                            text = if (showBassControls) "× CERRAR BASS" else "BASS / PUNCH",
+                            color = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .clickable { showBassControls = !showBassControls }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                        if (showBassControls) {
+                            PunchControlPanel(punch)
+                        }
+                    }
                 }
             }
         }
