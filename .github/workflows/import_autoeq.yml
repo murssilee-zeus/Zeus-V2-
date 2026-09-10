@@ -22,18 +22,24 @@ jobs:
       - name: Clone official AutoEq into /tmp/AutoEq
         run: |
           rm -rf /tmp/AutoEq
-          git clone --depth 1 https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
-          echo "AutoEq commit: $(git -C /tmp/AutoEq rev-parse HEAD)"
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
+          cd /tmp/AutoEq
+          git sparse-checkout set results targets
+          git lfs install --local || true
+          git lfs pull || true
+          echo "AutoEq commit: $(git rev-parse HEAD)"
+          echo "ParametricEQ paths in git tree: $(git ls-tree -r --name-only HEAD results | grep -E '/ParametricEQ\.txt$' | wc -l)"
+          echo "ParametricEQ files on disk: $(find results -type f -name 'ParametricEQ.txt' | wc -l)"
 
       - name: Scan ParametricEQ files and import target curves
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import csv
           import hashlib
           import json
           import re
           import shutil
+          import subprocess
 
           src = Path('/tmp/AutoEq')
           results = src / 'results'
@@ -46,24 +52,25 @@ jobs:
           preamp_re = re.compile(r'^Preamp:\s*([-+]?\d+(?:\.\d+)?)\s*dB\s*$', re.I)
           filter_re = re.compile(r'^Filter\s+\d+:\s+ON\s+(\S+)\s+Fc\s+([-+]?\d+(?:\.\d+)?)\s+Hz\s+Gain\s+([-+]?\d+(?:\.\d+)?)\s+dB\s+Q\s+([-+]?\d+(?:\.\d+)?)', re.I)
 
-          entries = []
           files = sorted(results.rglob('ParametricEQ.txt'))
+          if len(files) < 8000:
+              raise SystemExit(f'Expected 8000+ ParametricEQ.txt files, found {len(files)}')
+
+          entries = []
           for p in files:
               rel = p.relative_to(results).as_posix()
               parts = p.relative_to(results).parts
+              text = p.read_text(encoding='utf-8', errors='replace')
               preamp = None
               filter_count = 0
               filter_types = set()
-              try:
-                  text = p.read_text(encoding='utf-8', errors='replace')
-              except OSError:
-                  continue
               for line in text.splitlines():
-                  m = preamp_re.match(line.strip())
+                  line = line.strip()
+                  m = preamp_re.match(line)
                   if m:
                       preamp = float(m.group(1))
                       continue
-                  m = filter_re.match(line.strip())
+                  m = filter_re.match(line)
                   if m:
                       filter_count += 1
                       filter_types.add(m.group(1).upper())
@@ -71,13 +78,11 @@ jobs:
               model = p.parent.name
               if model.endswith(' ParametricEQ'):
                   model = model[:-12]
-              source = parts[0] if len(parts) > 0 else ''
-              target = parts[1] if len(parts) > 1 else ''
               entries.append({
                   'id': hashlib.sha1(rel.encode('utf-8')).hexdigest()[:12],
                   'name': model,
-                  'source': source,
-                  'target': target,
+                  'source': parts[0] if len(parts) > 0 else '',
+                  'target': parts[1] if len(parts) > 1 else '',
                   'path': rel,
                   'preampDb': preamp,
                   'filterCount': filter_count,
@@ -87,7 +92,7 @@ jobs:
           index = {
               'schema': 1,
               'source': 'jaakkopasanen/AutoEq',
-              'sourceCommit': __import__('subprocess').check_output(['git','-C',str(src),'rev-parse','HEAD'], text=True).strip(),
+              'sourceCommit': subprocess.check_output(['git','-C',str(src),'rev-parse','HEAD'], text=True).strip(),
               'generatedBy': 'Zeus-V2 AutoEQ importer',
               'modelCount': len(entries),
               'entries': entries,
@@ -96,9 +101,7 @@ jobs:
 
           copied = 0
           for p in sorted(targets.rglob('*')):
-              if not p.is_file() or p.name.startswith('.'):
-                  continue
-              if p.suffix.lower() != '.csv':
+              if not p.is_file() or p.name.startswith('.') or p.suffix.lower() != '.csv':
                   continue
               rel = p.relative_to(targets)
               dest = out_targets / rel
@@ -106,17 +109,14 @@ jobs:
               shutil.copy2(p, dest)
               copied += 1
 
-          source_note = out_index.parent / 'SOURCE.txt'
-          source_note.write_text(
+          (out_index.parent / 'SOURCE.txt').write_text(
               'AutoEQ catalog and target curves imported from https://github.com/jaakkopasanen/AutoEq\n'
-              'AutoEq is licensed under the MIT License. Target/measurement data may carry their own provenance; filenames and source paths are preserved.\n',
+              'AutoEQ is MIT licensed. Target/measurement data may have their own provenance; source paths are preserved.\n',
               encoding='utf-8')
 
           print(f'ParametricEQ.txt scanned: {len(files)}')
           print(f'Index entries: {len(entries)}')
           print(f'Target CSV files copied: {copied}')
-          if len(entries) < 8000:
-              raise SystemExit(f'Expected 8000+ AutoEQ models, found {len(entries)}')
           PY
 
       - name: Commit imported AutoEQ data
