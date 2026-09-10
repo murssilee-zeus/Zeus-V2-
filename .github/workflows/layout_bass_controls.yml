@@ -1,0 +1,57 @@
+name: Integrate Bass Controls Below SubSismo
+on:
+  push:
+    branches: [fix/punch-v2]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Move portrait bass controls below SubSismo
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt')
+          s = p.read_text()
+          old = '''  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){
+   Column(Modifier.weight(1f)){ Card("SUB / SISMO (18 — 90 Hz)"){
+    Text("Realce independiente de PUNCH",color=ZM,fontSize=9.sp)
+    S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
+   } }
+   Column(Modifier.weight(1.15f)){ Card("PUNCH (35 — 65 Hz)"){
+    Row(verticalAlignment=Alignment.CenterVertically){
+     Text("PUNCH",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+     Text("●",color=ZG,fontSize=11.sp)
+    }
+    S("Hz",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)}
+    S("Q",punch.q,.5f..3f){punch.updatePunchQ(it)}
+    S("AMOUNT",punch.amount,0f..100f," %"){punch.updatePunchAmount(it)}
+   } }
+   Column(Modifier.weight(.9f)){ Card("HEADROOM"){
+    S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
+    Text("Protección de salida",color=ZM,fontSize=8.sp)
+   } }
+  }'''
+          new = '''  SubSismoCard(vm)
+  PunchCard(punch,vm)
+  Card("HEADROOM"){
+   S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
+   Text("Protección de salida",color=ZM,fontSize=8.sp)
+  }'''
+          if old not in s:
+              raise SystemExit('Expected portrait layout block not found; refusing unsafe edit')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit layout change and remove workflow
+        run: |
+          git config user.name "zeus-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
+          git diff --cached --quiet || git commit -m "Place bass controls below SubSismo on portrait page"
+          git rm .github/workflows/layout_bass_controls.yml
+          git commit -m "Remove temporary layout workflow"
+          git push
