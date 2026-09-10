@@ -22,101 +22,134 @@ jobs:
       - name: Clone official AutoEq into /tmp/AutoEq
         run: |
           rm -rf /tmp/AutoEq
-          git clone --depth 1 --filter=blob:none --sparse https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
-          cd /tmp/AutoEq
-          git sparse-checkout set results targets
-          git lfs install --local || true
-          git lfs pull || true
-          echo "AutoEq commit: $(git rev-parse HEAD)"
-          echo "ParametricEQ paths in git tree: $(git ls-tree -r --name-only HEAD results | grep -E '/ParametricEQ\.txt$' | wc -l)"
-          echo "ParametricEQ files on disk: $(find results -type f -name 'ParametricEQ.txt' | wc -l)"
+          git clone --depth 1 https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
+          echo "AutoEq commit: $(git -C /tmp/AutoEq rev-parse HEAD)"
 
-      - name: Scan ParametricEQ files and import target curves
+      - name: Scan all ParametricEQ profiles and import target curves
+        env:
+          AUTOEQ_COMMIT: 7ae0f56d53074872b028649617a22bbb4232feb7
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          from urllib.parse import unquote
+          from urllib.request import Request, urlopen
+          from concurrent.futures import ThreadPoolExecutor, as_completed
           import hashlib
           import json
           import re
           import shutil
-          import subprocess
+          import time
+          import os
 
-          src = Path('/tmp/AutoEq')
-          results = src / 'results'
-          targets = src / 'targets'
+          BASE = 'https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results/'
+          INDEX_URL = BASE + 'INDEX.md'
           out_index = Path('app/src/main/assets/autoeq/index.json')
           out_targets = Path('app/src/main/assets/targets')
           out_index.parent.mkdir(parents=True, exist_ok=True)
           out_targets.mkdir(parents=True, exist_ok=True)
 
+          def get(url, attempts=4):
+              last = None
+              for n in range(attempts):
+                  try:
+                      req = Request(url, headers={'User-Agent':'Zeus-V2-AutoEQ-Importer/1.0'})
+                      with urlopen(req, timeout=30) as r:
+                          return r.read().decode('utf-8', 'replace')
+                  except Exception as e:
+                      last = e
+                      time.sleep(0.5 * (n + 1))
+              raise last
+
+          catalog = get(INDEX_URL)
+          links = re.findall(r'^- \[([^\]]+)\]\(\./([^\)]+)\)', catalog, re.M)
+          if len(links) < 8000:
+              raise SystemExit(f'AutoEQ catalog contains only {len(links)} profiles; expected 8000+')
+
           preamp_re = re.compile(r'^Preamp:\s*([-+]?\d+(?:\.\d+)?)\s*dB\s*$', re.I)
           filter_re = re.compile(r'^Filter\s+\d+:\s+ON\s+(\S+)\s+Fc\s+([-+]?\d+(?:\.\d+)?)\s+Hz\s+Gain\s+([-+]?\d+(?:\.\d+)?)\s+dB\s+Q\s+([-+]?\d+(?:\.\d+)?)', re.I)
 
-          files = sorted(results.rglob('ParametricEQ.txt'))
-          if len(files) < 8000:
-              raise SystemExit(f'Expected 8000+ ParametricEQ.txt files, found {len(files)}')
-
-          entries = []
-          for p in files:
-              rel = p.relative_to(results).as_posix()
-              parts = p.relative_to(results).parts
-              text = p.read_text(encoding='utf-8', errors='replace')
+          def scan(item):
+              display_name, rel = item
+              model_segment = rel.rsplit('/', 1)[-1]
+              peq_url = BASE + rel + '/' + model_segment + '%20ParametricEQ.txt'
+              text = get(peq_url)
               preamp = None
-              filter_count = 0
-              filter_types = set()
-              for line in text.splitlines():
-                  line = line.strip()
+              count = 0
+              types = set()
+              for raw in text.splitlines():
+                  line = raw.strip()
                   m = preamp_re.match(line)
                   if m:
                       preamp = float(m.group(1))
                       continue
                   m = filter_re.match(line)
                   if m:
-                      filter_count += 1
-                      filter_types.add(m.group(1).upper())
-
-              model = p.parent.name
-              if model.endswith(' ParametricEQ'):
-                  model = model[:-12]
-              entries.append({
-                  'id': hashlib.sha1(rel.encode('utf-8')).hexdigest()[:12],
-                  'name': model,
-                  'source': parts[0] if len(parts) > 0 else '',
-                  'target': parts[1] if len(parts) > 1 else '',
-                  'path': rel,
+                      count += 1
+                      types.add(m.group(1).upper())
+              parts = rel.split('/')
+              return {
+                  'id': hashlib.sha1(rel.encode()).hexdigest()[:12],
+                  'name': display_name,
+                  'source': unquote(parts[0]) if parts else '',
+                  'target': unquote(parts[1]) if len(parts) > 1 else '',
+                  'path': unquote(rel),
                   'preampDb': preamp,
-                  'filterCount': filter_count,
-                  'filterTypes': sorted(filter_types),
-              })
+                  'filterCount': count,
+                  'filterTypes': sorted(types),
+              }
 
+          entries = []
+          failures = []
+          with ThreadPoolExecutor(max_workers=24) as pool:
+              futures = {pool.submit(scan, item): item for item in links}
+              for i, future in enumerate(as_completed(futures), 1):
+                  item = futures[future]
+                  try:
+                      entries.append(future.result())
+                  except Exception as e:
+                      failures.append({'name': item[0], 'path': item[1], 'error': str(e)})
+                  if i % 500 == 0:
+                      print(f'Scanned {i}/{len(futures)} profiles; failures={len(failures)}')
+
+          if len(entries) < 8000:
+              raise SystemExit(f'Only {len(entries)} ParametricEQ profiles scanned successfully; failures={len(failures)}')
+
+          entries.sort(key=lambda x: (x['name'].lower(), x['source'].lower(), x['target'].lower()))
           index = {
               'schema': 1,
               'source': 'jaakkopasanen/AutoEq',
-              'sourceCommit': subprocess.check_output(['git','-C',str(src),'rev-parse','HEAD'], text=True).strip(),
+              'sourceCommit': os.environ['AUTOEQ_COMMIT'],
               'generatedBy': 'Zeus-V2 AutoEQ importer',
               'modelCount': len(entries),
               'entries': entries,
           }
           out_index.write_text(json.dumps(index, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
 
+          # Target curves are copied from the cloned official repo.
+          targets = Path('/tmp/AutoEq/targets')
           copied = 0
-          for p in sorted(targets.rglob('*')):
-              if not p.is_file() or p.name.startswith('.') or p.suffix.lower() != '.csv':
-                  continue
-              rel = p.relative_to(targets)
-              dest = out_targets / rel
-              dest.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(p, dest)
-              copied += 1
+          if targets.exists():
+              for p in sorted(targets.rglob('*')):
+                  if not p.is_file() or p.name.startswith('.') or p.suffix.lower() != '.csv':
+                      continue
+                  rel = p.relative_to(targets)
+                  dest = out_targets / rel
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(p, dest)
+                  copied += 1
 
           (out_index.parent / 'SOURCE.txt').write_text(
               'AutoEQ catalog and target curves imported from https://github.com/jaakkopasanen/AutoEq\n'
+              f'AutoEQ source commit: {os.environ["AUTOEQ_COMMIT"]}\n'
               'AutoEQ is MIT licensed. Target/measurement data may have their own provenance; source paths are preserved.\n',
               encoding='utf-8')
 
-          print(f'ParametricEQ.txt scanned: {len(files)}')
-          print(f'Index entries: {len(entries)}')
+          print(f'Catalog profiles: {len(links)}')
+          print(f'ParametricEQ.txt scanned: {len(entries)}')
+          print(f'Failed ParametricEQ fetches: {len(failures)}')
           print(f'Target CSV files copied: {copied}')
+          if failures:
+              Path('/tmp/autoeq_failures.json').write_text(json.dumps(failures, ensure_ascii=False), encoding='utf-8')
           PY
 
       - name: Commit imported AutoEQ data
