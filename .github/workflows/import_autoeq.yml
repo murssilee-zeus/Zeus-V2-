@@ -1,0 +1,129 @@
+name: Import AutoEQ catalog
+
+on:
+  push:
+    branches: [fix/punch-v2]
+    paths:
+      - '.github/workflows/import_autoeq.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Zeus
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone official AutoEq into /tmp/AutoEq
+        run: |
+          rm -rf /tmp/AutoEq
+          git clone --depth 1 https://github.com/jaakkopasanen/AutoEq.git /tmp/AutoEq
+          echo "AutoEq commit: $(git -C /tmp/AutoEq rev-parse HEAD)"
+
+      - name: Scan ParametricEQ files and import target curves
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import csv
+          import hashlib
+          import json
+          import re
+          import shutil
+
+          src = Path('/tmp/AutoEq')
+          results = src / 'results'
+          targets = src / 'targets'
+          out_index = Path('app/src/main/assets/autoeq/index.json')
+          out_targets = Path('app/src/main/assets/targets')
+          out_index.parent.mkdir(parents=True, exist_ok=True)
+          out_targets.mkdir(parents=True, exist_ok=True)
+
+          preamp_re = re.compile(r'^Preamp:\s*([-+]?\d+(?:\.\d+)?)\s*dB\s*$', re.I)
+          filter_re = re.compile(r'^Filter\s+\d+:\s+ON\s+(\S+)\s+Fc\s+([-+]?\d+(?:\.\d+)?)\s+Hz\s+Gain\s+([-+]?\d+(?:\.\d+)?)\s+dB\s+Q\s+([-+]?\d+(?:\.\d+)?)', re.I)
+
+          entries = []
+          files = sorted(results.rglob('ParametricEQ.txt'))
+          for p in files:
+              rel = p.relative_to(results).as_posix()
+              parts = p.relative_to(results).parts
+              preamp = None
+              filter_count = 0
+              filter_types = set()
+              try:
+                  text = p.read_text(encoding='utf-8', errors='replace')
+              except OSError:
+                  continue
+              for line in text.splitlines():
+                  m = preamp_re.match(line.strip())
+                  if m:
+                      preamp = float(m.group(1))
+                      continue
+                  m = filter_re.match(line.strip())
+                  if m:
+                      filter_count += 1
+                      filter_types.add(m.group(1).upper())
+
+              model = p.parent.name
+              if model.endswith(' ParametricEQ'):
+                  model = model[:-12]
+              source = parts[0] if len(parts) > 0 else ''
+              target = parts[1] if len(parts) > 1 else ''
+              entries.append({
+                  'id': hashlib.sha1(rel.encode('utf-8')).hexdigest()[:12],
+                  'name': model,
+                  'source': source,
+                  'target': target,
+                  'path': rel,
+                  'preampDb': preamp,
+                  'filterCount': filter_count,
+                  'filterTypes': sorted(filter_types),
+              })
+
+          index = {
+              'schema': 1,
+              'source': 'jaakkopasanen/AutoEq',
+              'sourceCommit': __import__('subprocess').check_output(['git','-C',str(src),'rev-parse','HEAD'], text=True).strip(),
+              'generatedBy': 'Zeus-V2 AutoEQ importer',
+              'modelCount': len(entries),
+              'entries': entries,
+          }
+          out_index.write_text(json.dumps(index, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+
+          copied = 0
+          for p in sorted(targets.rglob('*')):
+              if not p.is_file() or p.name.startswith('.'):
+                  continue
+              if p.suffix.lower() != '.csv':
+                  continue
+              rel = p.relative_to(targets)
+              dest = out_targets / rel
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(p, dest)
+              copied += 1
+
+          source_note = out_index.parent / 'SOURCE.txt'
+          source_note.write_text(
+              'AutoEQ catalog and target curves imported from https://github.com/jaakkopasanen/AutoEq\n'
+              'AutoEq is licensed under the MIT License. Target/measurement data may carry their own provenance; filenames and source paths are preserved.\n',
+              encoding='utf-8')
+
+          print(f'ParametricEQ.txt scanned: {len(files)}')
+          print(f'Index entries: {len(entries)}')
+          print(f'Target CSV files copied: {copied}')
+          if len(entries) < 8000:
+              raise SystemExit(f'Expected 8000+ AutoEQ models, found {len(entries)}')
+          PY
+
+      - name: Commit imported AutoEQ data
+        run: |
+          git config user.name 'zeus-autoeq-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/assets/autoeq app/src/main/assets/targets
+          git diff --cached --quiet && echo 'No AutoEQ changes' && exit 0
+          git commit -m 'Import AutoEQ catalog and target curves [skip ci]'
+          git push origin HEAD:fix/punch-v2
