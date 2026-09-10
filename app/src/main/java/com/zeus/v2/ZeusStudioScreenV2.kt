@@ -264,7 +264,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
       Column(Modifier.weight(1f)){Text(model.name,color=ZT,fontSize=10.sp,fontWeight=FontWeight.SemiBold);Text(listOf(model.source,model.type).filter{it.isNotBlank()}.joinToString(" · ").ifBlank{"Perfil paramétrico AutoEQ"},color=ZM,fontSize=8.sp)}
       Text("APLICAR",color=Color.White,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(5.dp)).clickable{
        selected=model
-       scope.launch{status=runCatching{AutoEqRepository.load(ctx,model).also{vm.applyAutoEqProfile(it)}}.fold({"Perfil aplicado: \${model.name}"},{"Error: \${it.message}"})}
+       scope.launch{status=runCatching{AutoEqRepository.load(ctx,model).also{vm.applyAutoEqProfile(it)}}.fold({"Perfil aplicado: \${model.name}"},{"Error: ${it.message ?: "Error desconocido"}"})}
       }.padding(horizontal=8.dp,vertical=6.dp))
      }
     }
@@ -277,7 +277,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    else{
     Text(m.name,color=ZT,fontSize=13.sp,fontWeight=FontWeight.Bold)
     Text(listOf(m.source,m.type).filter{it.isNotBlank()}.joinToString(" · "),color=ZM,fontSize=9.sp)
-    Text("APLICAR PERFIL",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{scope.launch{status=runCatching{AutoEqRepository.load(ctx,m).also{vm.applyAutoEqProfile(it)}}.fold({"Perfil aplicado"},{"Error: \${it.message}"})}}.padding(9.dp))
+    Text("APLICAR PERFIL",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{scope.launch{status=runCatching{AutoEqRepository.load(ctx,m).also{vm.applyAutoEqProfile(it)}}.fold({"Perfil aplicado"},{"Error: ${it.message ?: "Error desconocido"}"})}}.padding(9.dp))
    }
    if(status.isNotBlank()) Text(status,color=ZG,fontSize=9.sp)
   }
