@@ -14,21 +14,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
@@ -52,128 +43,73 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { p ->
-        if (!p.values.all { it }) {
-            Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento real", Toast.LENGTH_LONG).show()
-        }
+        if (!p.values.all { it }) Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento real", Toast.LENGTH_LONG).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            requestNeededPermissions()
-            setContent { ComposeRoot() }
-        } catch (e: Throwable) {
-            android.util.Log.e("ZeusMain", "onCreate fatal: ${android.util.Log.getStackTraceString(e)}")
-            Toast.makeText(this, "Error: ${e.javaClass.simpleName}", Toast.LENGTH_LONG).show()
-        }
+        try { requestNeededPermissions(); setContent { ComposeRoot() } }
+        catch (e: Throwable) { android.util.Log.e("ZeusMain", "onCreate fatal: ${android.util.Log.getStackTraceString(e)}"); Toast.makeText(this, "Error: ${e.javaClass.simpleName}", Toast.LENGTH_LONG).show() }
     }
 
     @Composable
     private fun ComposeRoot() {
         val vm: EqViewModel = viewModel(factory = EqViewModel.Factory)
         val punch: PunchViewModel = viewModel()
-        var showBassControls by remember { mutableStateOf(false) }
         val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
             if (uri != null) runCatching {
                 contentResolver.openOutputStream(uri)?.use { it.write(vm.toSettings().toJson().toByteArray(Charsets.UTF_8)) }
                 Toast.makeText(this@MainActivity, "Configuración exportada", Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(this@MainActivity, "No se pudo exportar: " + it.message, Toast.LENGTH_LONG).show()
-            }
+            }.onFailure { Toast.makeText(this@MainActivity, "No se pudo exportar: " + it.message, Toast.LENGTH_LONG).show() }
         }
 
         LaunchedEffect(Unit) { vm.loadSavedIfAny(); punch.loadSaved() }
         LaunchedEffect(Unit) {
             while (true) {
-                audioService?.audioEngine?.let { e ->
-                    vm.spectrum = e.spectrumData.copyOf()
-                    vm.isEngineRunning = e.isEnabled
-                }
+                audioService?.audioEngine?.let { e -> vm.spectrum = e.spectrumData.copyOf(); vm.isEngineRunning = e.isEnabled }
                 delay(50)
             }
         }
         LaunchedEffect(audioService) {
             audioService?.audioEngine?.let { e ->
                 e.settings = vm.toSettings()
+                e.setSubFrequency(vm.subFrequencyHz)
                 e.setPunch(punch.amount)
-                e.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics)
+                e.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics, punch.bassFrequencyHz)
                 e.applyAll()
             }
         }
-        LaunchedEffect(vm.bands.toList(), vm.subBoost, punch.amount, punch.bassAmount, punch.bassMono, punch.bassHarmonics) {
+        LaunchedEffect(vm.bands.toList(), vm.subBoost, vm.subFrequencyHz, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics) {
             audioService?.audioEngine?.setBands(vm.bands.toList())
             audioService?.audioEngine?.setSubBoost(vm.subBoost)
+            audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz)
             audioService?.audioEngine?.setPunch(punch.amount)
-            audioService?.audioEngine?.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics)
+            audioService?.audioEngine?.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics, punch.bassFrequencyHz)
         }
-        LaunchedEffect(vm.preamp, vm.headroomTrim) {
-            audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim)
-        }
-        LaunchedEffect(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) {
-            audioService?.audioEngine?.setPipelineTags(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled)
-        }
-        LaunchedEffect(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) {
-            audioService?.audioEngine?.setLimiter(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain)
-        }
-        LaunchedEffect(
-            vm.compressorMultibandEnabled, vm.crossoverFrequencies.toList(),
-            vm.compMbThLow, vm.compMbThLoMid, vm.compMbThHiMid, vm.compMbThHigh,
-            vm.compMbRatioLow, vm.compMbRatioLoMid, vm.compMbRatioHiMid, vm.compMbRatioHigh,
-            vm.compMbKneeLow, vm.compMbKneeLoMid, vm.compMbKneeHiMid, vm.compMbKneeHigh,
-            vm.compMbAttackLow, vm.compMbAttackLoMid, vm.compMbAttackHiMid, vm.compMbAttackHigh,
-            vm.compMbReleaseLow, vm.compMbReleaseLoMid, vm.compMbReleaseHiMid, vm.compMbReleaseHigh,
-            vm.compMbPostGainLow, vm.compMbPostGainLoMid, vm.compMbPostGainHiMid, vm.compMbPostGainHigh
-        ) {
+        LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }
+        LaunchedEffect(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) { audioService?.audioEngine?.setPipelineTags(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) }
+        LaunchedEffect(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) { audioService?.audioEngine?.setLimiter(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) }
+        LaunchedEffect(vm.compressorMultibandEnabled, vm.crossoverFrequencies.toList(), vm.compMbThLow, vm.compMbThLoMid, vm.compMbThHiMid, vm.compMbThHigh, vm.compMbRatioLow, vm.compMbRatioLoMid, vm.compMbRatioHiMid, vm.compMbRatioHigh, vm.compMbKneeLow, vm.compMbKneeLoMid, vm.compMbKneeHiMid, vm.compMbKneeHigh, vm.compMbAttackLow, vm.compMbAttackLoMid, vm.compMbAttackHiMid, vm.compMbAttackHigh, vm.compMbReleaseLow, vm.compMbReleaseLoMid, vm.compMbReleaseHiMid, vm.compMbReleaseHigh, vm.compMbPostGainLow, vm.compMbPostGainLoMid, vm.compMbPostGainHiMid, vm.compMbPostGainHigh) {
             audioService?.audioEngine?.setCompressor(
-                enabled = vm.compressorMultibandEnabled,
-                cross1 = vm.crossoverFrequencies.getOrElse(0) { 180f },
-                cross2 = vm.crossoverFrequencies.getOrElse(1) { 1800f },
-                cross3 = vm.crossoverFrequencies.getOrElse(2) { 8000f },
-                thLow = vm.compMbThLow, thLoMid = vm.compMbThLoMid, thHiMid = vm.compMbThHiMid, thHigh = vm.compMbThHigh,
-                ratioLow = vm.compMbRatioLow, ratioLoMid = vm.compMbRatioLoMid, ratioHiMid = vm.compMbRatioHiMid, ratioHigh = vm.compMbRatioHigh,
-                kneeLow = vm.compMbKneeLow, kneeLoMid = vm.compMbKneeLoMid, kneeHiMid = vm.compMbKneeHiMid, kneeHigh = vm.compMbKneeHigh,
-                attackLow = vm.compMbAttackLow, attackLoMid = vm.compMbAttackLoMid, attackHiMid = vm.compMbAttackHiMid, attackHigh = vm.compMbAttackHigh,
-                releaseLow = vm.compMbReleaseLow, releaseLoMid = vm.compMbReleaseLoMid, releaseHiMid = vm.compMbReleaseHiMid, releaseHigh = vm.compMbReleaseHigh,
-                postGainLow = vm.compMbPostGainLow, postGainLoMid = vm.compMbPostGainLoMid, postGainHiMid = vm.compMbPostGainHiMid, postGainHigh = vm.compMbPostGainHigh
+                enabled=vm.compressorMultibandEnabled,
+                cross1=vm.crossoverFrequencies.getOrElse(0){180f}, cross2=vm.crossoverFrequencies.getOrElse(1){1800f}, cross3=vm.crossoverFrequencies.getOrElse(2){8000f},
+                thLow=vm.compMbThLow, thLoMid=vm.compMbThLoMid, thHiMid=vm.compMbThHiMid, thHigh=vm.compMbThHigh,
+                ratioLow=vm.compMbRatioLow, ratioLoMid=vm.compMbRatioLoMid, ratioHiMid=vm.compMbRatioHiMid, ratioHigh=vm.compMbRatioHigh,
+                kneeLow=vm.compMbKneeLow, kneeLoMid=vm.compMbKneeLoMid, kneeHiMid=vm.compMbKneeHiMid, kneeHigh=vm.compMbKneeHigh,
+                attackLow=vm.compMbAttackLow, attackLoMid=vm.compMbAttackLoMid, attackHiMid=vm.compMbAttackHiMid, attackHigh=vm.compMbAttackHigh,
+                releaseLow=vm.compMbReleaseLow, releaseLoMid=vm.compMbReleaseLoMid, releaseHiMid=vm.compMbReleaseHiMid, releaseHigh=vm.compMbReleaseHigh,
+                postGainLow=vm.compMbPostGainLow, postGainLoMid=vm.compMbPostGainLoMid, postGainHiMid=vm.compMbPostGainHiMid, postGainHigh=vm.compMbPostGainHigh
             )
         }
 
-        MaterialTheme(colorScheme = darkColorScheme(
-            primary = Color(0xFFFF6B9E), secondary = Color(0xFF9B59B6),
-            background = Color(0xFF0D0D12), surface = Color(0xFF0D0D12),
-            onPrimary = Color.White, onBackground = Color(0xFFECECEE), onSurface = Color(0xFFECECEE)
-        )) {
-            Surface(Modifier.fillMaxSize(), color = Color(0xFF0D0D12)) {
-                Box(Modifier.fillMaxSize()) {
-                    ZeusStudioScreenV2(
-                        vm, punch,
-                        { toggleEngine(vm) },
-                        {
-                            vm.saveSettings(); punch.save()
-                            Toast.makeText(this@MainActivity, "Configuración guardada", Toast.LENGTH_SHORT).show()
-                        },
-                        { exportLauncher.launch(ConfigFileRepository.fileNameForExport()) }
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 8.dp, bottom = 42.dp)
-                            .widthIn(max = 330.dp)
-                    ) {
-                        Text(
-                            text = if (showBassControls) "× CERRAR BASS" else "BASS / PUNCH",
-                            color = Color.White,
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .clickable { showBassControls = !showBassControls }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                        if (showBassControls) {
-                            PunchControlPanel(punch)
-                        }
-                    }
-                }
+        MaterialTheme(colorScheme=darkColorScheme(primary=Color(0xFFFF6B9E),secondary=Color(0xFF9B59B6),background=Color(0xFF0D0D12),surface=Color(0xFF0D0D12),onPrimary=Color.White,onBackground=Color(0xFFECECEE),onSurface=Color(0xFFECECEE))) {
+            Surface(Modifier, color=Color(0xFF0D0D12)) {
+                ZeusStudioScreenV2(
+                    vm, punch,
+                    { toggleEngine(vm) },
+                    { vm.saveSettings(); punch.save(); Toast.makeText(this@MainActivity,"Configuración guardada",Toast.LENGTH_SHORT).show() },
+                    { exportLauncher.launch(ConfigFileRepository.fileNameForExport()) }
+                )
             }
         }
     }
@@ -182,40 +118,15 @@ class MainActivity : ComponentActivity() {
         if (vm.isEngineRunning) {
             try { audioService?.audioEngine?.setEnabled(false) } catch (_: Exception) {}
             try { stopService(Intent(this, AudioEngineService::class.java)) } catch (_: Exception) {}
-            if (bound) {
-                try { unbindService(connection) } catch (_: Exception) {}
-                bound = false
-            }
-            audioService = null
-            vm.isEngineRunning = false
+            if (bound) { try { unbindService(connection) } catch (_: Exception) {}; bound=false }
+            audioService=null; vm.isEngineRunning=false
         } else {
-            val intent = Intent(this, AudioEngineService::class.java)
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-                bindService(intent, connection, Context.BIND_AUTO_CREATE)
-                vm.isEngineRunning = true
-                Toast.makeText(this, "Zeus EQ Pro18 activado", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                vm.isEngineRunning = false
-                Toast.makeText(this, "No se pudo iniciar el motor: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            val intent=Intent(this,AudioEngineService::class.java)
+            try { if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent); bindService(intent,connection,Context.BIND_AUTO_CREATE); vm.isEngineRunning=true; Toast.makeText(this,"Zeus EQ Pro18 activado",Toast.LENGTH_SHORT).show() }
+            catch(e:Exception){vm.isEngineRunning=false;Toast.makeText(this,"No se pudo iniciar el motor: ${e.message}",Toast.LENGTH_LONG).show()}
         }
     }
-
-    private fun requestNeededPermissions() {
-        val permissions = mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        val toRequest = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (toRequest.isNotEmpty()) requestPermissionLauncher.launch(toRequest.toTypedArray())
-    }
-
-    override fun onStart() { super.onStart() }
-
-    override fun onStop() {
-        super.onStop()
-        if (bound) {
-            try { unbindService(connection) } catch (_: Exception) {}
-            bound = false
-        }
-    }
+    private fun requestNeededPermissions(){val permissions=mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU)permissions.add(Manifest.permission.POST_NOTIFICATIONS);val toRequest=permissions.filter{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED};if(toRequest.isNotEmpty())requestPermissionLauncher.launch(toRequest.toTypedArray())}
+    override fun onStart(){super.onStart()}
+    override fun onStop(){super.onStop();if(bound){try{unbindService(connection)}catch(_:Exception){};bound=false}}
 }
