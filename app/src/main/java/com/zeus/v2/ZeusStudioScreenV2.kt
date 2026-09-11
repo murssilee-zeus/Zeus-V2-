@@ -70,6 +70,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text("Configuraciones: JSON compatible para exportación",fontSize=10.sp,color=ZM)
     Text("EXPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onExport()}.padding(8.dp))
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
+    Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
    }},confirmButton={TextButton(onClick={showSettings=false}){Text("Cerrar")}})
   }
  }
