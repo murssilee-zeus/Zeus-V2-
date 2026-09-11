@@ -1,5 +1,7 @@
 name: Implement Hi-Res mode
 on:
+  push:
+    branches: [fix/punch-v2]
   workflow_dispatch:
 permissions:
   contents: write
@@ -15,51 +17,42 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
-          # EqViewModel: runtime state
           p=Path('app/src/main/java/com/zeus/v2/EqViewModel.kt'); s=p.read_text()
           needle='    var audioSessionEnabled by mutableStateOf(false)\n'
           if 'var hiResEnabled by mutableStateOf(false)' not in s:
-              s=s.replace(needle, needle+'    /** Hi-Res acoustic mode: preserves dynamics and adds gentle mid/high harmonic voicing. */\n    var hiResEnabled by mutableStateOf(false)\n',1)
+              s=s.replace(needle, needle+'    /** Hi-Res acoustic mode. */\n    var hiResEnabled by mutableStateOf(false)\n',1)
           p.write_text(s)
 
-          # AudioEngine: Hi-Res control and voicing
           p=Path('app/src/main/java/com/zeus/v2/AudioEngine.kt'); s=p.read_text()
           needle='    @Volatile var isEnabled=false; private set\n'
-          insert='''    @Volatile var isEnabled=false; private set\n    @Volatile var hiResEnabled=false\n'''
           if 'var hiResEnabled=false' not in s:
-              s=s.replace(needle,insert,1)
+              s=s.replace(needle, needle+'    @Volatile var hiResEnabled=false\n',1)
           needle='    fun setPreGain(v:Float){settings.preGain=v;applyInputGain()}\n'
-          insert='''    fun setHiResEnabled(enabled:Boolean){\n        hiResEnabled=enabled\n        applyInputGain()\n        applyMbc()\n        applyPostEq()\n        applyLimiter()\n        Log.i(TAG,"Hi-Res mode ${if(enabled) "ON" else "OFF"}")\n    }\n    fun setPreGain(v:Float){settings.preGain=v;applyInputGain()}\n'''
           if 'fun setHiResEnabled' not in s:
-              s=s.replace(needle,insert,1)
+              s=s.replace(needle, '''    fun setHiResEnabled(enabled:Boolean){\n        hiResEnabled=enabled\n        applyInputGain(); applyMbc(); applyPostEq(); applyLimiter()\n        Log.i(TAG,"Hi-Res mode ${if(enabled) "ON" else "OFF"}")\n    }\n    fun setPreGain(v:Float){settings.preGain=v;applyInputGain()}\n''',1)
           s=s.replace('val active=s.compEnabled&&pipelineEnabled;', 'val active=s.compEnabled&&pipelineEnabled&&!hiResEnabled;',1)
-          # Hi-Res uses the existing post-EQ safely: no bass synthesis, subtle mid/air voicing.
           old='''    private fun applyPostEq(){val dp=dynamicsProcessing?:return;try{val amount=settings.bassAmount.coerceIn(0f,100f)/100f;'''
-          new='''    private fun applyPostEq(){val dp=dynamicsProcessing?:return;try{if(hiResEnabled){\n                // DynamicsProcessing has no nonlinear waveshaper, so true harmonic synthesis is not possible here.\n                // Use very gentle harmonic-region voicing instead, preserving the original signal and transients.\n                dp.setPostEqBandAllChannelsTo(0,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(1,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(2,DynamicsProcessing.EqBand(true,2800f,0.65f))\n                dp.setPostEqBandAllChannelsTo(3,DynamicsProcessing.EqBand(true,11500f,0.75f))\n                return\n            };val amount=settings.bassAmount.coerceIn(0f,100f)/100f;'''
+          new='''    private fun applyPostEq(){val dp=dynamicsProcessing?:return;try{if(hiResEnabled){\n                // DynamicsProcessing cannot synthesize new harmonics; use restrained mid/air voicing while preserving dynamics.\n                dp.setPostEqBandAllChannelsTo(0,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(1,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(2,DynamicsProcessing.EqBand(true,2800f,0.65f))\n                dp.setPostEqBandAllChannelsTo(3,DynamicsProcessing.EqBand(true,11500f,0.75f))\n                return\n            };val amount=settings.bassAmount.coerceIn(0f,100f)/100f;'''
           if old in s: s=s.replace(old,new,1)
-          # Hi-Res limiter becomes transparent protection rather than loudness processing.
           old='''val s=settings;dp.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true,s.limiterEnabled,0,s.limiterAttack.coerceIn(.01f,100f),s.limiterRelease.coerceIn(20f,1000f),s.limiterRatio.coerceIn(1f,50f),s.limiterThreshold.coerceIn(-30f,0f),s.limiterPostGain.coerceIn(-12f,12f)))'''
           new='''val s=settings;val threshold=if(hiResEnabled)-0.3f else s.limiterThreshold.coerceIn(-30f,0f);val ratio=if(hiResEnabled)20f else s.limiterRatio.coerceIn(1f,50f);dp.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true,s.limiterEnabled,0,s.limiterAttack.coerceIn(.01f,100f),s.limiterRelease.coerceIn(20f,1000f),ratio,threshold,if(hiResEnabled)0f else s.limiterPostGain.coerceIn(-12f,12f)))'''
           if old in s: s=s.replace(old,new,1)
           p.write_text(s)
 
-          # MainActivity: push UI state into live audio engine
           p=Path('app/src/main/java/com/zeus/v2/MainActivity.kt'); s=p.read_text()
-          needle='''        LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }\n'''
-          insert='''        LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }\n        LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }\n'''
-          if 'LaunchedEffect(vm.hiResEnabled)' not in s: s=s.replace(needle,insert,1)
+          needle='        LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }\n'
+          if 'LaunchedEffect(vm.hiResEnabled)' not in s:
+              s=s.replace(needle, needle+'        LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }\n',1)
           p.write_text(s)
 
-          # UI: visible HI-RES switch in the top bar
           p=Path('app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt'); s=p.read_text()
-          needle='''   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})\n'''
-          insert='''   Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){\n    Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)\n    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))\n   }\n   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})\n'''
-          if 'Text("HI-RES"' not in s: s=s.replace(needle,insert,1)
+          needle='   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})\n'
+          if 'Text("HI-RES"' not in s:
+              s=s.replace(needle, '''   Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){\n    Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)\n    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))\n   }\n   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})\n''',1)
           p.write_text(s)
           PY
-
           git config user.name 'zeus-autoeq-bot'
           git config user.email 'actions@users.noreply.github.com'
           git add app/src/main/java/com/zeus/v2/EqViewModel.kt app/src/main/java/com/zeus/v2/AudioEngine.kt app/src/main/java/com/zeus/v2/MainActivity.kt app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
-          git diff --cached --quiet && echo 'No changes' || git commit -m 'Add Hi-Res acoustic mode with mid high voicing' && git push origin HEAD:fix/punch-v2
+          git diff --cached --quiet || git commit -m 'Add Hi-Res acoustic mode'
+          git push origin HEAD:fix/punch-v2
