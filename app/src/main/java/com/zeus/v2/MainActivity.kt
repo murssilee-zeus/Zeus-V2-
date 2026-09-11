@@ -34,15 +34,10 @@ class MainActivity : ComponentActivity() {
             audioService = binder.getService()
             bound = true
         }
-        override fun onServiceDisconnected(name: ComponentName?) {
-            audioService = null
-            bound = false
-        }
+        override fun onServiceDisconnected(name: ComponentName?) { audioService = null; bound = false }
     }
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { p ->
+    private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         if (!p.values.all { it }) Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento y Spectrum en tiempo real", Toast.LENGTH_LONG).show()
     }
 
@@ -60,7 +55,17 @@ class MainActivity : ComponentActivity() {
             if (uri != null) runCatching {
                 contentResolver.openOutputStream(uri)?.use { it.write(vm.toSettings().toJson().toByteArray(Charsets.UTF_8)) }
                 Toast.makeText(this@MainActivity, "Configuración exportada", Toast.LENGTH_SHORT).show()
-            }.onFailure { Toast.makeText(this@MainActivity, "No se pudo exportar: " + it.message, Toast.LENGTH_LONG).show() }
+            }.onFailure { Toast.makeText(this@MainActivity, "No se pudo exportar: ${it.message}", Toast.LENGTH_LONG).show() }
+        }
+        val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) runCatching {
+                val json = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                    ?: error("No se pudo leer el archivo")
+                val settings = EqSettings.fromJson(json)
+                vm.loadFrom(settings)
+                vm.saveSettings()
+                Toast.makeText(this@MainActivity, "Configuración importada", Toast.LENGTH_SHORT).show()
+            }.onFailure { Toast.makeText(this@MainActivity, "No se pudo importar: ${it.message}", Toast.LENGTH_LONG).show() }
         }
 
         LaunchedEffect(Unit) { vm.loadSavedIfAny(); punch.loadSaved() }
@@ -80,52 +85,26 @@ class MainActivity : ComponentActivity() {
             }
         }
         LaunchedEffect(vm.bands.toList(), vm.subBoost, vm.subFrequencyHz, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics) {
-            audioService?.audioEngine?.setBands(vm.bands.toList())
-            audioService?.audioEngine?.setSubBoost(vm.subBoost)
-            audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz)
-            audioService?.audioEngine?.setPunch(punch.amount)
-            audioService?.audioEngine?.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics, punch.bassFrequencyHz)
+            audioService?.audioEngine?.setBands(vm.bands.toList()); audioService?.audioEngine?.setSubBoost(vm.subBoost); audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz); audioService?.audioEngine?.setPunch(punch.amount); audioService?.audioEngine?.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics, punch.bassFrequencyHz)
         }
         LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }
         LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }
         LaunchedEffect(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) { audioService?.audioEngine?.setPipelineTags(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) }
         LaunchedEffect(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) { audioService?.audioEngine?.setLimiter(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) }
         LaunchedEffect(vm.compressorMultibandEnabled, vm.crossoverFrequencies.toList(), vm.compMbThLow, vm.compMbThLoMid, vm.compMbThHiMid, vm.compMbThHigh, vm.compMbRatioLow, vm.compMbRatioLoMid, vm.compMbRatioHiMid, vm.compMbRatioHigh, vm.compMbKneeLow, vm.compMbKneeLoMid, vm.compMbKneeHiMid, vm.compMbKneeHigh, vm.compMbAttackLow, vm.compMbAttackLoMid, vm.compMbAttackHiMid, vm.compMbAttackHigh, vm.compMbReleaseLow, vm.compMbReleaseLoMid, vm.compMbReleaseHiMid, vm.compMbReleaseHigh, vm.compMbPostGainLow, vm.compMbPostGainLoMid, vm.compMbPostGainHiMid, vm.compMbPostGainHigh) {
-            audioService?.audioEngine?.setCompressor(
-                enabled=vm.compressorMultibandEnabled,
-                cross1=vm.crossoverFrequencies.getOrElse(0){180f}, cross2=vm.crossoverFrequencies.getOrElse(1){1800f}, cross3=vm.crossoverFrequencies.getOrElse(2){8000f},
-                thLow=vm.compMbThLow, thLoMid=vm.compMbThLoMid, thHiMid=vm.compMbThHiMid, thHigh=vm.compMbThHigh,
-                ratioLow=vm.compMbRatioLow, ratioLoMid=vm.compMbRatioLoMid, ratioHiMid=vm.compMbRatioHiMid, ratioHigh=vm.compMbRatioHigh,
-                kneeLow=vm.compMbKneeLow, kneeLoMid=vm.compMbKneeLoMid, kneeHiMid=vm.compMbKneeHiMid, kneeHigh=vm.compMbKneeHigh,
-                attackLow=vm.compMbAttackLow, attackLoMid=vm.compMbAttackLoMid, attackHiMid=vm.compMbAttackHiMid, attackHigh=vm.compMbAttackHigh,
-                releaseLow=vm.compMbReleaseLow, releaseLoMid=vm.compMbReleaseLoMid, releaseHiMid=vm.compMbReleaseHiMid, releaseHigh=vm.compMbReleaseHigh,
-                postGainLow=vm.compMbPostGainLow, postGainLoMid=vm.compMbPostGainLoMid, postGainHiMid=vm.compMbPostGainHiMid, postGainHigh=vm.compMbPostGainHigh
-            )
+            audioService?.audioEngine?.setCompressor(enabled=vm.compressorMultibandEnabled,cross1=vm.crossoverFrequencies.getOrElse(0){180f},cross2=vm.crossoverFrequencies.getOrElse(1){1800f},cross3=vm.crossoverFrequencies.getOrElse(2){8000f},thLow=vm.compMbThLow,thLoMid=vm.compMbThLoMid,thHiMid=vm.compMbThHiMid,thHigh=vm.compMbThHigh,ratioLow=vm.compMbRatioLow,ratioLoMid=vm.compMbRatioLoMid,ratioHiMid=vm.compMbRatioHiMid,ratioHigh=vm.compMbRatioHigh,kneeLow=vm.compMbKneeLow,kneeLoMid=vm.compMbKneeLoMid,kneeHiMid=vm.compMbKneeHiMid,kneeHigh=vm.compMbKneeHigh,attackLow=vm.compMbAttackLow,attackLoMid=vm.compMbAttackLoMid,attackHiMid=vm.compMbAttackHiMid,attackHigh=vm.compMbAttackHigh,releaseLow=vm.compMbReleaseLow,releaseLoMid=vm.compMbReleaseLoMid,releaseHiMid=vm.compMbReleaseHiMid,releaseHigh=vm.compMbReleaseHigh,postGainLow=vm.compMbPostGainLow,postGainLoMid=vm.compMbPostGainLoMid,postGainHiMid=vm.compMbPostGainHiMid,postGainHigh=vm.compMbPostGainHigh)
         }
 
         MaterialTheme(colorScheme=darkColorScheme(primary=Color(0xFFFF6B9E),secondary=Color(0xFF9B59B6),background=Color(0xFF0D0D12),surface=Color(0xFF0D0D12),onPrimary=Color.White,onBackground=Color(0xFFECECEE),onSurface=Color(0xFFECECEE))) {
-            Surface(Modifier, color=Color(0xFF0D0D12)) {
-                ZeusStudioScreenV2(
-                    vm, punch,
-                    { toggleEngine(vm) },
-                    { vm.saveSettings(); punch.save(); Toast.makeText(this@MainActivity,"Configuración guardada",Toast.LENGTH_SHORT).show() },
-                    { exportLauncher.launch(ConfigFileRepository.fileNameForExport()) }
-                )
+            Surface(Modifier,color=Color(0xFF0D0D12)) {
+                ZeusStudioScreenV2(vm,punch,{toggleEngine(vm)},{vm.saveSettings();punch.save();Toast.makeText(this@MainActivity,"Configuración guardada",Toast.LENGTH_SHORT).show()},{exportLauncher.launch(ConfigFileRepository.fileNameForExport())},{importLauncher.launch(arrayOf("application/json","text/json","text/plain"))})
             }
         }
     }
 
     private fun toggleEngine(vm: EqViewModel) {
-        if (vm.isEngineRunning) {
-            try { audioService?.audioEngine?.setEnabled(false) } catch (_: Exception) {}
-            try { stopService(Intent(this, AudioEngineService::class.java)) } catch (_: Exception) {}
-            if (bound) { try { unbindService(connection) } catch (_: Exception) {}; bound=false }
-            audioService=null; vm.isEngineRunning=false
-        } else {
-            val intent=Intent(this,AudioEngineService::class.java)
-            try { if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent); bindService(intent,connection,Context.BIND_AUTO_CREATE); vm.isEngineRunning=true; Toast.makeText(this,"Zeus EQ Pro18 activado",Toast.LENGTH_SHORT).show() }
-            catch(e:Exception){vm.isEngineRunning=false;Toast.makeText(this,"No se pudo iniciar el motor: ${e.message}",Toast.LENGTH_LONG).show()}
-        }
+        if (vm.isEngineRunning) { try { audioService?.audioEngine?.setEnabled(false) } catch (_:Exception) {}; try { stopService(Intent(this,AudioEngineService::class.java)) } catch (_:Exception) {}; if(bound){try{unbindService(connection)}catch(_:Exception){};bound=false};audioService=null;vm.isEngineRunning=false }
+        else { val intent=Intent(this,AudioEngineService::class.java);try{if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O)startForegroundService(intent)else startService(intent);bindService(intent,connection,Context.BIND_AUTO_CREATE);vm.isEngineRunning=true;Toast.makeText(this,"Zeus EQ Pro18 activado",Toast.LENGTH_SHORT).show()}catch(e:Exception){vm.isEngineRunning=false;Toast.makeText(this,"No se pudo iniciar el motor: ${e.message}",Toast.LENGTH_LONG).show()} }
     }
     private fun requestNeededPermissions(){val permissions=mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS,Manifest.permission.RECORD_AUDIO);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU)permissions.add(Manifest.permission.POST_NOTIFICATIONS);val toRequest=permissions.filter{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED};if(toRequest.isNotEmpty())requestPermissionLauncher.launch(toRequest.toTypedArray())}
     override fun onStart(){super.onStart()}
