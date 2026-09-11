@@ -53,11 +53,10 @@ class MainActivity : ComponentActivity() {
                 val json = contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: error("No se pudo leer el archivo")
                 val settings = EqSettings.fromJson(json)
                 vm.loadFrom(settings)
-                // Restaurar también los parámetros de Bass/Punch que forman parte del JSON.
-                punch.bassMono = settings.bassMono
-                punch.bassAmount = settings.bassAmount
-                punch.amount = settings.bassPunch
-                punch.bassHarmonics = settings.bassHarmonics
+                punch.updateBassMono(settings.bassMono)
+                punch.updateBassAmount(settings.bassAmount)
+                punch.updatePunchAmount(settings.bassPunch)
+                punch.updateBassHarmonics(settings.bassHarmonics)
                 vm.saveSettings()
                 punch.save()
                 audioService?.audioEngine?.let { e ->
