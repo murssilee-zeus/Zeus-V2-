@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
             audioService?.audioEngine?.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics, punch.bassFrequencyHz)
         }
         LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }
+        LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }
         LaunchedEffect(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) { audioService?.audioEngine?.setPipelineTags(vm.pipelineEnabled, vm.lowShelfEnabled, vm.peakBandsEnabled, vm.highShelfEnabled) }
         LaunchedEffect(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) { audioService?.audioEngine?.setLimiter(vm.limiterEnabled, vm.limiterThreshold, vm.limiterAttack, vm.limiterRelease, vm.limiterRatio, vm.limiterPostGain) }
         LaunchedEffect(vm.compressorMultibandEnabled, vm.crossoverFrequencies.toList(), vm.compMbThLow, vm.compMbThLoMid, vm.compMbThHiMid, vm.compMbThHigh, vm.compMbRatioLow, vm.compMbRatioLoMid, vm.compMbRatioHiMid, vm.compMbRatioHigh, vm.compMbKneeLow, vm.compMbKneeLoMid, vm.compMbKneeHiMid, vm.compMbKneeHigh, vm.compMbAttackLow, vm.compMbAttackLoMid, vm.compMbAttackHiMid, vm.compMbAttackHigh, vm.compMbReleaseLow, vm.compMbReleaseLoMid, vm.compMbReleaseHiMid, vm.compMbReleaseHigh, vm.compMbPostGainLow, vm.compMbPostGainLoMid, vm.compMbPostGainHiMid, vm.compMbPostGainHigh) {

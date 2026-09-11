@@ -35,6 +35,10 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text("ZEUS EQ PRO18",color=ZT,fontSize=17.sp,fontWeight=FontWeight.ExtraBold)
     Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
    }
+   Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
+    Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)
+    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))
+   }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
   Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){

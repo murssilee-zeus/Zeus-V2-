@@ -51,6 +51,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     var pipelineEnabled by mutableStateOf(true)
     var audioSessionEnabled by mutableStateOf(false)
+    /** Hi-Res acoustic mode. */
+    var hiResEnabled by mutableStateOf(false)
     var lowShelfEnabled by mutableStateOf(true)
     var peakBandsEnabled by mutableStateOf(true)
     var highShelfEnabled by mutableStateOf(true)
