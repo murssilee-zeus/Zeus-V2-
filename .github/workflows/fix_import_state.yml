@@ -1,0 +1,30 @@
+name: Fix imported Punch state
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+          fetch-depth: 0
+      - name: Patch private Punch state setters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/zeus/v2/MainActivity.kt')
+          s=p.read_text()
+          s=s.replace('punch.bassMono = settings.bassMono', 'punch.updateBassMono(settings.bassMono)')
+          s=s.replace('punch.bassAmount = settings.bassAmount', 'punch.updateBassAmount(settings.bassAmount)')
+          s=s.replace('punch.amount = settings.bassPunch', 'punch.updatePunchAmount(settings.bassPunch)')
+          s=s.replace('punch.bassHarmonics = settings.bassHarmonics', 'punch.updateBassHarmonics(settings.bassHarmonics)')
+          p.write_text(s)
+          PY
+          git config user.name 'zeus-autoeq-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/MainActivity.kt
+          git diff --cached --quiet || git commit -m 'Fix imported Punch state setters'
+          git push origin HEAD:fix/punch-v2
