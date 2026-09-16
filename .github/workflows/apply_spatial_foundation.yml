@@ -1,0 +1,69 @@
+name: Wire Zeus Spatial foundation
+on:
+  push:
+    branches: [fix/punch-v2]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/punch-v2
+          fetch-depth: 0
+      - name: Patch spatial integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def edit(path, fn):
+              p=Path(path); s=p.read_text(); n=fn(s)
+              if n!=s: p.write_text(n); print('changed',path)
+              else: print('unchanged',path)
+
+          def eqsettings(s):
+              if 'var spatialEnabled: Boolean' not in s:
+                  s=s.replace('    var hiResEnabled: Boolean = false\n)', '    var hiResEnabled: Boolean = false,\n    var spatialEnabled: Boolean = false,\n    var spatialWidth: Float = 35f\n)', 1)
+              if '"spatialEnabled"' not in s:
+                  s=s.replace('o.put("audioSessionEnabled", audioSessionEnabled); o.put("selectedAudioSession", selectedAudioSession); o.put("hiResEnabled", hiResEnabled)', 'o.put("audioSessionEnabled", audioSessionEnabled); o.put("selectedAudioSession", selectedAudioSession); o.put("hiResEnabled", hiResEnabled); o.put("spatialEnabled", spatialEnabled); o.put("spatialWidth", spatialWidth.toDouble())', 1)
+              if 's.spatialEnabled=o.optBoolean' not in s:
+                  s=s.replace('s.hiResEnabled=o.optBoolean("hiResEnabled",false)', 's.hiResEnabled=o.optBoolean("hiResEnabled",false);s.spatialEnabled=o.optBoolean("spatialEnabled",false);s.spatialWidth=o.optDouble("spatialWidth",35.0).toFloat().coerceIn(0f,100f)', 1)
+              return s
+
+          def vm(s):
+              if 'var spatialEnabled by mutableStateOf' not in s:
+                  s=s.replace('    var hiResEnabled by mutableStateOf(false)\n', '    var hiResEnabled by mutableStateOf(false)\n    var spatialEnabled by mutableStateOf(false)\n    var spatialWidth by mutableFloatStateOf(35f)\n', 1)
+              if 'spatialEnabled = spatialEnabled' not in s:
+                  s=re.sub(r'(        selectedAudioSession = selectedAudioSession)\n(\s*\))', r'\1,\n        spatialEnabled = spatialEnabled,\n        spatialWidth = spatialWidth\n\2', s, count=1)
+              if 'spatialEnabled = s.spatialEnabled' not in s:
+                  s=s.replace('        selectedAudioSession = s.selectedAudioSession\n    }', '        selectedAudioSession = s.selectedAudioSession\n        spatialEnabled = s.spatialEnabled\n        spatialWidth = s.spatialWidth\n    }', 1)
+              return s
+
+          def main(s):
+              if 'setSpatialEnabled(vm.spatialEnabled)' not in s:
+                  s=s.replace('LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }', 'LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }\n        LaunchedEffect(vm.spatialEnabled, vm.spatialWidth) { audioService?.audioEngine?.setSpatialEnabled(vm.spatialEnabled); audioService?.audioEngine?.setSpatialWidth(vm.spatialWidth) }', 1)
+              return s
+
+          def ui(s):
+              if 'Text("SPATIAL",color=if(vm.spatialEnabled)' not in s:
+                  s=s.replace('    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))', '    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))\n    Text("SPATIAL",color=if(vm.spatialEnabled) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=5.dp))\n    Switch(checked=vm.spatialEnabled,onCheckedChange={vm.spatialEnabled=it},modifier=Modifier.height(30.dp))', 1)
+              if 'fun SpatialCard(vm:EqViewModel)' not in s:
+                  card='''@Composable private fun SpatialCard(vm:EqViewModel){\n Card("ZEUS SPATIAL") {\n  Row(verticalAlignment=Alignment.CenterVertically){\n   Column(Modifier.weight(1f)){\n    Text("SPATIAL ENGINE",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)\n    Text(if(vm.spatialEnabled) "Stereo virtualizer activo" else "Procesamiento espacial apagado",color=ZM,fontSize=8.sp)\n   }\n   Switch(checked=vm.spatialEnabled,onCheckedChange={vm.spatialEnabled=it})\n  }\n  S("WIDTH",vm.spatialWidth,0f..100f," %"){vm.spatialWidth=it}\n  Text("Centro estable · expansión estéreo controlada",color=ZM,fontSize=8.sp)\n }\n}\n\n'''
+                  s=s.replace('@Composable private fun DynPage(vm:EqViewModel)', card+'@Composable private fun DynPage(vm:EqViewModel)', 1)
+              if 'SpatialCard(vm)' not in s:
+                  s=s.replace('   SubSismoCard(vm); PunchCard(punch,vm); Pipe(vm)', '   SubSismoCard(vm); PunchCard(punch,vm); SpatialCard(vm); Pipe(vm)', 1)
+              return s
+
+          edit('app/src/main/java/com/zeus/v2/EqSettings.kt',eqsettings)
+          edit('app/src/main/java/com/zeus/v2/EqViewModel.kt',vm)
+          edit('app/src/main/java/com/zeus/v2/MainActivity.kt',main)
+          edit('app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt',ui)
+          PY
+          git config user.name 'zeus-spatial-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2
+          rm -f .github/workflows/apply_spatial_foundation.yml
+          git add .github/workflows/apply_spatial_foundation.yml
+          if git diff --cached --quiet; then echo 'No changes'; else git commit -m 'Integrate Zeus Spatial controls'; git push origin HEAD:fix/punch-v2; fi
