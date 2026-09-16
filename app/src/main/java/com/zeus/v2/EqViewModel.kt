@@ -53,6 +53,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var audioSessionEnabled by mutableStateOf(false)
     /** Hi-Res acoustic mode. */
     var hiResEnabled by mutableStateOf(false)
+    var spatialEnabled by mutableStateOf(false)
+    var spatialWidth by mutableFloatStateOf(35f)
     var lowShelfEnabled by mutableStateOf(true)
     var peakBandsEnabled by mutableStateOf(true)
     var highShelfEnabled by mutableStateOf(true)
@@ -403,7 +405,9 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         peakEnabled = peakBandsEnabled,
         highShelfEnabled = highShelfEnabled,
         audioSessionEnabled = audioSessionEnabled,
-        selectedAudioSession = selectedAudioSession
+        selectedAudioSession = selectedAudioSession,
+        spatialEnabled = spatialEnabled,
+        spatialWidth = spatialWidth
     )
 
     fun loadFrom(s: EqSettings) {
@@ -455,6 +459,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         highShelfEnabled = s.highShelfEnabled
         audioSessionEnabled = s.audioSessionEnabled
         selectedAudioSession = s.selectedAudioSession
+        spatialEnabled = s.spatialEnabled
+        spatialWidth = s.spatialWidth
     }
 
     fun saveNamedPreset(name: String) {

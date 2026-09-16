@@ -57,7 +57,9 @@ data class EqSettings(
     var highShelfEnabled: Boolean = true,
     var audioSessionEnabled: Boolean = false,
     var selectedAudioSession: String = "0: LOAD - Audio TX Output (Float)",
-    var hiResEnabled: Boolean = false
+    var hiResEnabled: Boolean = false,
+    var spatialEnabled: Boolean = false,
+    var spatialWidth: Float = 35f
 ) {
     fun toJson(): String {
         val o = JSONObject()
@@ -79,7 +81,7 @@ data class EqSettings(
         o.put("compPostGainLow", compPostGainLow.toDouble()); o.put("compPostGainLoMid", compPostGainLoMid.toDouble()); o.put("compPostGainHiMid", compPostGainHiMid.toDouble()); o.put("compPostGainHigh", compPostGainHigh.toDouble())
         o.put("compPreGainLow", compPreGainLow.toDouble()); o.put("compPreGainLoMid", compPreGainLoMid.toDouble()); o.put("compPreGainHiMid", compPreGainHiMid.toDouble()); o.put("compPreGainHigh", compPreGainHigh.toDouble())
         o.put("pipelineEnabled", pipelineEnabled); o.put("lowShelfEnabled", lowShelfEnabled); o.put("peakEnabled", peakEnabled); o.put("highShelfEnabled", highShelfEnabled)
-        o.put("audioSessionEnabled", audioSessionEnabled); o.put("selectedAudioSession", selectedAudioSession); o.put("hiResEnabled", hiResEnabled)
+        o.put("audioSessionEnabled", audioSessionEnabled); o.put("selectedAudioSession", selectedAudioSession); o.put("hiResEnabled", hiResEnabled); o.put("spatialEnabled", spatialEnabled); o.put("spatialWidth", spatialWidth.toDouble())
         return o.toString()
     }
 
@@ -101,7 +103,7 @@ data class EqSettings(
                 s.compReleaseLow=o.optDouble("compReleaseLow",legacyRelease).toFloat();s.compReleaseLoMid=o.optDouble("compReleaseLoMid",legacyRelease).toFloat();s.compReleaseHiMid=o.optDouble("compReleaseHiMid",legacyRelease).toFloat();s.compReleaseHigh=o.optDouble("compReleaseHigh",legacyRelease).toFloat()
                 s.compPostGainLow=o.optDouble("compPostGainLow",legacyPost).toFloat();s.compPostGainLoMid=o.optDouble("compPostGainLoMid",legacyPost).toFloat();s.compPostGainHiMid=o.optDouble("compPostGainHiMid",legacyPost).toFloat();s.compPostGainHigh=o.optDouble("compPostGainHigh",legacyPost).toFloat()
                 s.compPreGainLow=o.optDouble("compPreGainLow",0.0).toFloat();s.compPreGainLoMid=o.optDouble("compPreGainLoMid",0.0).toFloat();s.compPreGainHiMid=o.optDouble("compPreGainHiMid",0.0).toFloat();s.compPreGainHigh=o.optDouble("compPreGainHigh",0.0).toFloat()
-                s.pipelineEnabled=o.optBoolean("pipelineEnabled",true);s.lowShelfEnabled=o.optBoolean("lowShelfEnabled",true);s.peakEnabled=o.optBoolean("peakEnabled",true);s.highShelfEnabled=o.optBoolean("highShelfEnabled",true);s.audioSessionEnabled=o.optBoolean("audioSessionEnabled",false);s.selectedAudioSession=o.optString("selectedAudioSession","0: LOAD - Audio TX Output (Float)");s.hiResEnabled=o.optBoolean("hiResEnabled",false)
+                s.pipelineEnabled=o.optBoolean("pipelineEnabled",true);s.lowShelfEnabled=o.optBoolean("lowShelfEnabled",true);s.peakEnabled=o.optBoolean("peakEnabled",true);s.highShelfEnabled=o.optBoolean("highShelfEnabled",true);s.audioSessionEnabled=o.optBoolean("audioSessionEnabled",false);s.selectedAudioSession=o.optString("selectedAudioSession","0: LOAD - Audio TX Output (Float)");s.hiResEnabled=o.optBoolean("hiResEnabled",false);s.spatialEnabled=o.optBoolean("spatialEnabled",false);s.spatialWidth=o.optDouble("spatialWidth",35.0).toFloat().coerceIn(0f,100f)
             }catch(_:Exception){}
             return s
         }

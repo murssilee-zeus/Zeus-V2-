@@ -38,6 +38,8 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
     Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)
     Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))
+    Text("SPATIAL",color=if(vm.spatialEnabled) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=5.dp))
+    Switch(checked=vm.spatialEnabled,onCheckedChange={vm.spatialEnabled=it},modifier=Modifier.height(30.dp))
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
@@ -92,8 +94,22 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
-   SubSismoCard(vm); PunchCard(punch,vm); Pipe(vm)
+   SubSismoCard(vm); PunchCard(punch,vm); SpatialCard(vm); Pipe(vm)
   }
+ }
+}
+
+@Composable private fun SpatialCard(vm:EqViewModel){
+ Card("ZEUS SPATIAL") {
+  Row(verticalAlignment=Alignment.CenterVertically){
+   Column(Modifier.weight(1f)){
+    Text("SPATIAL ENGINE",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)
+    Text(if(vm.spatialEnabled) "Stereo virtualizer activo" else "Procesamiento espacial apagado",color=ZM,fontSize=8.sp)
+   }
+   Switch(checked=vm.spatialEnabled,onCheckedChange={vm.spatialEnabled=it})
+  }
+  S("WIDTH",vm.spatialWidth,0f..100f," %"){vm.spatialWidth=it}
+  Text("Centro estable · expansión estéreo controlada",color=ZM,fontSize=8.sp)
  }
 }
 
@@ -161,7 +177,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
      S("HARMONICS",punch.bassHarmonics,0f..100f," %"){punch.updateBassHarmonics(it)}
     }
    }
-   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm) }
+   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); SpatialCard(vm) }
    Column(Modifier.weight(.9f)){ Card("HEADROOM") {
     S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
     Text("Protección de salida",color=ZM,fontSize=8.sp)
