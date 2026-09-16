@@ -6,6 +6,7 @@ import android.util.Log
 /**
  * Lightweight spatial enhancement for the existing audio-session architecture.
  * It uses Android's stereo virtualizer rather than pretending to be Dolby Atmos.
+ * Prototype stage: conservative stereo expansion for Hi-Fi evaluation.
  */
 class SpatialEngine(private val audioSessionId: Int) {
     companion object { private const val TAG = "ZeusSpatial" }
