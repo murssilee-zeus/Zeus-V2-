@@ -20,13 +20,11 @@ jobs:
           def patch(path, replacements):
               p = Path(path)
               s = p.read_text()
-              original = s
               for old, new in replacements:
                   if old not in s:
-                      raise SystemExit(f'Missing patch anchor in {path}: {old[:80]!r}')
+                      raise SystemExit(f'Missing patch anchor in {path}: {old[:100]!r}')
                   s = s.replace(old, new, 1)
               p.write_text(s)
-              print(path, 'changed:', s != original)
 
           patch('app/src/main/java/com/zeus/v2/EqSettings.kt', [
               ('var hiResEnabled: Boolean = false\n)', 'var hiResEnabled: Boolean = false,\n    var spatialEnabled: Boolean = false,\n    var spatialWidth: Float = 35f\n)'),
@@ -36,14 +34,12 @@ jobs:
 
           patch('app/src/main/java/com/zeus/v2/EqViewModel.kt', [
               ('var hiResEnabled by mutableStateOf(false)\n', 'var hiResEnabled by mutableStateOf(false)\n    var spatialEnabled by mutableStateOf(false)\n    var spatialWidth by mutableFloatStateOf(35f)\n'),
-              ('selectedAudioSession=selectedAudioSession,hiResEnabled=hiResEnabled)', 'selectedAudioSession=selectedAudioSession,hiResEnabled=hiResEnabled,spatialEnabled=spatialEnabled,spatialWidth=spatialWidth)'),
-              ('selectedAudioSession=s.selectedAudioSession;hiResEnabled=s.hiResEnabled;selectedBandIndex=0}', 'selectedAudioSession=s.selectedAudioSession;hiResEnabled=s.hiResEnabled;spatialEnabled=s.spatialEnabled;spatialWidth=s.spatialWidth;selectedBandIndex=0}')
+              ('        selectedAudioSession = selectedAudioSession\n    )', '        selectedAudioSession = selectedAudioSession,\n        spatialEnabled = spatialEnabled,\n        spatialWidth = spatialWidth\n    )'),
+              ('        selectedAudioSession = s.selectedAudioSession\n    }', '        selectedAudioSession = s.selectedAudioSession\n        spatialEnabled = s.spatialEnabled\n        spatialWidth = s.spatialWidth\n    }')
           ])
 
           patch('app/src/main/java/com/zeus/v2/AudioEngine.kt', [
-              ('import android.media.audiofx.Visualizer\n', 'import android.media.audiofx.Visualizer\n'),
               ('private var dynamicsProcessing:DynamicsProcessing?=null; private var visualizer:Visualizer?=null;', 'private var dynamicsProcessing:DynamicsProcessing?=null; private var visualizer:Visualizer?=null; private var spatialEngine:SpatialEngine?=null;'),
-              ('release();audioSessionId=sessionId;deviceSampleRate=resolveSampleRate();', 'release();audioSessionId=sessionId;deviceSampleRate=resolveSampleRate();'),
               ('dynamicsProcessing=dp;preEqBandCount=bands;mbcBandCount=if(mbcUse)mbcCount else 0;applyAll();startVisualizer();dp.enabled=true;isEnabled=true;', 'dynamicsProcessing=dp;preEqBandCount=bands;mbcBandCount=if(mbcUse)mbcCount else 0;spatialEngine=SpatialEngine(sessionId).also{it.initialize()};applyAll();startVisualizer();dp.enabled=true;isEnabled=true;'),
               ('try{dynamicsProcessing?.release()}catch(_:Exception){};dynamicsProcessing=null;isEnabled=false}', 'try{spatialEngine?.release()}catch(_:Exception){};spatialEngine=null;try{dynamicsProcessing?.release()}catch(_:Exception){};dynamicsProcessing=null;isEnabled=false}'),
               ('fun setHiResEnabled(enabled:Boolean){hiResEnabled=enabled;applyInputGain();applyMbc();applyPostEq();applyLimiter();Log.i(TAG,"Hi-Res mode ${if(enabled) "ON" else "OFF"}")}', 'fun setHiResEnabled(enabled:Boolean){hiResEnabled=enabled;applyInputGain();applyMbc();applyPostEq();applyLimiter();Log.i(TAG,"Hi-Res mode ${if(enabled) "ON" else "OFF"}")}\n    fun setSpatialEnabled(enabled:Boolean){settings.spatialEnabled=enabled;spatialEngine?.setEnabled(enabled)}\n    fun setSpatialWidth(width:Float){settings.spatialWidth=width.coerceIn(0f,100f);spatialEngine?.setWidth(settings.spatialWidth)}'),
