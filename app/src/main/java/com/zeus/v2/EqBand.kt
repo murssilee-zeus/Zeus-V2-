@@ -86,4 +86,4 @@ fun createNewBand(id: Int, frequency: Float = 1000f): EqBand {
     )
 }
 
-// Cross 4 build trigger: no DSP behavior change.
+// Cross 4 UI build trigger.
