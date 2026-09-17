@@ -63,7 +63,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var selectedTargetName by mutableStateOf("Flat")
     var targetCurve by mutableStateOf<List<TargetPoint>>(emptyList())
 
-    var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)
+    var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f, 20000f)
 
     var compMbPreGainLow by mutableFloatStateOf(0f)
     var compMbPreGainLoMid by mutableFloatStateOf(0f)
@@ -104,15 +104,12 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var spectrum by mutableStateOf(FloatArray(128) { 0f })
 
     fun setCrossover(index: Int, freq: Float) {
-        if (index !in 0..2) return
-        val f = freq.coerceIn(40f, 19500f)
+        if (index !in 0..3) return
         when (index) {
-            0 -> crossoverFrequencies[0] = f.coerceAtMost(crossoverFrequencies[1] - 50f)
-            1 -> crossoverFrequencies[1] = f.coerceIn(
-                crossoverFrequencies[0] + 50f,
-                crossoverFrequencies[2] - 50f
-            )
-            2 -> crossoverFrequencies[2] = f.coerceAtLeast(crossoverFrequencies[1] + 50f)
+            0 -> crossoverFrequencies[0] = freq.coerceIn(40f, crossoverFrequencies[1] - 50f)
+            1 -> crossoverFrequencies[1] = freq.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)
+            2 -> crossoverFrequencies[2] = freq.coerceIn(crossoverFrequencies[1] + 50f, crossoverFrequencies[3] - 50f)
+            3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
         }
     }
 
@@ -209,7 +206,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun toSettings(): EqSettings = EqSettings(
         preGain = preamp, subBoost = subBoost, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
         limiterAttack = limiterAttack, limiterRelease = limiterRelease, limiterRatio = limiterRatio, limiterPostGain = limiterPostGain,
-        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f },
+        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         compThLow = compMbThLow, compThLoMid = compMbThLoMid, compThHiMid = compMbThHiMid, compThHigh = compMbThHigh,
         compRatioLow = compMbRatioLow, compRatioLoMid = compMbRatioLoMid, compRatioHiMid = compMbRatioHiMid, compRatioHigh = compMbRatioHigh,
         compKneeLow = compMbKneeLow, compKneeLoMid = compMbKneeLoMid, compKneeHiMid = compMbKneeHiMid, compKneeHigh = compMbKneeHigh,
