@@ -67,7 +67,7 @@ class EqViewModel : ViewModel() {
         compEnabled = compressorMultibandEnabled,
         cross1 = crossoverFrequencies.getOrElse(0) { 180f },
         cross2 = crossoverFrequencies.getOrElse(1) { 1800f },
-        cross3 = crossoverFrequencies.getOrElse(2) { 8000f },
+        cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         compThLow = compMbThLow,
         compThLoMid = compMbThLoMid,
