@@ -160,6 +160,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         crossoverFrequencies[0] = 120f
         crossoverFrequencies[1] = 2500f
         crossoverFrequencies[2] = 8000f
+        crossoverFrequencies[3] = 20000f
         compMbThLow = -16f; compMbRatioLow = 2.2f; compMbKneeLow = 8f; compMbAttackLow = 12f; compMbReleaseLow = 160f; compMbPreGainLow = 1.0f; compMbPostGainLow = 1.0f
         compMbThLoMid = -14f; compMbRatioLoMid = 2.0f; compMbKneeLoMid = 6f; compMbAttackLoMid = 10f; compMbReleaseLoMid = 120f; compMbPreGainLoMid = 0f; compMbPostGainLoMid = 0f
         compMbThHiMid = -12f; compMbRatioHiMid = 2.0f; compMbKneeHiMid = 6f; compMbAttackHiMid = 8f; compMbReleaseHiMid = 90f; compMbPreGainHiMid = 0f; compMbPostGainHiMid = 0f
@@ -206,7 +207,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun toSettings(): EqSettings = EqSettings(
         preGain = preamp, subBoost = subBoost, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
         limiterAttack = limiterAttack, limiterRelease = limiterRelease, limiterRatio = limiterRatio, limiterPostGain = limiterPostGain,
-        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
+        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         compThLow = compMbThLow, compThLoMid = compMbThLoMid, compThHiMid = compMbThHiMid, compThHigh = compMbThHigh,
         compRatioLow = compMbRatioLow, compRatioLoMid = compMbRatioLoMid, compRatioHiMid = compMbRatioHiMid, compRatioHigh = compMbRatioHigh,
         compKneeLow = compMbKneeLow, compKneeLoMid = compMbKneeLoMid, compKneeHiMid = compMbKneeHiMid, compKneeHigh = compMbKneeHigh,
@@ -220,7 +221,10 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadFrom(s: EqSettings) {
         preamp = s.preGain; subBoost = s.subBoost; bands.clear(); bands.addAll(s.bands); limiterEnabled = s.limiterEnabled; limiterThreshold = s.limiterThreshold; limiterAttack = s.limiterAttack; limiterRelease = s.limiterRelease; limiterRatio = s.limiterRatio; limiterPostGain = s.limiterPostGain; compressorMultibandEnabled = s.compEnabled
-        crossoverFrequencies[0] = s.cross1; crossoverFrequencies[1] = s.cross2; crossoverFrequencies[2] = s.cross3
+        crossoverFrequencies[0] = s.cross1
+        crossoverFrequencies[1] = s.cross2
+        crossoverFrequencies[2] = s.cross3
+        crossoverFrequencies[3] = s.cross4.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
         compMbThLow = s.compThLow; compMbThLoMid = s.compThLoMid; compMbThHiMid = s.compThHiMid; compMbThHigh = s.compThHigh; compMbRatioLow = s.compRatioLow; compMbRatioLoMid = s.compRatioLoMid; compMbRatioHiMid = s.compRatioHiMid; compMbRatioHigh = s.compRatioHigh; compMbKneeLow = s.compKneeLow; compMbKneeLoMid = s.compKneeLoMid; compMbKneeHiMid = s.compKneeHiMid; compMbKneeHigh = s.compKneeHigh; compMbAttackLow = s.compAttackLow; compMbAttackLoMid = s.compAttackLoMid; compMbAttackHiMid = s.compAttackHiMid; compMbAttackHigh = s.compAttackHigh; compMbReleaseLow = s.compReleaseLow; compMbReleaseLoMid = s.compReleaseLoMid; compMbReleaseHiMid = s.compReleaseHiMid; compMbReleaseHigh = s.compReleaseHigh; compMbPostGainLow = s.compPostGainLow; compMbPostGainLoMid = s.compPostGainLoMid; compMbPostGainHiMid = s.compPostGainHiMid; compMbPostGainHigh = s.compPostGainHigh; compMbPreGainLow = s.compPreGainLow; compMbPreGainLoMid = s.compPreGainLoMid; compMbPreGainHiMid = s.compPreGainHiMid; compMbPreGainHigh = s.compPreGainHigh; pipelineEnabled = s.pipelineEnabled; lowShelfEnabled = s.lowShelfEnabled; peakBandsEnabled = s.peakEnabled; highShelfEnabled = s.highShelfEnabled; audioSessionEnabled = s.audioSessionEnabled; selectedAudioSession = s.selectedAudioSession; spatialEnabled = s.spatialEnabled; spatialWidth = s.spatialWidth
     }
 
