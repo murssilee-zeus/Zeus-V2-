@@ -38,7 +38,7 @@ private val BAND_COLORS = listOf(
  */
 fun createDefaultBands(): List<EqBand> {
     val defaults = listOf(
-        Triple(31f, 5.0f, 0.7f),   // SUB (LSHELF)
+        Triple(31f, 5.0f, 0.7f),
         Triple(62f, 4.0f, 1.0f),
         Triple(125f, 2.5f, 1.2f),
         Triple(250f, 1.0f, 1.0f),
@@ -47,7 +47,7 @@ fun createDefaultBands(): List<EqBand> {
         Triple(2000f, 0f, 1.2f),
         Triple(4000f, 0f, 1.5f),
         Triple(8000f, 0f, 1.0f),
-        Triple(16000f, -1.0f, 0.8f)  // HSHELF
+        Triple(16000f, -1.0f, 0.8f)
     )
 
     val initial = ArrayList<EqBand>(16)
@@ -85,3 +85,5 @@ fun createNewBand(id: Int, frequency: Float = 1000f): EqBand {
         color = BAND_COLORS[id % BAND_COLORS.size]
     )
 }
+
+// Cross 4 build trigger: no DSP behavior change.
