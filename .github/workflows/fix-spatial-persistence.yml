@@ -1,0 +1,42 @@
+name: Fix Spatial persistence
+
+on:
+  push:
+    branches: [fix/punch-v2]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'fix: preserve crossover 4 in settings'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair Cross 4 persistence
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/src/main/java/com/zeus/v2/EqViewModel.kt')
+          s = p.read_text()
+          s = s.replace(
+              'cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },',
+              'cross4 = crossoverFrequencies.getOrElse(3) { 20000f },'
+          )
+          s = s.replace(
+              'crossoverFrequencies[2] = 8000f\n        compMbThLow',
+              'crossoverFrequencies[2] = 8000f\n        crossoverFrequencies[3] = 20000f\n        compMbThLow'
+          )
+          s = s.replace(
+              'crossoverFrequencies[0] = s.cross1; crossoverFrequencies[1] = s.cross2; crossoverFrequencies[2] = s.cross3',
+              'crossoverFrequencies[0] = s.cross1; crossoverFrequencies[1] = s.cross2; crossoverFrequencies[2] = s.cross3; crossoverFrequencies[3] = s.cross4.coerceIn(crossoverFrequencies[2] + 50f, 20000f)'
+          )
+          p.write_text(s)
+      - name: Commit repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/EqViewModel.kt
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: preserve crossover 4 in settings'
+          git push
