@@ -23,6 +23,7 @@ data class EqSettings(
     var cross1: Float = 180f,
     var cross2: Float = 1800f,
     var cross3: Float = 8000f,
+    var cross4: Float = 20000f,
     var compThLow: Float = -18f,
     var compThLoMid: Float = -14f,
     var compThHiMid: Float = -12f,
@@ -63,7 +64,7 @@ data class EqSettings(
 ) {
     fun toJson(): String {
         val o = JSONObject()
-        o.put("version", 4)
+        o.put("version", 5)
         o.put("preGain", preGain.toDouble()); o.put("subBoost", subBoost.toDouble())
         o.put("bassMono", bassMono); o.put("bassAmount", bassAmount.toDouble()); o.put("bassPunch", bassPunch.toDouble()); o.put("bassHarmonics", bassHarmonics.toDouble())
         val bArr = JSONArray()
@@ -72,7 +73,7 @@ data class EqSettings(
         }
         o.put("bands", bArr)
         o.put("limiterEnabled", limiterEnabled); o.put("limiterThreshold", limiterThreshold.toDouble()); o.put("limiterAttack", limiterAttack.toDouble()); o.put("limiterRelease", limiterRelease.toDouble()); o.put("limiterRatio", limiterRatio.toDouble()); o.put("limiterPostGain", limiterPostGain.toDouble())
-        o.put("compEnabled", compEnabled); o.put("cross1", cross1.toDouble()); o.put("cross2", cross2.toDouble()); o.put("cross3", cross3.toDouble())
+        o.put("compEnabled", compEnabled); o.put("cross1", cross1.toDouble()); o.put("cross2", cross2.toDouble()); o.put("cross3", cross3.toDouble()); o.put("cross4", cross4.toDouble())
         o.put("compThLow", compThLow.toDouble()); o.put("compThLoMid", compThLoMid.toDouble()); o.put("compThHiMid", compThHiMid.toDouble()); o.put("compThHigh", compThHigh.toDouble())
         o.put("compRatioLow", compRatioLow.toDouble()); o.put("compRatioLoMid", compRatioLoMid.toDouble()); o.put("compRatioHiMid", compRatioHiMid.toDouble()); o.put("compRatioHigh", compRatioHigh.toDouble())
         o.put("compKneeLow", compKneeLow.toDouble()); o.put("compKneeLoMid", compKneeLoMid.toDouble()); o.put("compKneeHiMid", compKneeHiMid.toDouble()); o.put("compKneeHigh", compKneeHigh.toDouble())
@@ -94,7 +95,7 @@ data class EqSettings(
                 val bArr=o.optJSONArray("bands")
                 if(bArr!=null&&bArr.length()>0){val list=mutableListOf<EqBand>();for(i in 0 until bArr.length()){val jo=bArr.getJSONObject(i);val typeOrd=jo.optInt("t",EqBand.FilterType.PEAK.ordinal);val type=EqBand.FilterType.values().getOrElse(typeOrd){EqBand.FilterType.PEAK};val id=jo.optInt("id",i);list.add(EqBand(id,jo.optDouble("f",1000.0).toFloat(),jo.optDouble("g",0.0).toFloat(),jo.optDouble("q",1.0).toFloat(),jo.optBoolean("e",true),type,bandColor(id)))};s.bands=list}
                 s.limiterEnabled=o.optBoolean("limiterEnabled",true);s.limiterThreshold=o.optDouble("limiterThreshold",-2.5).toFloat();s.limiterAttack=o.optDouble("limiterAttack",0.5).toFloat().coerceIn(.01f,100f);s.limiterRelease=o.optDouble("limiterRelease",120.0).toFloat();s.limiterRatio=o.optDouble("limiterRatio",20.0).toFloat();s.limiterPostGain=o.optDouble("limiterPostGain",0.0).toFloat()
-                s.compEnabled=o.optBoolean("compEnabled",true);s.cross1=o.optDouble("cross1",180.0).toFloat();s.cross2=o.optDouble("cross2",1800.0).toFloat();s.cross3=o.optDouble("cross3",8000.0).toFloat()
+                s.compEnabled=o.optBoolean("compEnabled",true);s.cross1=o.optDouble("cross1",180.0).toFloat();s.cross2=o.optDouble("cross2",1800.0).toFloat();s.cross3=o.optDouble("cross3",8000.0).toFloat();s.cross4=o.optDouble("cross4",20000.0).toFloat().coerceIn(s.cross3+50f,20000f)
                 val legacyRatio=o.optDouble("compRatio",4.0);val legacyKnee=o.optDouble("compKnee",6.0);val legacyAttack=o.optDouble("compAttack",10.0);val legacyRelease=o.optDouble("compRelease",100.0);val legacyPost=o.optDouble("compPostGain",0.0)
                 s.compThLow=o.optDouble("compThLow",-18.0).toFloat();s.compThLoMid=o.optDouble("compThLoMid",-14.0).toFloat();s.compThHiMid=o.optDouble("compThHiMid",-12.0).toFloat();s.compThHigh=o.optDouble("compThHigh",-14.0).toFloat()
                 s.compRatioLow=o.optDouble("compRatioLow",legacyRatio).toFloat();s.compRatioLoMid=o.optDouble("compRatioLoMid",legacyRatio).toFloat();s.compRatioHiMid=o.optDouble("compRatioHiMid",legacyRatio).toFloat();s.compRatioHigh=o.optDouble("compRatioHigh",legacyRatio).toFloat()
