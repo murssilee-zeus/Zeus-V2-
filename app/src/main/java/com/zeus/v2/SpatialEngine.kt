@@ -4,9 +4,8 @@ import android.media.audiofx.Virtualizer
 import android.util.Log
 
 /**
- * Lightweight spatial enhancement for the existing audio-session architecture.
- * It uses Android's stereo virtualizer rather than pretending to be Dolby Atmos.
- * Prototype stage: conservative stereo expansion for Hi-Fi evaluation.
+ * Spatial enhancement for the existing audio-session architecture.
+ * The Android virtualizer remains the playback processor; analysis is handled separately.
  */
 class SpatialEngine(private val audioSessionId: Int) {
     companion object { private const val TAG = "ZeusSpatial" }
@@ -14,7 +13,7 @@ class SpatialEngine(private val audioSessionId: Int) {
     private var virtualizer: Virtualizer? = null
     var enabled: Boolean = false
         private set
-    var width: Float = 35f
+    var width: Float = 100f
         private set
 
     fun initialize(): Boolean {
@@ -37,10 +36,7 @@ class SpatialEngine(private val audioSessionId: Int) {
         }
     }
 
-    fun setEnabled(value: Boolean) {
-        enabled = value
-        apply()
-    }
+    fun setEnabled(value: Boolean) { enabled = value; apply() }
 
     fun setWidth(value: Float) {
         width = value.coerceIn(0f, 100f)
