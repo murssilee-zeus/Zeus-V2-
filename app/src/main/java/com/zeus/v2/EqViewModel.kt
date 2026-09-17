@@ -206,7 +206,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun toSettings(): EqSettings = EqSettings(
         preGain = preamp, subBoost = subBoost, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
         limiterAttack = limiterAttack, limiterRelease = limiterRelease, limiterRatio = limiterRatio, limiterPostGain = limiterPostGain,
-        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
+        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         compThLow = compMbThLow, compThLoMid = compMbThLoMid, compThHiMid = compMbThHiMid, compThHigh = compMbThHigh,
         compRatioLow = compMbRatioLow, compRatioLoMid = compMbRatioLoMid, compRatioHiMid = compMbRatioHiMid, compRatioHigh = compMbRatioHigh,
         compKneeLow = compMbKneeLow, compKneeLoMid = compMbKneeLoMid, compKneeHiMid = compMbKneeHiMid, compKneeHigh = compMbKneeHigh,
