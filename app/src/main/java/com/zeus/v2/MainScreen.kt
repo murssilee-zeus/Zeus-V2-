@@ -630,11 +630,11 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     title = "HIGH",
                     color = colors[3],
                     selected = selectedCompBand == 3,
-                    freq = 20000f,
-                    range = 20000f..20000f,
+                    freq = viewModel.crossoverFrequencies[3],
+                    range = 9000f..20000f,
                     onSelect = { selectedCompBand = 3 },
-                    onFreq = { },
-                    enabled = false,
+                    onFreq = { viewModel.setCrossover(3, it) },
+                    enabled = true,
                     modifier = Modifier.weight(1f).fillMaxHeight()
                 )
             }
@@ -644,6 +644,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             cross1 = viewModel.crossoverFrequencies[0],
             cross2 = viewModel.crossoverFrequencies[1],
             cross3 = viewModel.crossoverFrequencies[2],
+            cross4 = viewModel.crossoverFrequencies[3],
             colors = colors,
             modifier = Modifier
                 .fillMaxWidth()
@@ -782,6 +783,7 @@ private fun CrossoverBandsGraph(
     cross1: Float,
     cross2: Float,
     cross3: Float,
+    cross4: Float,
     colors: List<Color>,
     modifier: Modifier = Modifier
 ) {
@@ -795,7 +797,7 @@ private fun CrossoverBandsGraph(
     Canvas(modifier = modifier.padding(8.dp)) {
         val w = size.width
         val h = size.height
-        val cuts = listOf(minF, cross1, cross2, cross3, maxF)
+        val cuts = listOf(minF, cross1, cross2, cross3, cross4, maxF)
 
         for (i in 0 until 4) {
             val x0 = xOf(cuts[i], w)
@@ -811,7 +813,7 @@ private fun CrossoverBandsGraph(
             path.quadraticBezierTo(mid, h * 0.15f, x1, h * 0.5f)
             drawPath(path, colors[i], style = Stroke(width = 2f, cap = StrokeCap.Round))
         }
-        listOf(cross1, cross2, cross3).forEach { c ->
+        listOf(cross1, cross2, cross3, cross4).forEach { c ->
             val x = xOf(c, w)
             drawLine(Color.White.copy(alpha = 0.5f), Offset(x, 0f), Offset(x, h), strokeWidth = 1.2f)
         }
