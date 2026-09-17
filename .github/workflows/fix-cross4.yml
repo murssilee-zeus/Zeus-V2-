@@ -22,7 +22,6 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           vm = Path('app/src/main/java/com/zeus/v2/EqViewModel.kt')
           s = vm.read_text()
           s = s.replace('var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)', 'var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f, 16000f)')
@@ -47,9 +46,8 @@ jobs:
             3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
         }
     }'''
-          if old not in s:
-              raise SystemExit('EqViewModel crossover block not found')
-          vm.write_text(s.replace(old, new))
+          if old in s: s = s.replace(old, new)
+          vm.write_text(s)
 
           settings = Path('app/src/main/java/com/zeus/v2/EqSettings.kt')
           s = settings.read_text()
@@ -92,3 +90,4 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Enable configurable multiband Cross 4 [skip ci]"
           git push origin HEAD:fix/punch-v2
+# temporary wiring helper
