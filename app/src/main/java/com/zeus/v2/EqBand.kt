@@ -32,58 +32,21 @@ private val BAND_COLORS = listOf(
     Color(0xFF2D3436), Color(0xFFD63031)
 )
 
-/**
- * 16 bandas por defecto alineadas con la imagen de referencia.
- * Subgrave profundo: las primeras bandas con empuje positivo.
- */
 fun createDefaultBands(): List<EqBand> {
     val defaults = listOf(
-        Triple(31f, 5.0f, 0.7f),
-        Triple(62f, 4.0f, 1.0f),
-        Triple(125f, 2.5f, 1.2f),
-        Triple(250f, 1.0f, 1.0f),
-        Triple(500f, 0f, 1.0f),
-        Triple(1000f, 0f, 1.0f),
-        Triple(2000f, 0f, 1.2f),
-        Triple(4000f, 0f, 1.5f),
-        Triple(8000f, 0f, 1.0f),
+        Triple(31f, 5.0f, 0.7f), Triple(62f, 4.0f, 1.0f), Triple(125f, 2.5f, 1.2f),
+        Triple(250f, 1.0f, 1.0f), Triple(500f, 0f, 1.0f), Triple(1000f, 0f, 1.0f),
+        Triple(2000f, 0f, 1.2f), Triple(4000f, 0f, 1.5f), Triple(8000f, 0f, 1.0f),
         Triple(16000f, -1.0f, 0.8f)
     )
-
     val initial = ArrayList<EqBand>(16)
     for (i in 0 until 16) {
-        val (freq, gain, q) = if (i < defaults.size) {
-            Triple(defaults[i].first, defaults[i].second, defaults[i].third)
-        } else {
-            Triple(1000f + (i - 10) * 1500f, 0f, 1.0f)
-        }
-        initial += EqBand(
-            id = i,
-            frequency = freq,
-            gain = gain,
-            q = q,
-            enabled = true,
-            filterType = when (i) {
-                0 -> EqBand.FilterType.LOW_SHELF
-                15 -> EqBand.FilterType.HIGH_SHELF
-                else -> EqBand.FilterType.PEAK
-            },
-            color = BAND_COLORS[i % BAND_COLORS.size]
-        )
+        val (freq, gain, q) = if (i < defaults.size) Triple(defaults[i].first, defaults[i].second, defaults[i].third) else Triple(1000f + (i - 10) * 1500f, 0f, 1.0f)
+        initial += EqBand(i, freq, gain, q, true, when (i) { 0 -> EqBand.FilterType.LOW_SHELF; 15 -> EqBand.FilterType.HIGH_SHELF; else -> EqBand.FilterType.PEAK }, BAND_COLORS[i % BAND_COLORS.size])
     }
     return initial
 }
 
-fun createNewBand(id: Int, frequency: Float = 1000f): EqBand {
-    return EqBand(
-        id = id,
-        frequency = frequency.coerceIn(1f, 30000f),
-        gain = 0f,
-        q = 1.0f,
-        enabled = true,
-        filterType = EqBand.FilterType.PEAK,
-        color = BAND_COLORS[id % BAND_COLORS.size]
-    )
-}
+fun createNewBand(id: Int, frequency: Float = 1000f): EqBand = EqBand(id, frequency.coerceIn(1f, 30000f), 0f, 1.0f, true, EqBand.FilterType.PEAK, BAND_COLORS[id % BAND_COLORS.size])
 
-// Cross 4 UI build trigger.
+// Cross 4 verification build.
