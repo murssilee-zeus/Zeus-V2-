@@ -13,14 +13,26 @@ jobs:
         with:
           ref: fix/punch-v2
           fetch-depth: 0
-      - name: Patch Hi-Res mode
+      - name: Patch Hi-Res and Cross 4
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           p=Path('app/src/main/java/com/zeus/v2/EqViewModel.kt'); s=p.read_text()
           needle='    var audioSessionEnabled by mutableStateOf(false)\n'
           if 'var hiResEnabled by mutableStateOf(false)' not in s:
               s=s.replace(needle, needle+'    /** Hi-Res acoustic mode. */\n    var hiResEnabled by mutableStateOf(false)\n',1)
+
+          if 'mutableStateListOf(180f, 1800f, 8000f, 20000f)' not in s:
+              s=s.replace('mutableStateListOf(180f, 1800f, 8000f)', 'mutableStateListOf(180f, 1800f, 8000f, 20000f)',1)
+
+          old_fun='''    fun setCrossover(index: Int, freq: Float) {\n        if (index !in 0..2) return\n        val f = freq.coerceIn(40f, 19500f)\n        when (index) {\n            0 -> crossoverFrequencies[0] = f.coerceAtMost(crossoverFrequencies[1] - 50f)\n            1 -> crossoverFrequencies[1] = f.coerceIn(\n                crossoverFrequencies[0] + 50f,\n                crossoverFrequencies[2] - 50f\n            )\n            2 -> crossoverFrequencies[2] = f.coerceAtLeast(crossoverFrequencies[1] + 50f)\n        }\n    }'''
+          new_fun='''    fun setCrossover(index: Int, freq: Float) {\n        if (index !in 0..3) return\n        when (index) {\n            0 -> crossoverFrequencies[0] = freq.coerceIn(40f, crossoverFrequencies[1] - 50f)\n            1 -> crossoverFrequencies[1] = freq.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)\n            2 -> crossoverFrequencies[2] = freq.coerceIn(crossoverFrequencies[1] + 50f, crossoverFrequencies[3] - 50f)\n            3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)\n        }\n    }'''
+          if old_fun in s: s=s.replace(old_fun,new_fun,1)
+          s=re.sub(r'(cross3\s*=\s*crossoverFrequencies\.getOrElse\(2\)\s*\{\s*8000f\s*\},)',r'\1 cross4 = crossoverFrequencies.getOrElse(3) { 20000f },',s,count=1)
+          if 'crossoverFrequencies[3] = settings.cross4' not in s:
+              s=s.replace('crossoverFrequencies[2] = settings.cross3','crossoverFrequencies[2] = settings.cross3\n        crossoverFrequencies[3] = settings.cross4',1)
           p.write_text(s)
 
           p=Path('app/src/main/java/com/zeus/v2/AudioEngine.kt'); s=p.read_text()
@@ -32,7 +44,7 @@ jobs:
               s=s.replace(needle, '''    fun setHiResEnabled(enabled:Boolean){\n        hiResEnabled=enabled\n        applyInputGain(); applyMbc(); applyPostEq(); applyLimiter()\n        Log.i(TAG,"Hi-Res mode ${if(enabled) "ON" else "OFF"}")\n    }\n    fun setPreGain(v:Float){settings.preGain=v;applyInputGain()}\n''',1)
           s=s.replace('val active=s.compEnabled&&pipelineEnabled;', 'val active=s.compEnabled&&pipelineEnabled&&!hiResEnabled;',1)
           old='''    private fun applyPostEq(){val dp=dynamicsProcessing?:return;try{val amount=settings.bassAmount.coerceIn(0f,100f)/100f;'''
-          new='''    private fun applyPostEq(){val dp=dynamicsProcessing?:return;try{if(hiResEnabled){\n                // DynamicsProcessing cannot synthesize new harmonics; use restrained mid/air voicing while preserving dynamics.\n                dp.setPostEqBandAllChannelsTo(0,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(1,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(2,DynamicsProcessing.EqBand(true,2800f,0.65f))\n                dp.setPostEqBandAllChannelsTo(3,DynamicsProcessing.EqBand(true,11500f,0.75f))\n                return\n            };val amount=settings.bassAmount.coerceIn(0f,100f)/100f;'''
+          new='''    private fun applyPostEq(){val dp=dynamicsProcessing?:return;try{if(hiResEnabled){\n                dp.setPostEqBandAllChannelsTo(0,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(1,DynamicsProcessing.EqBand(false,1000f,0f))\n                dp.setPostEqBandAllChannelsTo(2,DynamicsProcessing.EqBand(true,2800f,0.65f))\n                dp.setPostEqBandAllChannelsTo(3,DynamicsProcessing.EqBand(true,11500f,0.75f))\n                return\n            };val amount=settings.bassAmount.coerceIn(0f,100f)/100f;'''
           if old in s: s=s.replace(old,new,1)
           old='''val s=settings;dp.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true,s.limiterEnabled,0,s.limiterAttack.coerceIn(.01f,100f),s.limiterRelease.coerceIn(20f,1000f),s.limiterRatio.coerceIn(1f,50f),s.limiterThreshold.coerceIn(-30f,0f),s.limiterPostGain.coerceIn(-12f,12f)))'''
           new='''val s=settings;val threshold=if(hiResEnabled)-0.3f else s.limiterThreshold.coerceIn(-30f,0f);val ratio=if(hiResEnabled)20f else s.limiterRatio.coerceIn(1f,50f);dp.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(true,s.limiterEnabled,0,s.limiterAttack.coerceIn(.01f,100f),s.limiterRelease.coerceIn(20f,1000f),ratio,threshold,if(hiResEnabled)0f else s.limiterPostGain.coerceIn(-12f,12f)))'''
@@ -50,9 +62,10 @@ jobs:
           if 'Text("HI-RES"' not in s:
               s=s.replace(needle, '''   Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){\n    Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)\n    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))\n   }\n   Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})\n''',1)
           p.write_text(s)
+
           PY
           git config user.name 'zeus-autoeq-bot'
           git config user.email 'actions@users.noreply.github.com'
           git add app/src/main/java/com/zeus/v2/EqViewModel.kt app/src/main/java/com/zeus/v2/AudioEngine.kt app/src/main/java/com/zeus/v2/MainActivity.kt app/src/main/java/com/zeus/v2/ZeusStudioScreenV2.kt
-          git diff --cached --quiet || git commit -m 'Add Hi-Res acoustic mode'
+          git diff --cached --quiet || git commit -m 'Activate editable multiband Cross 4'
           git push origin HEAD:fix/punch-v2
