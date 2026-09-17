@@ -1,23 +1,17 @@
 package com.zeus.v2
 
 import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.sin
 
 /**
  * PCM Atmos-style spatial processor.
  *
- * This class is intentionally independent from Android AudioEffect/Virtualizer.
- * It is the DSP core to be connected later to a PCM-controlled audio path.
+ * Independent from Android AudioEffect/Virtualizer. This is the DSP core for
+ * a future PCM-controlled path.
  *
- * Design goals:
- * - Keep the mono/center low end stable.
- * - Apply spatial delay primarily to Side content above the low-frequency
- *   protection crossover.
- * - Use a causal ITD model: one ear receives the Side contribution immediately
- *   while the opposite ear receives the same contribution delayed by 0.2..0.8 ms.
- * - Shape the delayed/high-frequency reflection subtly between 6 and 12 kHz.
- * - Avoid hard clipping by using a soft saturating output stage.
+ * The important rule is simple: protect the low end, spatialize Side above the
+ * crossover, and introduce a real interaural delay rather than delaying both
+ * channels equally.
  */
 class ZeusAtmosEngine(
     private val sampleRate: Int = 44100
@@ -35,36 +29,33 @@ class ZeusAtmosEngine(
     var itdMs: Float = 0.6f
         set(value) { field = value.coerceIn(0.2f, 0.8f) }
 
-    /** Low frequencies below this point remain effectively non-spatialized. */
+    /** Sub-bass / punch protection starts here. */
     var lowProtectHz: Float = 120f
         set(value) { field = value.coerceIn(60f, 250f) }
 
-    /** Side spatialization starts fading in above this point. */
+    /** Side spatialization is fully active above this point. */
     var spatialStartHz: Float = 250f
         set(value) { field = value.coerceIn(120f, 1000f) }
 
-    /** HRTF-like high-frequency shaping starts here. */
+    /** HRTF-like shaping starts here. */
     var hrtfStartHz: Float = 6000f
         set(value) { field = value.coerceIn(3000f, 9000f) }
 
-    /** HRTF-like high-frequency shaping reaches its maximum here. */
+    /** HRTF-like shaping ends here. */
     var hrtfEndHz: Float = 12000f
         set(value) { field = value.coerceIn(hrtfStartHz + 500f, 18000f) }
 
     private val maxDelaySamples = (sampleRate * 0.0008f).toInt().coerceAtLeast(2)
-    private val leftDelay = FloatArray(maxDelaySamples + 1)
-    private val rightDelay = FloatArray(maxDelaySamples + 1)
+    private val sideDelay = FloatArray(maxDelaySamples + 1)
     private var delayIndex = 0
 
-    // One-pole crossover state. These are deliberately independent per channel.
-    private var lowL = 0f
-    private var lowR = 0f
-    private var spatialL = 0f
-    private var spatialR = 0f
+    // Low-pass states used to derive two complementary Side bands:
+    // <120 Hz protected, 120..250 Hz transitional, >250 Hz spatialized.
+    private var sideLow120 = 0f
+    private var sideLow250 = 0f
 
-    // Simple HF emphasis/de-emphasis states used only on the delayed reflection.
-    private var hrtfLpL = 0f
-    private var hrtfLpR = 0f
+    // HF state for the delayed reflection only.
+    private var hrtfLp = 0f
 
     /**
      * Processes interleaved signed 16-bit stereo PCM in-place.
@@ -74,85 +65,75 @@ class ZeusAtmosEngine(
         val sampleCount = size.coerceIn(0, pcmBuffer.size - (pcmBuffer.size % 2))
         if (sampleCount < 2) return
 
-        val itdSamples = (sampleRate * itdMs * 0.001f).coerceIn(1f, maxDelaySamples.toFloat()).toInt()
-        val immersion = atmosImmersion
-        val center = centerFocus
+        val itdSamples = (sampleRate * itdMs * 0.001f)
+            .coerceIn(1f, maxDelaySamples.toFloat())
+            .toInt()
 
         val lowAlpha = onePoleAlpha(lowProtectHz)
         val spatialAlpha = onePoleAlpha(spatialStartHz)
         val hrtfAlpha = onePoleAlpha(hrtfStartHz)
+        val immersion = atmosImmersion
+        val centerGain = centerFocus.coerceIn(0f, 1.5f)
 
         for (i in 0 until sampleCount step 2) {
-            val l = pcmBuffer[i] / 32768f
-            val r = pcmBuffer[i + 1] / 32768f
+            val left = pcmBuffer[i] / 32768f
+            val right = pcmBuffer[i + 1] / 32768f
 
-            // M/S decomposition. Mid is protected; Side is the spatial target.
-            val mid = (l + r) * 0.5f
-            val side = (l - r) * 0.5f
+            // M/S extraction.
+            val mid = (left + right) * 0.5f
+            val side = (left - right) * 0.5f
 
-            // Split the signal into a protected low band and a spatializable band.
-            lowL += lowAlpha * (l - lowL)
-            lowR += lowAlpha * (r - lowR)
+            // Complementary low-pass states produce a frequency-aware Side split.
+            // sideBelow120 is protected; side120to250 is transition; sideAbove250
+            // is the main spatial path.
+            sideLow120 += lowAlpha * (side - sideLow120)
+            sideLow250 += spatialAlpha * (side - sideLow250)
 
-            spatialL += spatialAlpha * (l - spatialL)
-            spatialR += spatialAlpha * (r - spatialR)
+            val side120to250 = sideLow120 - sideLow250
+            val sideAbove250 = side - sideLow250
 
-            val lowMid = (lowL + lowR) * 0.5f
-            val spatialMid = (spatialL + spatialR) * 0.5f
-            val spatialSide = ((spatialL - spatialR) * 0.5f)
+            // Smoothly preserve a small part of the transition band while keeping
+            // the sub-120 Hz Side component out of the ITD path.
+            val spatialSide = sideAbove250 + side120to250 * 0.5f
 
-            // Remove the low-band portion from Side. This keeps sub-bass/punch out
-            // of the ITD path instead of delaying the entire spectrum.
-            val protectedSide = side - (mid - lowMid - spatialMid + lowMid) * 0.0f
-            val spatialWeight = ((spatialSide - protectedSide) * 0.0f + 1f).coerceIn(0f, 1f)
+            // Causal ITD: one ear gets the Side contribution immediately and the
+            // opposite ear gets it after 0.2..0.8 ms. This is genuinely interaural;
+            // the previous model delayed both channels identically.
+            sideDelay[delayIndex] = spatialSide
+            val delayedIndex = wrap(delayIndex - itdSamples, sideDelay.size)
+            val delayedSide = sideDelay[delayedIndex]
+            delayIndex = (delayIndex + 1) % sideDelay.size
 
-            // Practical band weighting: the low-protected component stays centered;
-            // the side path fades in from 120 -> 250 Hz rather than switching abruptly.
-            val lowProtection = ((spatialStartHz - lowProtectHz).coerceAtLeast(1f))
-            val sideStart = ((spatialStartHz - lowProtectHz) / lowProtection).coerceIn(0f, 1f)
-            val highPassSide = side * sideStart
+            // Apply the HRTF-like coloration only to the delayed reflection.
+            // This is intentionally subtle and is not a true measured HRTF.
+            hrtfLp += hrtfAlpha * (delayedSide - hrtfLp)
+            val delayedHigh = (delayedSide - hrtfLp) * hrtfBandGain() * height3D
 
-            // ITD is now genuinely interaural: the left/right Side contributions use
-            // different read positions instead of delaying each channel identically.
-            leftDelay[delayIndex] = highPassSide
-            rightDelay[delayIndex] = highPassSide
-            val direct = highPassSide
-            val delayedIndex = wrap(delayIndex - itdSamples, leftDelay.size)
-            val delayed = leftDelay[delayedIndex]
-            val delayedRight = rightDelay[delayedIndex]
+            // Keep the center stable. Spatial gain is applied to Side only.
+            val sideGain = 1f + immersion * 0.90f
+            val delayedMix = immersion * 0.30f
 
-            // HF shaping is applied only to the delayed reflection. This is an
-            // intentionally subtle HRTF-like coloration, not a claim of true HRTF.
-            hrtfLpL += hrtfAlpha * (delayed - hrtfLpL)
-            hrtfLpR += hrtfAlpha * (delayedRight - hrtfLpR)
-            val hfL = (delayed - hrtfLpL) * hrtfBandGain() * height3D
-            val hfR = (delayedRight - hrtfLpR) * hrtfBandGain() * height3D
+            // Direction is intentionally fixed for this first PCM core. A later
+            // azimuth control can swap direct/delayed ears without changing DSP.
+            val sideLeft = spatialSide * sideGain + delayedSide * delayedMix + delayedHigh
+            val sideRight = delayedSide * sideGain + spatialSide * delayedMix + delayedHigh
 
-            // Keep the center stable and widen only the spatialized Side component.
-            val sideAmount = immersion * (0.55f + 0.45f * spatialWeight)
-            val leftSpatial = direct * (1f + sideAmount) + delayedRight * 0.30f * immersion + hfL
-            val rightSpatial = direct * (1f + sideAmount) + delayed * 0.30f * immersion + hfR
+            // Reinsert the protected low Side naturally. Mid receives center focus.
+            val protectedSide = sideLow120
+            val outMid = mid * centerGain
+            val outLeft = outMid + protectedSide + sideLeft
+            val outRight = outMid - protectedSide - sideRight
 
-            val outMid = mid * center
-            val outL = outMid + leftSpatial + (l - mid) * 0.15f + lowMid * (1f - center).coerceAtLeast(0f)
-            val outR = outMid - rightSpatial + (r - mid) * 0.15f + lowMid * (1f - center).coerceAtLeast(0f)
-
-            pcmBuffer[i] = (softClip(outL) * 32767f).toInt().toShort()
-            pcmBuffer[i + 1] = (softClip(outR) * 32767f).toInt().toShort()
-
-            delayIndex = (delayIndex + 1) % leftDelay.size
+            pcmBuffer[i] = (softClip(outLeft) * 32767f).toInt().toShort()
+            pcmBuffer[i + 1] = (softClip(outRight) * 32767f).toInt().toShort()
         }
     }
 
     fun reset() {
-        leftDelay.fill(0f)
-        rightDelay.fill(0f)
-        lowL = 0f
-        lowR = 0f
-        spatialL = 0f
-        spatialR = 0f
-        hrtfLpL = 0f
-        hrtfLpR = 0f
+        sideDelay.fill(0f)
+        sideLow120 = 0f
+        sideLow250 = 0f
+        hrtfLp = 0f
         delayIndex = 0
     }
 
@@ -163,8 +144,6 @@ class ZeusAtmosEngine(
     }
 
     private fun hrtfBandGain(): Float {
-        // Gentle high-frequency reflection lift. The actual frequency selectivity
-        // comes from the high-pass state above; this stays deliberately restrained.
         val span = (hrtfEndHz - hrtfStartHz).coerceAtLeast(500f)
         val normalized = ((10000f - hrtfStartHz) / span).coerceIn(0f, 1f)
         return 0.08f + 0.10f * sin(normalized * PI.toFloat())
