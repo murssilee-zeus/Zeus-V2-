@@ -19,31 +19,24 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          ms=Path('app/src/main/java/com/zeus/v2/MainScreen.kt')
-          m=ms.read_text()
+          import re
+          p=Path('app/src/main/java/com/zeus/v2/MainScreen.kt')
+          m=p.read_text()
 
-          old='''                    selected = selectedCompBand == 3,
-                    freq = 20000f,
-                    range = 20000f..20000f,
-                    onSelect = { selectedCompBand = 3 },
-                    onFreq = { },
-                    enabled = false,'''
-          new='''                    selected = selectedCompBand == 3,
-                    freq = viewModel.crossoverFrequencies[3],
-                    range = 9000f..20000f,
-                    onSelect = { selectedCompBand = 3 },
-                    onFreq = { viewModel.setCrossover(3, it) },
-                    enabled = true,'''
-          if old in m:
-              m=m.replace(old,new,1)
-          elif 'freq = viewModel.crossoverFrequencies[3]' not in m:
+          # The HIGH column is currently fixed at 20 kHz. Replace that block regardless of indentation.
+          pat=re.compile(r'(selected\s*=\s*selectedCompBand\s*==\s*3,\s*\n\s*)freq\s*=\s*20000f,\s*\n\s*range\s*=\s*20000f\.\.20000f,\s*\n\s*onSelect\s*=\s*\{\s*selectedCompBand\s*=\s*3\s*\},\s*\n\s*onFreq\s*=\s*\{\s*\},\s*\n\s*enabled\s*=\s*false,')
+          repl=r'\1freq = viewModel.crossoverFrequencies[3],\n                    range = 9000f..20000f,\n                    onSelect = { selectedCompBand = 3 },\n                    onFreq = { viewModel.setCrossover(3, it) },\n                    enabled = true,'
+          m,n=pat.subn(repl,m,count=1)
+          if n==0 and 'freq = viewModel.crossoverFrequencies[3]' not in m:
               raise SystemExit('HIGH Cross4 UI block not found')
 
-          m=m.replace('            cross3 = viewModel.crossoverFrequencies[2],\n', '            cross3 = viewModel.crossoverFrequencies[2],\n            cross4 = viewModel.crossoverFrequencies[3],\n', 1)
-          m=m.replace('    cross3: Float,\n    colors: List<Color>,', '    cross3: Float,\n    cross4: Float,\n    colors: List<Color>,', 1)
+          if 'cross4 = viewModel.crossoverFrequencies[3]' not in m:
+              m=m.replace('cross3 = viewModel.crossoverFrequencies[2],', 'cross3 = viewModel.crossoverFrequencies[2],\n            cross4 = viewModel.crossoverFrequencies[3],', 1)
+          if 'cross4: Float' not in m:
+              m=m.replace('cross3: Float,\n    colors: List<Color>,', 'cross3: Float,\n    cross4: Float,\n    colors: List<Color>,', 1)
           m=m.replace('val cuts = listOf(minF, cross1, cross2, cross3, maxF)', 'val cuts = listOf(minF, cross1, cross2, cross3, cross4, maxF)', 1)
           m=m.replace('listOf(cross1, cross2, cross3).forEach', 'listOf(cross1, cross2, cross3, cross4).forEach', 1)
-          ms.write_text(m)
+          p.write_text(m)
           PY
           rm -f .github/workflows/enable-cross4.yml .github/cross4-trigger.txt
           git config user.name 'zeus-autoeq-bot'
