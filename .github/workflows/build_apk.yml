@@ -7,100 +7,12 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Apply Cross 4 implementation
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          vm = Path('app/src/main/java/com/zeus/v2/EqViewModel.kt')
-          s = vm.read_text()
-          s = s.replace('var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)', 'var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f, 20000f)', 1)
-          old_fun = '''    fun setCrossover(index: Int, freq: Float) {
-        if (index !in 0..2) return
-        val f = freq.coerceIn(40f, 19500f)
-        when (index) {
-            0 -> crossoverFrequencies[0] = f.coerceAtMost(crossoverFrequencies[1] - 50f)
-            1 -> crossoverFrequencies[1] = f.coerceIn(
-                crossoverFrequencies[0] + 50f,
-                crossoverFrequencies[2] - 50f
-            )
-            2 -> crossoverFrequencies[2] = f.coerceAtLeast(crossoverFrequencies[1] + 50f)
-        }
-    }'''
-          new_fun = '''    fun setCrossover(index: Int, freq: Float) {
-        if (index !in 0..3) return
-        when (index) {
-            0 -> crossoverFrequencies[0] = freq.coerceIn(40f, crossoverFrequencies[1] - 50f)
-            1 -> crossoverFrequencies[1] = freq.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)
-            2 -> crossoverFrequencies[2] = freq.coerceIn(crossoverFrequencies[1] + 50f, crossoverFrequencies[3] - 50f)
-            3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
-        }
-    }'''
-          if old_fun in s:
-              s = s.replace(old_fun, new_fun, 1)
-          elif 'if (index !in 0..3) return' not in s:
-              raise SystemExit('setCrossover block not found')
-          s = re.sub(r'(cross3\s*=\s*crossoverFrequencies\.getOrElse\(2\)\s*\{\s*8000f\s*\},)', r'\1 cross4 = crossoverFrequencies.getOrElse(3) { 20000f },', s, count=1)
-          # Preserve Cross4 when loading saved settings if the restore block exists.
-          p = re.compile(r'(crossoverFrequencies\[2\]\s*=\s*settings\.cross3\s*)')
-          if p.search(s) and 'crossoverFrequencies[3] = settings.cross4' not in s:
-              s = p.sub(r'\1\n        crossoverFrequencies[3] = settings.cross4', s, count=1)
-          vm.write_text(s)
-
-          ms = Path('app/src/main/java/com/zeus/v2/MainScreen.kt')
-          m = ms.read_text()
-          old_high = '''                    selected = selectedCompBand == 3,
-                    freq = 20000f,
-                    range = 20000f..20000f,
-                    onSelect = { selectedCompBand = 3 },
-                    onFreq = { },
-                    enabled = false,'''
-          new_high = '''                    selected = selectedCompBand == 3,
-                    freq = viewModel.crossoverFrequencies[3],
-                    range = 9000f..20000f,
-                    onSelect = { selectedCompBand = 3 },
-                    onFreq = { viewModel.setCrossover(3, it) },
-                    enabled = true,'''
-          if old_high in m:
-              m = m.replace(old_high, new_high, 1)
-          m = m.replace('            cross3 = viewModel.crossoverFrequencies[2],\n', '            cross3 = viewModel.crossoverFrequencies[2],\n            cross4 = viewModel.crossoverFrequencies[3],\n', 1)
-          m = m.replace('    cross3: Float,\n    colors: List<Color>,', '    cross3: Float,\n    cross4: Float,\n    colors: List<Color>,', 1)
-          m = m.replace('val cuts = listOf(minF, cross1, cross2, cross3, maxF)', 'val cuts = listOf(minF, cross1, cross2, cross3, cross4, maxF)', 1)
-          m = m.replace('listOf(cross1, cross2, cross3).forEach', 'listOf(cross1, cross2, cross3, cross4).forEach', 1)
-          ms.write_text(m)
-          PY
-
-          rm -f .github/workflows/enable-cross4.yml
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('.github/workflows/build_apk.yml')
-          s=p.read_text()
-          marker='      - name: Apply Cross 4 implementation\n'
-          start=s.find(marker)
-          if start >= 0:
-              end=s.find('      - name: Set up JDK 17\n', start)
-              if end < 0:
-                  raise SystemExit('build workflow cleanup marker not found')
-              s=s[:start]+s[end:]
-              p.write_text(s)
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/com/zeus/v2/EqViewModel.kt app/src/main/java/com/zeus/v2/MainScreen.kt .github/workflows/build_apk.yml .github/workflows/enable-cross4.yml
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: activate editable multiband cross4"
-          git push origin HEAD:fix/punch-v2
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
