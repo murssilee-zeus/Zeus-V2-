@@ -1,4 +1,4 @@
-name: Enable Cross 4
+name: Enable Cross 4 UI
 
 on:
   push:
@@ -15,94 +15,39 @@ jobs:
         with:
           ref: fix/punch-v2
           fetch-depth: 1
-
-      - name: Patch Cross 4 UI and ViewModel
+      - name: Patch Cross 4 UI
         run: |
-          python3 <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
-          import re
+          ms=Path('app/src/main/java/com/zeus/v2/MainScreen.kt')
+          m=ms.read_text()
 
-          vm = Path('app/src/main/java/com/zeus/v2/EqViewModel.kt')
-          s = vm.read_text()
-
-          old = 'var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f)'
-          new = 'var crossoverFrequencies = mutableStateListOf(180f, 1800f, 8000f, 20000f)'
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit('Cross4 list declaration not found')
-
-          old_fun = '''    fun setCrossover(index: Int, freq: Float) {
-          if (index !in 0..2) return
-          val f = freq.coerceIn(40f, 19500f)
-          when (index) {
-              0 -> crossoverFrequencies[0] = f.coerceAtMost(crossoverFrequencies[1] - 50f)
-              1 -> crossoverFrequencies[1] = f.coerceIn(
-                  crossoverFrequencies[0] + 50f,
-                  crossoverFrequencies[2] - 50f
-              )
-              2 -> crossoverFrequencies[2] = f.coerceAtLeast(crossoverFrequencies[1] + 50f)
-          }
-      }'''
-          new_fun = '''    fun setCrossover(index: Int, freq: Float) {
-          if (index !in 0..3) return
-          when (index) {
-              0 -> crossoverFrequencies[0] = freq.coerceIn(40f, crossoverFrequencies[1] - 50f)
-              1 -> crossoverFrequencies[1] = freq.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)
-              2 -> crossoverFrequencies[2] = freq.coerceIn(crossoverFrequencies[1] + 50f, crossoverFrequencies[3] - 50f)
-              3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
-          }
-      }'''
-          if old_fun in s:
-              s = s.replace(old_fun, new_fun, 1)
-          elif 'if (index !in 0..3) return' not in s:
-              raise SystemExit('setCrossover block not found')
-
-          s = re.sub(r'(cross3\s*=\s*crossoverFrequencies\.getOrElse\(2\)\s*\{\s*8000f\s*\},)', r'\1 cross4 = crossoverFrequencies.getOrElse(3) { 20000f },', s, count=1)
-
-          # Load Cross 4 when restoring a saved configuration, while keeping old configs valid.
-          pat = re.compile(r'(crossoverFrequencies\[2\]\s*=\s*(?:settings|s)\.cross3\s*)')
-          if pat.search(s) and 'crossoverFrequencies[3]' not in s[s.find('crossoverFrequencies[2] ='):s.find('crossoverFrequencies[2] =')+300]:
-              s = pat.sub(r'\1\n        crossoverFrequencies[3] = (?:settings|s).cross4', s, count=1)
-              s = s.replace('= (?:settings|s).cross4', '= settings.cross4')
-          vm.write_text(s)
-
-          ms = Path('app/src/main/java/com/zeus/v2/MainScreen.kt')
-          m = ms.read_text()
-
-          # Expose the fourth crossover as the editable upper boundary of the HIGH band.
-          old_high = '''                    selected = selectedCompBand == 3,
+          old='''                    selected = selectedCompBand == 3,
                     freq = 20000f,
                     range = 20000f..20000f,
                     onSelect = { selectedCompBand = 3 },
                     onFreq = { },
                     enabled = false,'''
-          new_high = '''                    selected = selectedCompBand == 3,
+          new='''                    selected = selectedCompBand == 3,
                     freq = viewModel.crossoverFrequencies[3],
                     range = 9000f..20000f,
                     onSelect = { selectedCompBand = 3 },
                     onFreq = { viewModel.setCrossover(3, it) },
                     enabled = true,'''
-          if old_high in m:
-              m = m.replace(old_high, new_high, 1)
+          if old in m:
+              m=m.replace(old,new,1)
           elif 'freq = viewModel.crossoverFrequencies[3]' not in m:
               raise SystemExit('HIGH Cross4 UI block not found')
 
-          # Pass Cross4 into the crossover graph.
-          m = m.replace('            cross3 = viewModel.crossoverFrequencies[2],\n', '            cross3 = viewModel.crossoverFrequencies[2],\n            cross4 = viewModel.crossoverFrequencies[3],\n', 1)
-          m = m.replace('    cross3: Float,\n    colors: List<Color>,', '    cross3: Float,\n    cross4: Float,\n    colors: List<Color>,', 1)
-          m = m.replace('val cuts = listOf(minF, cross1, cross2, cross3, maxF)', 'val cuts = listOf(minF, cross1, cross2, cross3, cross4, maxF)', 1)
-          m = m.replace('for (i in 0 until 4) {', 'for (i in 0 until 4) {', 1)
-          m = m.replace('listOf(cross1, cross2, cross3).forEach', 'listOf(cross1, cross2, cross3, cross4).forEach', 1)
+          m=m.replace('            cross3 = viewModel.crossoverFrequencies[2],\n', '            cross3 = viewModel.crossoverFrequencies[2],\n            cross4 = viewModel.crossoverFrequencies[3],\n', 1)
+          m=m.replace('    cross3: Float,\n    colors: List<Color>,', '    cross3: Float,\n    cross4: Float,\n    colors: List<Color>,', 1)
+          m=m.replace('val cuts = listOf(minF, cross1, cross2, cross3, maxF)', 'val cuts = listOf(minF, cross1, cross2, cross3, cross4, maxF)', 1)
+          m=m.replace('listOf(cross1, cross2, cross3).forEach', 'listOf(cross1, cross2, cross3, cross4).forEach', 1)
           ms.write_text(m)
           PY
-
-      - name: Remove patch workflow and commit changes
-        run: |
-          rm -f .github/workflows/enable-cross4.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/com/zeus/v2/EqViewModel.kt app/src/main/java/com/zeus/v2/MainScreen.kt .github/workflows/enable-cross4.yml
-          git diff --cached --quiet && exit 0
-          git commit -m "feat: activate editable multiband cross4"
+          rm -f .github/workflows/enable-cross4.yml .github/cross4-trigger.txt
+          git config user.name 'zeus-autoeq-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/com/zeus/v2/MainScreen.kt .github/workflows/enable-cross4.yml .github/cross4-trigger.txt
+          git diff --cached --quiet || git commit -m 'Finish Cross 4 UI activation'
           git push origin HEAD:fix/punch-v2
