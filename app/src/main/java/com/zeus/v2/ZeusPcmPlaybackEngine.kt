@@ -4,7 +4,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
-import android.media.MediaProjection
+import android.media.projection.MediaProjection
 import android.media.AudioPlaybackCaptureConfiguration
 import android.os.Build
 import android.os.Process
