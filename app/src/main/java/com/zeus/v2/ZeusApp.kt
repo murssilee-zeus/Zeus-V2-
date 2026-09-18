@@ -10,6 +10,7 @@ import java.util.Locale
 class ZeusApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        ZeusShizukuBridge.initialize()
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
