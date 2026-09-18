@@ -28,6 +28,7 @@ object ZeusShizukuBridge {
     } catch (t: Throwable) {
         Log.w(TAG, "Shizuku refresh failed: " + t.message)
         state = State.UNAVAILABLE; remoteUid = -1; selinuxContext = null; state
+        }
     }
 
     fun requestPermission(): Boolean = try {
