@@ -16,7 +16,8 @@ object ZeusShizukuBridge {
     @Volatile var selinuxContext: String? = null
         private set
 
-    fun refresh(): State = try {
+    fun refresh(): State {
+        return try {
         if (!Shizuku.pingBinder()) {
             state = State.UNAVAILABLE; remoteUid = -1; selinuxContext = null; return state
         }
