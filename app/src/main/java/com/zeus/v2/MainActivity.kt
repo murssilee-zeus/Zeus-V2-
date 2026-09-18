@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -27,11 +28,21 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private var audioService: AudioEngineService? = null
     private var bound = false
+    private var pendingEngineVm: EqViewModel? = null
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) { audioService = (service as AudioEngineService.LocalBinder).getService(); bound = true }
         override fun onServiceDisconnected(name: ComponentName?) { audioService = null; bound = false }
     }
     private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p -> if (!p.values.all { it }) Toast.makeText(this, "Se necesitan permisos de audio para el procesamiento y Spectrum en tiempo real", Toast.LENGTH_LONG).show() }
+    private val playbackCaptureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val vm = pendingEngineVm
+        pendingEngineVm = null
+        if (result.resultCode != android.app.Activity.RESULT_OK || result.data == null) {
+            Toast.makeText(this, "PCM Atmos no se inició: permiso de captura cancelado", Toast.LENGTH_LONG).show()
+            return@registerForActivityResult
+        }
+        startEngineService(vm, result.resultCode, result.data)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,7 +97,31 @@ class MainActivity : ComponentActivity() {
             Surface(Modifier,color=Color(0xFF0D0D12)) { ZeusStudioScreenV2(vm,punch,{toggleEngine(vm)},{vm.saveSettings();punch.save();Toast.makeText(this@MainActivity,"Configuración guardada",Toast.LENGTH_SHORT).show()},{exportLauncher.launch(ConfigFileRepository.fileNameForExport())},{importLauncher.launch(arrayOf("application/json","text/json","text/plain"))}) }
         }
     }
-    private fun toggleEngine(vm:EqViewModel){if(vm.isEngineRunning){try{audioService?.audioEngine?.setEnabled(false)}catch(_:Exception){};try{stopService(Intent(this,AudioEngineService::class.java))}catch(_:Exception){};if(bound){try{unbindService(connection)}catch(_:Exception){};bound=false};audioService=null;vm.isEngineRunning=false}else{val intent=Intent(this,AudioEngineService::class.java);try{if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O)startForegroundService(intent)else startService(intent);bindService(intent,connection,Context.BIND_AUTO_CREATE);vm.isEngineRunning=true;Toast.makeText(this,"Zeus EQ Pro18 activado",Toast.LENGTH_SHORT).show()}catch(e:Exception){vm.isEngineRunning=false;Toast.makeText(this,"No se pudo iniciar el motor: ${e.message}",Toast.LENGTH_LONG).show()}}}
+    private fun toggleEngine(vm:EqViewModel){
+        if(vm.isEngineRunning){
+            try{audioService?.audioEngine?.setEnabled(false)}catch(_:Exception){}
+            try{stopService(Intent(this,AudioEngineService::class.java))}catch(_:Exception){}
+            if(bound){try{unbindService(connection)}catch(_:Exception){};bound=false}
+            audioService=null;vm.isEngineRunning=false;return
+        }
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){
+            pendingEngineVm=vm
+            try{
+                val manager=getSystemService(MediaProjectionManager::class.java)
+                playbackCaptureLauncher.launch(manager.createScreenCaptureIntent())
+            }catch(e:Exception){pendingEngineVm=null;Toast.makeText(this,"No se pudo solicitar captura PCM: ${e.message}",Toast.LENGTH_LONG).show()}
+        }else startEngineService(vm,-1,null)
+    }
+    private fun startEngineService(vm:EqViewModel?,projectionResultCode:Int,projectionData:Intent?){
+        val intent=Intent(this,AudioEngineService::class.java)
+        if(projectionData!=null){intent.putExtra(AudioEngineService.EXTRA_PROJECTION_RESULT,projectionResultCode);intent.putExtra(AudioEngineService.EXTRA_PROJECTION_DATA,projectionData)}
+        try{
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O)startForegroundService(intent)else startService(intent)
+            bindService(intent,connection,Context.BIND_AUTO_CREATE)
+            vm?.isEngineRunning=true
+            Toast.makeText(this,if(projectionData!=null)"Zeus PCM Atmos activado" else "Zeus EQ Pro18 activado",Toast.LENGTH_SHORT).show()
+        }catch(e:Exception){vm?.isEngineRunning=false;Toast.makeText(this,"No se pudo iniciar el motor: ${e.message}",Toast.LENGTH_LONG).show()}
+    }
     private fun requestNeededPermissions(){val permissions=mutableListOf(Manifest.permission.MODIFY_AUDIO_SETTINGS,Manifest.permission.RECORD_AUDIO);if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU)permissions.add(Manifest.permission.POST_NOTIFICATIONS);val toRequest=permissions.filter{ContextCompat.checkSelfPermission(this,it)!=PackageManager.PERMISSION_GRANTED};if(toRequest.isNotEmpty())requestPermissionLauncher.launch(toRequest.toTypedArray())}
     override fun onStart(){super.onStart()}; override fun onStop(){super.onStop();if(bound){try{unbindService(connection)}catch(_:Exception){};bound=false}}
 }
