@@ -135,26 +135,16 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         subBoost = 6f
 
         bands.clear()
-        bands.add(
-            createNewBand(0, 18f).copy(gain = 9f, q = 0.75f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true)
-        )
-        bands.add(
-            createNewBand(1, 33f).copy(gain = 3.5f, q = 1.1f, filterType = EqBand.FilterType.PEAK, enabled = true)
-        )
-        bands.add(
-            createNewBand(2, 48f).copy(gain = 2.5f, q = 2.2f, filterType = EqBand.FilterType.PEAK, enabled = true)
-        )
-        bands.add(
-            createNewBand(3, 90f).copy(gain = 1.5f, q = 0.9f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true)
-        )
+        bands.add(createNewBand(0, 18f).copy(gain = 9f, q = 0.75f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
+        bands.add(createNewBand(1, 33f).copy(gain = 3.5f, q = 1.1f, filterType = EqBand.FilterType.PEAK, enabled = true))
+        bands.add(createNewBand(2, 48f).copy(gain = 2.5f, q = 2.2f, filterType = EqBand.FilterType.PEAK, enabled = true))
+        bands.add(createNewBand(3, 90f).copy(gain = 1.5f, q = 0.9f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
         bands.add(createNewBand(4, 250f).copy(gain = 0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(5, 500f).copy(gain = 0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(6, 1000f).copy(gain = 0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(7, 2500f).copy(gain = 0.5f, q = 1.2f, enabled = true))
         bands.add(createNewBand(8, 6000f).copy(gain = 1.0f, q = 1.0f, enabled = true))
-        bands.add(
-            createNewBand(9, 12000f).copy(gain = 1.0f, q = 0.8f, filterType = EqBand.FilterType.HIGH_SHELF, enabled = true)
-        )
+        bands.add(createNewBand(9, 12000f).copy(gain = 1.0f, q = 0.8f, filterType = EqBand.FilterType.HIGH_SHELF, enabled = true))
         selectedBandIndex = 0
         compressorMultibandEnabled = true
         crossoverFrequencies[0] = 120f
@@ -207,7 +197,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun toSettings(): EqSettings = EqSettings(
         preGain = preamp, subBoost = subBoost, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
         limiterAttack = limiterAttack, limiterRelease = limiterRelease, limiterRatio = limiterRatio, limiterPostGain = limiterPostGain,
-        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
+        compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         compThLow = compMbThLow, compThLoMid = compMbThLoMid, compThHiMid = compMbThHiMid, compThHigh = compMbThHigh,
         compRatioLow = compMbRatioLow, compRatioLoMid = compMbRatioLoMid, compRatioHiMid = compMbRatioHiMid, compRatioHigh = compMbRatioHigh,
         compKneeLow = compMbKneeLow, compKneeLoMid = compMbKneeLoMid, compKneeHiMid = compMbKneeHiMid, compKneeHigh = compMbKneeHigh,
