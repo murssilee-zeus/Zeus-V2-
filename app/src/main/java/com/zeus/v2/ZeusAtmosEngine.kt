@@ -1,24 +1,19 @@
 package com.zeus.v2
 
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.sin
 import kotlin.math.tanh
 
 /**
  * PCM Atmos-style spatial processor.
  *
- * Independent from Android AudioEffect/Virtualizer. This is the DSP core for
- * a future PCM-controlled path.
+ * The PCM path now uses a real LR4 four-way frequency split:
+ * 180 / 1800 / 8000 Hz, with 24 dB/octave slopes.
  *
- * Frequency architecture:
- * - Side below lowProtectHz stays in the direct path for bass/punch safety.
- * - Side between lowProtectHz and spatialStartHz is only partly spatialized.
- * - Side above spatialStartHz receives the ITD spatial path.
- * - A subtle 6..12 kHz band is added to the delayed path for height/air.
- *
- * ITD is fractional-sample capable so 0.2..0.8 ms is not forced to integer samples.
+ * The low band remains protected from ITD/spatial widening. Spatial energy
+ * is progressively introduced through low-mid, high-mid and high bands.
+ * This keeps the previous Zeus sonic character while making the crossover
+ * behavior substantially more controlled than the former one-pole split.
  */
 class ZeusAtmosEngine(
     private val sampleRate: Int = 44100
@@ -36,19 +31,23 @@ class ZeusAtmosEngine(
     var itdMs: Float = 0.6f
         set(value) { field = value.coerceIn(0.2f, 0.8f) }
 
-    /** Sub-bass / punch protection starts here. */
+    /** Bass protection reference. The LR4 low band extends through the 180 Hz crossover. */
     var lowProtectHz: Float = 120f
         set(value) { field = value.coerceIn(60f, 250f) }
 
-    /** Side spatialization is fully active above this point. */
-    var spatialStartHz: Float = 250f
+    /** First LR4 crossover. */
+    var spatialStartHz: Float = 180f
         set(value) { field = value.coerceIn(120f, 1000f) }
 
-    /** HRTF-like shaping starts here. */
-    var hrtfStartHz: Float = 6000f
-        set(value) { field = value.coerceIn(3000f, 9000f) }
+    /** Second LR4 crossover. */
+    var spatialMidHz: Float = 1800f
+        set(value) { field = value.coerceIn(spatialStartHz + 100f, 8000f) }
 
-    /** HRTF-like shaping ends here. */
+    /** Third LR4 crossover / high spatial band boundary. */
+    var hrtfStartHz: Float = 8000f
+        set(value) { field = value.coerceIn(spatialMidHz + 100f, 16000f) }
+
+    /** Kept as a public tuning point for compatibility. */
     var hrtfEndHz: Float = 12000f
         set(value) { field = value.coerceIn(hrtfStartHz + 500f, 18000f) }
 
@@ -56,13 +55,12 @@ class ZeusAtmosEngine(
     private val sideDelay = FloatArray(maxDelaySamples + 2)
     private var delayIndex = 0
 
-    // Proper complementary Side split: LP120, LP250, then the differences.
-    private var sideLow = 0f
-    private var sideLowSpatial = 0f
-
-    // Two low-pass states make a real 6..12 kHz band from LP(end) - LP(start).
-    private var hrtfLpStart = 0f
-    private var hrtfLpEnd = 0f
+    private var lr4 = ZeusLr4BandSplitter(
+        sampleRate = sampleRate,
+        crossover1Hz = spatialStartHz,
+        crossover2Hz = spatialMidHz,
+        crossover3Hz = hrtfStartHz
+    )
 
     /**
      * Processes interleaved signed 16-bit stereo PCM in-place.
@@ -75,10 +73,6 @@ class ZeusAtmosEngine(
         val itdSamples = (sampleRate * itdMs * 0.001f)
             .coerceIn(1f, maxDelaySamples.toFloat())
 
-        val lowAlpha = onePoleAlpha(lowProtectHz)
-        val spatialAlpha = onePoleAlpha(spatialStartHz)
-        val hrtfStartAlpha = onePoleAlpha(hrtfStartHz)
-        val hrtfEndAlpha = onePoleAlpha(hrtfEndHz)
         val immersion = atmosImmersion
         val centerGain = centerFocus.coerceIn(0f, 1.5f)
 
@@ -90,17 +84,16 @@ class ZeusAtmosEngine(
             val mid = (left + right) * 0.5f
             val side = (left - right) * 0.5f
 
-            // Complementary frequency split.
-            sideLow += lowAlpha * (side - sideLow)
-            sideLowSpatial += spatialAlpha * (side - sideLowSpatial)
+            // True LR4 four-way split: 24 dB/octave at 180 / 1800 / 8000 Hz.
+            val bands = lr4.process(side)
 
-            val protectedLow = sideLow
-            val transition = (sideLowSpatial - sideLow).coerceAtLeast(0f)
-            val spatialSide = (side - sideLowSpatial).coerceAtLeast(-1f)
-
-            // Keep half of the transition band spatializable, but never feed the
-            // protected low band into ITD.
-            val spatialInput = spatialSide + transition * 0.5f
+            // Keep the low band out of ITD. Low-mid is introduced gently,
+            // while upper bands receive progressively more spatial energy.
+            val protectedLow = bands.low
+            val spatialInput =
+                bands.lowMid * 0.55f +
+                bands.highMid * 0.85f +
+                bands.high
 
             // Fractional causal delay using linear interpolation in the ring buffer.
             sideDelay[delayIndex] = spatialInput
@@ -112,22 +105,19 @@ class ZeusAtmosEngine(
             val delayedSide = delayedA * (1f - frac) + delayedB * frac
             delayIndex = (delayIndex + 1) % sideDelay.size
 
-            // A subtle 6..12 kHz band on the delayed path. This is an HRTF-like
-            // coloration, not a measured HRTF profile.
-            hrtfLpStart += hrtfStartAlpha * (delayedSide - hrtfLpStart)
-            hrtfLpEnd += hrtfEndAlpha * (delayedSide - hrtfLpEnd)
-            val hrtfBand = (hrtfLpEnd - hrtfLpStart).coerceIn(-1f, 1f)
-            val delayedHigh = hrtfBand * (0.08f + 0.10f * height3D) * height3D
+            // High-band contribution provides a restrained height/air cue.
+            // This is an HRTF-like coloration, not a measured HRTF profile.
+            val delayedHigh =
+                bands.high * (0.08f + 0.10f * height3D) * height3D
 
             val sideGain = 1f + immersion * 0.90f
             val delayedMix = immersion * 0.30f
 
-            // Fixed direction for the first PCM core. A later azimuth control can
-            // swap direct/delayed ears without changing the frequency architecture.
+            // Fixed direction for the first PCM core.
             val sideLeft = spatialInput * sideGain + delayedSide * delayedMix + delayedHigh
             val sideRight = delayedSide * sideGain + spatialInput * delayedMix + delayedHigh
 
-            // Reinsert protected low Side naturally. Mid receives center focus.
+            // Reinsert the protected low band naturally. Mid receives center focus.
             val outMid = mid * centerGain
             val outLeft = outMid + protectedLow + sideLeft
             val outRight = outMid - protectedLow - sideRight
@@ -139,17 +129,8 @@ class ZeusAtmosEngine(
 
     fun reset() {
         sideDelay.fill(0f)
-        sideLow = 0f
-        sideLowSpatial = 0f
-        hrtfLpStart = 0f
-        hrtfLpEnd = 0f
         delayIndex = 0
-    }
-
-    private fun onePoleAlpha(cutoffHz: Float): Float {
-        val fc = cutoffHz.coerceIn(20f, sampleRate * 0.45f)
-        val x = (2f * PI.toFloat() * fc / sampleRate).coerceAtLeast(0.0001f)
-        return (x / (1f + x)).coerceIn(0.001f, 0.95f)
+        lr4.reset()
     }
 
     private fun wrap(index: Int, size: Int): Int {
