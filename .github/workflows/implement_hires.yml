@@ -30,7 +30,9 @@ jobs:
           old_fun='''    fun setCrossover(index: Int, freq: Float) {\n        if (index !in 0..2) return\n        val f = freq.coerceIn(40f, 19500f)\n        when (index) {\n            0 -> crossoverFrequencies[0] = f.coerceAtMost(crossoverFrequencies[1] - 50f)\n            1 -> crossoverFrequencies[1] = f.coerceIn(\n                crossoverFrequencies[0] + 50f,\n                crossoverFrequencies[2] - 50f\n            )\n            2 -> crossoverFrequencies[2] = f.coerceAtLeast(crossoverFrequencies[1] + 50f)\n        }\n    }'''
           new_fun='''    fun setCrossover(index: Int, freq: Float) {\n        if (index !in 0..3) return\n        when (index) {\n            0 -> crossoverFrequencies[0] = freq.coerceIn(40f, crossoverFrequencies[1] - 50f)\n            1 -> crossoverFrequencies[1] = freq.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)\n            2 -> crossoverFrequencies[2] = freq.coerceIn(crossoverFrequencies[1] + 50f, crossoverFrequencies[3] - 50f)\n            3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)\n        }\n    }'''
           if old_fun in s: s=s.replace(old_fun,new_fun,1)
-          s=re.sub(r'(cross3\s*=\s*crossoverFrequencies\.getOrElse\(2\)\s*\{\s*8000f\s*\},)',r'\1 cross4 = crossoverFrequencies.getOrElse(3) { 20000f },',s,count=1)
+          # Make the Cross 4 insertion idempotent: remove every previous generated copy, then add exactly one.
+          s=re.sub(r'\s*cross4\s*=\s*crossoverFrequencies\.getOrElse\(3\)\s*\{\s*20000f\s*\},?', '', s)
+          s=re.sub(r'(cross3\s*=\s*crossoverFrequencies\.getOrElse\(2\)\s*\{\s*8000f\s*\},)', r'\1 cross4 = crossoverFrequencies.getOrElse(3) { 20000f },', s, count=1)
           if 'crossoverFrequencies[3] = settings.cross4' not in s:
               s=s.replace('crossoverFrequencies[2] = settings.cross3','crossoverFrequencies[2] = settings.cross3\n        crossoverFrequencies[3] = settings.cross4',1)
           p.write_text(s)
