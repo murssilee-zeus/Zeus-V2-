@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background_dark">#0A0A0F</color>
+    <color name="black_base">#0A0A0F</color>
+    <color name="grid_line">#2E1A35</color>
+    <color name="pink_dark">#C44569</color>
+    <color name="pink_primary">#FF6B9E</color>
+    <color name="purple_dark">#6C3483</color>
+    <color name="purple_primary">#9B59B6</color>
+    <color name="spectrum_fill">#3A1A4A</color>
+    <color name="surface_dark">#16101C</color>
+    <string name="app_name">Zeus-V2</string>
+    <string name="crossover_section">Crossover Multiband</string>
+    <string name="engine_started">Zeus EQ Pro18 activado</string>
+    <string name="eq_section">Equalizer V2</string>
+    <string name="eq_tile_label">Zeus EQ</string>
+    <string name="limiter_section">Limiter</string>
+    <string name="notif_channel_desc">Mantiene el motor de audio de Zeus EQ activo</string>
+    <string name="notif_channel_name">Zeus EQ</string>
+    <string name="notif_text_running">Motor de audio activo</string>
+    <string name="permissions_needed">Se necesitan permisos de audio para el procesamiento real</string>
+    <string name="pipeline_section">Audio Effects Pipeline</string>
+    <string name="service_channel">Zeus-V2 Service</string>
+    <string name="service_running">Zeus-V2 activo</string>
+    <string name="settings_saved">Configuración guardada</string>
+    <style name="Theme.ZeusV2" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#FF6B9E</item>
+        <item name="colorPrimaryVariant">#C44569</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#9B59B6</item>
+        <item name="android:statusBarColor">#0A0A0F</item>
+        <item name="android:navigationBarColor">#0A0A0F</item>
+        <item name="android:windowBackground">#0A0A0F</item>
+    </style>
+</resources>

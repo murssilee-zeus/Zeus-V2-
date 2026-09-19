@@ -1,0 +1,30 @@
+R_DEF: Internal format may change without notice
+local
+color background_dark
+color black_base
+color grid_line
+color pink_dark
+color pink_primary
+color purple_dark
+color purple_primary
+color spectrum_fill
+color surface_dark
+drawable ic_eq_tile
+drawable ic_launcher_background
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string crossover_section
+string engine_started
+string eq_section
+string eq_tile_label
+string limiter_section
+string notif_channel_desc
+string notif_channel_name
+string notif_text_running
+string permissions_needed
+string pipeline_section
+string service_channel
+string service_running
+string settings_saved
+style Theme.ZeusV2
