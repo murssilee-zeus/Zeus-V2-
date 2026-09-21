@@ -99,11 +99,11 @@ class ZeusMultibandCompressor(
             val g3 = bandGain(3, lb.high, rb.high)
 
             val outL =
-                lb.low * g0.first + lb.lowMid * g1.first +
-                lb.highMid * g2.first + lb.high * g3.first
+                lb.low * g0 + lb.lowMid * g1 +
+                lb.highMid * g2 + lb.high * g3
             val outR =
-                rb.low * g0.second + rb.lowMid * g1.second +
-                rb.highMid * g2.second + rb.high * g3.second
+                rb.low * g0 + rb.lowMid * g1 +
+                rb.highMid * g2 + rb.high * g3
 
             pcm[i] = clampAudio(outL)
             pcm[i + 1] = clampAudio(outR)
@@ -116,7 +116,7 @@ class ZeusMultibandCompressor(
         gainDb.fill(0f)
     }
 
-    private fun bandGain(band: Int, left: Float, right: Float): Pair<Float, Float> {
+    private fun bandGain(band: Int, left: Float, right: Float): Float {
         val p = params[band]
         val pre = dbToLinear(p.preGain)
         val lPre = left * pre
@@ -134,7 +134,7 @@ class ZeusMultibandCompressor(
         gainDb[band] += (targetGr - gainDb[band]) * (1f - coefficient)
 
         val gain = dbToLinear(gainDb[band] + p.postGain)
-        return Pair(lPre * gain, rPre * gain)
+        return gain
     }
 
     private fun compressionGainDb(levelDb: Float, threshold: Float, ratio: Float, knee: Float): Float {
