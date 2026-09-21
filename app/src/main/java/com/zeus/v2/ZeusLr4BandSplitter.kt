@@ -58,8 +58,8 @@ class ZeusLr4BandSplitter(
         cutoffHz: Float,
         highPass: Boolean
     ) {
-        private val first = Biquad(sampleRate, cutoffHz, highPass, 0.5411961f)
-        private val second = Biquad(sampleRate, cutoffHz, highPass, 1.306563f)
+        private val first = Biquad(sampleRate, cutoffHz, highPass, 0.70710678f)
+        private val second = Biquad(sampleRate, cutoffHz, highPass, 0.70710678f)
 
         fun process(x: Float): Float = second.process(first.process(x))
         fun reset() { first.reset(); second.reset() }
