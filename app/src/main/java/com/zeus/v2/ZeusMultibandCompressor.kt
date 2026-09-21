@@ -1,25 +1,24 @@
 package com.zeus.v2
 
+import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
-import kotlin.math.abs
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
- * Native Zeus 4-band multiband compressor.
+ * Native Zeus four-band multiband compressor.
  *
  * PCM stereo -> LR4 split -> independent band dynamics -> recombine.
- * Crossovers are LR4 (24 dB/oct) and the detector is stereo-linked RMS.
+ * The three crossover points use LR4 24 dB/octave filters.
  *
  * Bands:
- *   0 Low       < cross1
- *   1 Low-Mid   cross1 .. cross2
- *   2 High-Mid  cross2 .. cross3
- *   3 High      > cross3
+ *   Low      < cross1
+ *   Low-Mid  cross1 .. cross2
+ *   High-Mid cross2 .. cross3
+ *   High     > cross3
  *
- * This processor is deliberately independent from ZeusAtmosEngine.
+ * Deliberately independent from ZeusAtmosEngine.
  */
 class ZeusMultibandCompressor(
     private val sampleRate: Int
@@ -30,27 +29,21 @@ class ZeusMultibandCompressor(
     var cross3: Float = 8000f
 
     private data class Params(
-        var threshold: Float,
-        var ratio: Float,
-        var knee: Float,
-        var attack: Float,
-        var release: Float,
-        var preGain: Float,
-        var postGain: Float
+        var threshold: Float = -18f,
+        var ratio: Float = 4f,
+        var knee: Float = 6f,
+        var attack: Float = 15f,
+        var release: Float = 180f,
+        var preGain: Float = 0f,
+        var postGain: Float = 0f
     )
 
-    private val params = Array(4) {
-        Params(-18f, 4f, 6f, 15f, 180f, 0f, 0f)
-    }
-
-    private val splitL = ZeusLr4BandSplitter(sampleRate)
-    private val splitR = ZeusLr4BandSplitter(sampleRate)
-
+    private val params = Array(4) { Params() }
+    private var splitL = ZeusLr4BandSplitter(sampleRate)
+    private var splitR = ZeusLr4BandSplitter(sampleRate)
     private var configuredC1 = 180f
     private var configuredC2 = 1800f
     private var configuredC3 = 8000f
-
-    private val envelope = FloatArray(4)
     private val gainDb = FloatArray(4)
 
     fun configure(
@@ -80,8 +73,8 @@ class ZeusMultibandCompressor(
         }
 
         if (crossoverChanged()) {
-            splitL.reconfigure(cross1, cross2, cross3)
-            splitR.reconfigure(cross1, cross2, cross3)
+            splitL = ZeusLr4BandSplitter(sampleRate, cross1, cross2, cross3)
+            splitR = ZeusLr4BandSplitter(sampleRate, cross1, cross2, cross3)
             configuredC1 = cross1
             configuredC2 = cross2
             configuredC3 = cross3
@@ -97,51 +90,20 @@ class ZeusMultibandCompressor(
         for (i in 0 until n step 2) {
             val left = pcm[i] / 32768f
             val right = pcm[i + 1] / 32768f
-
             val lb = splitL.process(left)
             val rb = splitR.process(right)
 
-            val l0 = lb.low
-            val l1 = lb.lowMid
-            val l2 = lb.highMid
-            val l3 = lb.high
-            val r0 = rb.low
-            val r1 = rb.lowMid
-            val r2 = rb.highMid
-            val r3 = rb.high
+            val g0 = bandGain(0, lb.low, rb.low)
+            val g1 = bandGain(1, lb.lowMid, rb.lowMid)
+            val g2 = bandGain(2, lb.highMid, rb.highMid)
+            val g3 = bandGain(3, lb.high, rb.high)
 
-            val ls = floatArrayOf(l0, l1, l2, l3)
-            val rs = floatArrayOf(r0, r1, r2, r3)
-
-            for (band in 0..3) {
-                val p = params[band]
-                val pre = dbToLinear(p.preGain)
-                val lPre = ls[band] * pre
-                val rPre = rs[band] * pre
-
-                // Stereo-linked RMS detector: both channels receive the same GR.
-                val level = sqrt(
-                    max(1e-12f, (lPre * lPre + rPre * rPre) * 0.5f)
-                )
-                val levelDb = 20f * kotlin.math.log10(level.coerceAtLeast(1e-6f))
-
-                val targetGr = compressionGainDb(levelDb, p.threshold, p.ratio, p.knee)
-                val coefficient = if (targetGr < gainDb[band]) {
-                    // Faster movement into compression.
-                    exp(-1f / (0.001f * p.attack * sampleRate))
-                } else {
-                    // Slower recovery.
-                    exp(-1f / (0.001f * p.release * sampleRate))
-                }
-                gainDb[band] = coefficient * gainDb[band] + (1f - coefficient) * targetGr
-
-                val gain = dbToLinear(gainDb[band] + p.postGain)
-                ls[band] = lPre * gain
-                rs[band] = rPre * gain
-            }
-
-            val outL = ls[0] + ls[1] + ls[2] + ls[3]
-            val outR = rs[0] + rs[1] + rs[2] + rs[3]
+            val outL =
+                lb.low * g0.first + lb.lowMid * g1.first +
+                lb.highMid * g2.first + lb.high * g3.first
+            val outR =
+                rb.low * g0.second + rb.lowMid * g1.second +
+                rb.highMid * g2.second + rb.high * g3.second
 
             pcm[i] = clampAudio(outL)
             pcm[i + 1] = clampAudio(outR)
@@ -151,8 +113,39 @@ class ZeusMultibandCompressor(
     fun reset() {
         splitL.reset()
         splitR.reset()
-        envelope.fill(0f)
         gainDb.fill(0f)
+    }
+
+    private fun bandGain(band: Int, left: Float, right: Float): Pair<Float, Float> {
+        val p = params[band]
+        val pre = dbToLinear(p.preGain)
+        val lPre = left * pre
+        val rPre = right * pre
+
+        val level = sqrt(max(1e-12f, (lPre * lPre + rPre * rPre) * 0.5f))
+        val levelDb = 20f * kotlin.math.log10(level.coerceAtLeast(1e-6f))
+        val targetGr = compressionGainDb(levelDb, p.threshold, p.ratio, p.knee)
+
+        val coefficient = if (targetGr < gainDb[band]) {
+            exp(-1f / (0.001f * p.attack * sampleRate))
+        } else {
+            exp(-1f / (0.001f * p.release * sampleRate))
+        }
+        gainDb[band] += (targetGr - gainDb[band]) * (1f - coefficient)
+
+        val gain = dbToLinear(gainDb[band] + p.postGain)
+        return Pair(lPre * gain, rPre * gain)
+    }
+
+    private fun compressionGainDb(levelDb: Float, threshold: Float, ratio: Float, knee: Float): Float {
+        if (ratio <= 1.0001f || levelDb <= threshold - knee * 0.5f) return 0f
+        if (knee <= 0.01f || levelDb >= threshold + knee * 0.5f) {
+            return threshold + (levelDb - threshold) / ratio - levelDb
+        }
+
+        val x = levelDb - (threshold - knee * 0.5f)
+        val compressed = x * x / (2f * knee * ratio)
+        return -compressed
     }
 
     private fun crossoverChanged(): Boolean =
@@ -160,35 +153,10 @@ class ZeusMultibandCompressor(
         abs(cross2 - configuredC2) > 0.01f ||
         abs(cross3 - configuredC3) > 0.01f
 
-    private fun compressionGainDb(levelDb: Float, threshold: Float, ratio: Float, knee: Float): Float {
-        if (ratio <= 1.0001f) return 0f
-
-        if (knee <= 0.01f) {
-            return if (levelDb > threshold) {
-                threshold + (levelDb - threshold) / ratio - levelDb
-            } else 0f
-        }
-
-        val lower = threshold - knee * 0.5f
-        val upper = threshold + knee * 0.5f
-        return when {
-            levelDb <= lower -> 0f
-            levelDb >= upper -> threshold + (levelDb - threshold) / ratio - levelDb
-            else -> {
-                val x = levelDb - lower
-                val compressed = x * x / (2f * knee * ratio)
-                -compressed
-            }
-        }
-    }
-
-    private fun dbToLinear(db: Float): Float =
-        10f.pow(db / 20f)
+    private fun dbToLinear(db: Float): Float = 10f.pow(db / 20f)
 
     private fun clampAudio(x: Float): Short {
-        val shaped = if (abs(x) > 0.92f) {
-            kotlin.math.tanh(x.toDouble()).toFloat()
-        } else x
+        val shaped = if (abs(x) > 0.92f) kotlin.math.tanh(x.toDouble()).toFloat() else x
         return (shaped.coerceIn(-1f, 1f) * 32767f).toInt().toShort()
     }
 }
