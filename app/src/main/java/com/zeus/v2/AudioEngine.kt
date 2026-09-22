@@ -592,11 +592,13 @@ class AudioEngine(private val context: Context) {
                 PunchControl
                     .midBassGain(punch) * .65f
 
+            // Epicenter Extreme: preserve substantially more low-end headroom.
+            // The final limiter remains the safety net; do not pre-dilute the bass hit.
             val bassReserve =
                 settings.bassAmount
-                    .coerceIn(0f, 100f) * .018f +
+                    .coerceIn(0f, 100f) * .008f +
                 settings.bassHarmonics
-                    .coerceIn(0f, 100f) * .008f
+                    .coerceIn(0f, 100f) * .003f
 
             dp.setInputGainAllChannelsTo(
                 (
@@ -875,7 +877,9 @@ class AudioEngine(private val context: Context) {
                 return
             }
 
-            // MODO NORMAL (EPICENTER POWER ACTIVADO)
+            // MODO NORMAL: EPICENTER 2X EXTREMO
+            // La idea no es simplemente subir un único EQ: se reparte la presión
+            // entre subgrave, punch y armónicos para conservar impacto perceptible.
             val amount =
                 settings.bassAmount
                     .coerceIn(0f, 100f) / 100f
@@ -892,15 +896,15 @@ class AudioEngine(private val context: Context) {
                 settings.subBoost
                     .coerceIn(0f, 12f)
 
-            // Frecuencia central del golpe/punch
             val center =
                 PunchControl.punchCenter(
                     bassPunch
                 )
 
-            // BANDA 0: SUB-SÍSMICO PROFUNDIDAD EPICENTER (18Hz - 50Hz)
+            // BANDA 0: SUB-SÍSMICO EXTREMO
+            // 2x respecto al perfil Epicenter anterior, con techo de seguridad.
             val epicenterGain =
-                (amount * 4.0f) + (subBoostVal * 0.75f)
+                (amount * 8.0f) + (subBoostVal * 1.5f)
 
             val epicenterFreq =
                 if (subBoostVal > 0f) {
@@ -915,26 +919,29 @@ class AudioEngine(private val context: Context) {
                 DynamicsProcessing.EqBand(
                     epicenterGain > 0.05f,
                     epicenterFreq,
-                    epicenterGain.coerceAtMost(14f)
+                    epicenterGain.coerceAtMost(12f)
                 )
             )
 
-            // BANDA 1: EXPANSOR DE PUNCTUAL PUNCH (PEGADA DE SECA Y BATERÍA)
+            // BANDA 1: PUNCH EXTREMO
+            // Mantiene el golpe entre el subgrave y el cuerpo del bajo.
             val punchGain =
-                PunchControl.midBassGain(bassPunch) * 1.45f
+                PunchControl.midBassGain(bassPunch) * 2.30f
 
             dp.setPostEqBandAllChannelsTo(
                 1,
                 DynamicsProcessing.EqBand(
                     punchGain > 0.05f,
                     center,
-                    punchGain
+                    punchGain.coerceAtMost(12f)
                 )
             )
 
-            // BANDA 2: PARED DE PRESIÓN ARMÓNICA (2do ARMÓNICO)
+            // BANDA 2: ARMÓNICO DE PRESIÓN
+            // Hace que el grave siga siendo físicamente perceptible en altavoces
+            // que no reproducen con soltura la primera octava.
             val harmonic2Gain =
-                (harmonics * 2.2f) + (amount * 1.2f)
+                (harmonics * 4.4f) + (amount * 2.4f)
 
             val harmonic2Freq =
                 (center * 2f).coerceIn(80f, 320f)
@@ -944,13 +951,14 @@ class AudioEngine(private val context: Context) {
                 DynamicsProcessing.EqBand(
                     harmonic2Gain > 0.05f,
                     harmonic2Freq,
-                    harmonic2Gain
+                    harmonic2Gain.coerceAtMost(10f)
                 )
             )
 
-            // BANDA 3: COMPENSACIÓN Y TERCER ARMÓNICO (Evita opacar voces)
+            // BANDA 3: TERCER ARMÓNICO CONTROLADO
+            // Menos agresivo que el segundo para evitar ensuciar voces.
             val harmonic3Gain =
-                harmonics * 1.1f
+                harmonics * 2.2f
 
             val harmonic3Freq =
                 (center * 3f).coerceIn(240f, 1200f)
@@ -960,7 +968,7 @@ class AudioEngine(private val context: Context) {
                 DynamicsProcessing.EqBand(
                     harmonic3Gain > 0.05f,
                     harmonic3Freq,
-                    harmonic3Gain
+                    harmonic3Gain.coerceAtMost(6f)
                 )
             )
 
