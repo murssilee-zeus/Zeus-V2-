@@ -3,6 +3,7 @@ package com.zeus.v2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.pow
 
 class ZeusEpicenter(
     private val sampleRate: Int
@@ -85,7 +86,7 @@ class ZeusEpicenter(
             val w = 2.0 * Math.PI * f / sr
             val c = cos(w); val s = sin(w)
             val alpha = s / (2.0 * q)
-            val a = kotlin.math.pow(10.0, gainDb / 40.0)
+            val a = 10.0.pow(gainDb.toDouble() / 40.0)
             val sa = sqrt(a)
 
             val rb0: Double
