@@ -30,6 +30,7 @@ class AudioEngine(private val context: Context) {
 
     private var atmosEngine: ZeusAtmosEngine? = null
     private var zeusMbc: ZeusMultibandCompressor? = null
+    private var zeusEpicenter: ZeusEpicenter? = null
     private var pcmBuffer: ZeusPcmBuffer? = null
 
     @Volatile
@@ -203,6 +204,14 @@ class AudioEngine(private val context: Context) {
                 applyZeusMbc(it)
             }
 
+        zeusEpicenter =
+            ZeusEpicenter(sampleRate).also {
+                it.enabled =
+                    !hiResEnabled &&
+                    settings.pipelineEnabled
+                applyEpicenter(it)
+            }
+
         pcmBuffer = ZeusPcmBuffer()
 
         pcmAtmosEnabled = true
@@ -219,6 +228,7 @@ class AudioEngine(private val context: Context) {
 
         atmosEngine?.reset()
         zeusMbc?.reset()
+        zeusEpicenter?.reset()
         pcmBuffer?.clear()
     }
 
@@ -246,6 +256,15 @@ class AudioEngine(private val context: Context) {
             buffer,
             n
         )
+
+        // Native 2x Extreme Epicenter for the PCM route.
+        zeusEpicenter?.let {
+            it.enabled =
+                !hiResEnabled &&
+                settings.pipelineEnabled
+            applyEpicenter(it)
+            it.processStereo(buffer, n)
+        }
 
         // Existing Zeus Atmos engine.
         atmosEngine?.let {
@@ -283,10 +302,12 @@ class AudioEngine(private val context: Context) {
 
         atmosEngine?.reset()
         zeusMbc?.reset()
+        zeusEpicenter?.reset()
         pcmBuffer?.clear()
 
         atmosEngine = null
         zeusMbc = null
+        zeusEpicenter = null
         pcmBuffer = null
 
         try {
@@ -339,6 +360,10 @@ class AudioEngine(private val context: Context) {
         applyPostEq()
         applyLimiter()
         applyZeusMbc()
+        zeusEpicenter?.let {
+            it.enabled = !enabled && settings.pipelineEnabled
+            applyEpicenter(it)
+        }
 
         Log.i(
             TAG,
@@ -1070,6 +1095,20 @@ class AudioEngine(private val context: Context) {
                 settings.compPostGainHiMid,
                 settings.compPostGainHigh
             )
+        )
+    }
+
+    private fun applyEpicenter(
+        target: ZeusEpicenter? = zeusEpicenter
+    ) {
+        val epicenter = target ?: return
+
+        epicenter.configure(
+            settings.bassAmount,
+            settings.bassPunch,
+            settings.bassHarmonics,
+            bassFrequencyHz,
+            subFrequencyHz
         )
     }
 
