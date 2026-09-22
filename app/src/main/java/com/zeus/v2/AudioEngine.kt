@@ -395,6 +395,7 @@ class AudioEngine(private val context: Context) {
         settings.subBoost = v
         applyEq()
         applyPostEq()
+        zeusEpicenter?.let { applyEpicenter(it) }
     }
 
     fun setSubFrequency(v: Float) {
@@ -403,6 +404,7 @@ class AudioEngine(private val context: Context) {
             v.coerceIn(18f, 90f)
 
         applyPostEq()
+        zeusEpicenter?.let { applyEpicenter(it) }
     }
 
     fun setPunch(v: Float) {
@@ -414,6 +416,7 @@ class AudioEngine(private val context: Context) {
 
         applyInputGain()
         applyPostEq()
+        zeusEpicenter?.let { applyEpicenter(it) }
     }
 
     fun setBassControls(
@@ -436,6 +439,7 @@ class AudioEngine(private val context: Context) {
 
         applyInputGain()
         applyPostEq()
+        zeusEpicenter?.let { applyEpicenter(it) }
 
         Log.i(
             TAG,
@@ -470,6 +474,10 @@ class AudioEngine(private val context: Context) {
         applyMbc()
         applyPostEq()
         applyZeusMbc()
+        zeusEpicenter?.let {
+            it.enabled = !hiResEnabled && pipelineEnabled
+            applyEpicenter(it)
+        }
     }
 
     fun setLimiter(
@@ -593,6 +601,11 @@ class AudioEngine(private val context: Context) {
         applyPostEq()
         applyLimiter()
         applyZeusMbc()
+
+        zeusEpicenter?.let {
+            it.enabled = !hiResEnabled && pipelineEnabled
+            applyEpicenter(it)
+        }
 
         spatialEngine?.setWidth(
             settings.spatialWidth
