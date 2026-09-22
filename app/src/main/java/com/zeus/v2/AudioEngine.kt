@@ -208,7 +208,7 @@ class AudioEngine(private val context: Context) {
             ZeusEpicenter(sampleRate).also {
                 it.enabled =
                     !hiResEnabled &&
-                    settings.pipelineEnabled
+                    pipelineEnabled
                 applyEpicenter(it)
             }
 
@@ -261,7 +261,7 @@ class AudioEngine(private val context: Context) {
         zeusEpicenter?.let {
             it.enabled =
                 !hiResEnabled &&
-                settings.pipelineEnabled
+                pipelineEnabled
             applyEpicenter(it)
             it.processStereo(buffer, n)
         }
@@ -361,7 +361,7 @@ class AudioEngine(private val context: Context) {
         applyLimiter()
         applyZeusMbc()
         zeusEpicenter?.let {
-            it.enabled = !enabled && settings.pipelineEnabled
+            it.enabled = !enabled && pipelineEnabled
             applyEpicenter(it)
         }
 
@@ -1052,7 +1052,7 @@ class AudioEngine(private val context: Context) {
 
         mbc.enabled =
             settings.compEnabled &&
-                settings.pipelineEnabled &&
+                pipelineEnabled &&
                 !hiResEnabled
 
         mbc.configure(
