@@ -793,7 +793,7 @@ private fun CrossoverBandsGraph(
     modifier: Modifier = Modifier
 ) {
     val minF = 20f
-    val maxF = 20000f
+    val maxF = cross4.coerceIn(cross3 + 50f, 20000f)
     fun xOf(f: Float, w: Float): Float {
         val t = (ln(f.coerceIn(minF, maxF)) - ln(minF)) / (ln(maxF) - ln(minF))
         return t * w
