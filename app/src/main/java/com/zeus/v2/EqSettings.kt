@@ -27,6 +27,7 @@ data class EqSettings(
     var cross1: Float = 180f,
     var cross2: Float = 1800f,
     var cross3: Float = 8000f,
+    var cross4: Float = 20000f,
 
     var compThLow: Float = -18f,
     var compThLoMid: Float = -14f,
@@ -102,6 +103,7 @@ data class EqSettings(
         o.put("cross1", cross1.toDouble())
         o.put("cross2", cross2.toDouble())
         o.put("cross3", cross3.toDouble())
+        o.put("cross4", cross4.toDouble())
 
         o.put("compThLow", compThLow.toDouble())
         o.put("compThLoMid", compThLoMid.toDouble())
@@ -193,6 +195,7 @@ data class EqSettings(
                 s.cross1 = o.optDouble("cross1", 180.0).toFloat()
                 s.cross2 = o.optDouble("cross2", 1800.0).toFloat()
                 s.cross3 = o.optDouble("cross3", 8000.0).toFloat()
+                s.cross4 = o.optDouble("cross4", 20000.0).toFloat()
 
                 s.compThLow = o.optDouble("compThLow", -18.0).toFloat()
                 s.compThLoMid = o.optDouble("compThLoMid", -14.0).toFloat()
