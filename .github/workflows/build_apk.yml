@@ -1,7 +1,7 @@
 name: Build Zeus-V2 APK
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, 'fix/cross4-controls' ]
   workflow_dispatch:   # Poder ejecutarlo manualmente desde la pestaña Actions
 
 jobs:
