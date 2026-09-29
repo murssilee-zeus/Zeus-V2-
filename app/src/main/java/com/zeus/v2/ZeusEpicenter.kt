@@ -58,7 +58,7 @@ class ZeusEpicenter(
         // Extreme profile, distributed over four musical regions.
         val subGain = (a * 10.0f).coerceAtMost(12f)
         val punchGain =
-            (PunchControl.midBassGain(punch) * 1.90f).coerceAtMost(10f)
+            ((punch / 100f) * 5.0f * 1.90f).coerceAtMost(10f)
         val secondGain =
             ((h * 4.0f) + (a * 2.0f)).coerceAtMost(9f)
         val thirdGain =
