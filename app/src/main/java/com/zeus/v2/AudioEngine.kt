@@ -198,6 +198,7 @@ class AudioEngine(private val context: Context) {
         cross1: Float,
         cross2: Float,
         cross3: Float,
+        cross4: Float = 20000f,
         thLow: Float,
         thLoMid: Float,
         thHiMid: Float,
@@ -231,6 +232,7 @@ class AudioEngine(private val context: Context) {
         settings.cross1 = cross1
         settings.cross2 = cross2
         settings.cross3 = cross3
+        settings.cross4 = cross4
         settings.compThLow = thLow
         settings.compThLoMid = thLoMid
         settings.compThHiMid = thHiMid
@@ -344,7 +346,8 @@ class AudioEngine(private val context: Context) {
             val c1 = s.cross1.coerceIn(40f, 1000f)
             val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
             val c3 = s.cross3.coerceIn(c2 + 50f, 19500f)
-            val cuts = listOf(c1, c2, c3, MAX_FREQ)
+            val c4 = s.cross4.coerceIn(c3 + 50f, MAX_FREQ)
+            val cuts = listOf(c1, c2, c3, c4)
 
             val thresholds = listOf(s.compThLow, s.compThLoMid, s.compThHiMid, s.compThHigh)
             val ratios = listOf(s.compRatioLow, s.compRatioLoMid, s.compRatioHiMid, s.compRatioHigh)
