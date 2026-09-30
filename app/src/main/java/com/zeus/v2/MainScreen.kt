@@ -595,8 +595,8 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 CompFreqColumn(
                     title = "LOW",
@@ -606,7 +606,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     range = 40f..1000f,
                     onSelect = { selectedCompBand = 0 },
                     onFreq = { viewModel.setCrossover(0, it) },
-                    modifier = Modifier.width(108.dp).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight()
                 )
                 CompFreqColumn(
                     title = "LO-MID",
@@ -616,7 +616,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     range = 200f..6000f,
                     onSelect = { selectedCompBand = 1 },
                     onFreq = { viewModel.setCrossover(1, it) },
-                    modifier = Modifier.width(108.dp).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight()
                 )
                 CompFreqColumn(
                     title = "HI-MID",
@@ -626,7 +626,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     range = 2000f..16000f,
                     onSelect = { selectedCompBand = 2 },
                     onFreq = { viewModel.setCrossover(2, it) },
-                    modifier = Modifier.width(108.dp).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight()
                 )
                 CompFreqColumn(
                     title = "HIGH",
@@ -637,7 +637,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     onSelect = { selectedCompBand = 3 },
                     onFreq = { viewModel.setCrossover(3, it) },
                     enabled = true,
-                    modifier = Modifier.width(108.dp).fillMaxHeight()
+                    modifier = Modifier.weight(1f).fillMaxHeight()
                 )
             }
         }
