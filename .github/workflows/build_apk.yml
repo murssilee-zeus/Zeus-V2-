@@ -3,7 +3,7 @@ name: Build Zeus-V2 APK
 # Cross 4 UI verification build.
 on:
   push:
-    branches: [ main, master, fix/punch-v2 ]
+    branches: [ main, master, fix/punch-v2, fix/cross4-controls-v2 ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
