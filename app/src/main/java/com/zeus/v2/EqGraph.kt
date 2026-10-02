@@ -126,75 +126,58 @@ fun EqGraph(
             drawPath(zone, band.color.copy(alpha = .075f))
         }
 
-        // Reference-style multi-frequency visualizer.
-        // Each enabled EQ frequency gets its own flowing line. The live spectrum
-        // controls the amplitude, while the smooth carrier keeps the visual stable
-        // instead of turning it into a noisy FFT trace.
-        if (spectrum.size > 1) {
-            val lineBands = bands.filter { it.enabled }.take(16)
-            val lineCount = lineBands.size.coerceAtLeast(4)
-            val laneHeight = h / lineCount.toFloat()
+        // Reference-style multi-frequency EQ response visualizer.
+        // One line belongs to each configured EQ band. Unlike the previous
+        // animated lane visualizer, these curves are the actual response of
+        // that band's configured filter, frequency, gain and Q.
+        bands.filter { it.enabled }.forEach { band ->
+            val filter = BiquadFilter(
+                frequency = band.frequency,
+                gainDb = band.gain,
+                q = band.q,
+                type = band.filterType
+            )
+            val path = Path()
+            val samples = 320
 
-            fun spectrumLevelAt(freq: Float): Float {
+            for (sample in 0 until samples) {
+                val t = sample.toFloat() / (samples - 1)
+                val frequency = 18f * (20000f / 18f).pow(t)
+                val responseDb = filter.responseDb(frequency)
+                val point = Offset(
+                    freqToX(frequency, w),
+                    dbToY(responseDb, h)
+                )
+                if (sample == 0) path.moveTo(point.x, point.y)
+                else path.lineTo(point.x, point.y)
+            }
+
+            // The curve itself is driven only by the band's actual settings.
+            // The live spectrum only controls a subtle glow so the visual
+            // remains faithful to the EQ configuration.
+            val liveLevel = if (spectrum.size > 1) {
                 val lo = ln(18f)
                 val hi = ln(20000f)
-                val t = ((ln(freq.coerceIn(18f, 20000f)) - lo) / (hi - lo))
+                val normalized = ((ln(band.frequency.coerceIn(18f, 20000f)) - lo) / (hi - lo))
                     .coerceIn(0f, 1f)
-                val index = (t * (spectrum.size - 1)).roundToInt()
+                val index = (normalized * (spectrum.size - 1)).roundToInt()
                     .coerceIn(0, spectrum.lastIndex)
-                return ((spectrum[index] + 72f) / 72f).coerceIn(0f, 1f)
-            }
+                ((spectrum[index] + 72f) / 72f).coerceIn(0f, 1f)
+            } else 0f
 
-            lineBands.forEachIndexed { lineIndex, band ->
-                val centerY = laneHeight * (lineIndex + 0.5f)
-                val localEnergy = spectrumLevelAt(band.frequency)
-                val amplitude = (laneHeight * (0.22f + localEnergy * 0.28f))
-                    .coerceIn(3f, laneHeight * 0.46f)
-                val cycles = 1.15f + lineIndex * 0.055f
-                val phase = localEnergy * 2.2f + band.gain * 0.025f
-                val path = Path()
-                val samples = 180
+            val glowAlpha = 0.10f + liveLevel * 0.16f
+            val lineAlpha = if (abs(band.gain) < 0.01f) 0.28f else 0.88f
 
-                for (sample in 0 until samples) {
-                    val t = sample.toFloat() / (samples - 1)
-                    val x = t * w
-
-                    val localFreq = band.frequency *
-                        (0.55f + t * 1.9f)
-                    val energy = spectrumLevelAt(localFreq)
-
-                    val waveA = kotlin.math.sin(
-                        t * cycles * (2f * Math.PI.toFloat()) + phase
-                    )
-                    val waveB = kotlin.math.sin(
-                        t * (cycles * 0.53f) * (2f * Math.PI.toFloat()) -
-                            phase * 0.7f
-                    ) * 0.34f
-                    val movement = (waveA + waveB) * (0.38f + energy * 0.62f)
-                    val y = centerY + movement * amplitude
-
-                    if (sample == 0) path.moveTo(x, y)
-                    else path.lineTo(x, y)
-                }
-
-                val progress = if (lineCount <= 1) 0f
-                else lineIndex.toFloat() / (lineCount - 1).toFloat()
-                val r = (52f + (222f - 52f) * progress) / 255f
-                val g = (168f + (105f - 168f) * progress) / 255f
-                val b = 1f
-                val lineColor = Color(r, g, b)
-
-                drawPath(
-                    path,
-                    lineColor.copy(alpha = 0.18f),
-                    style = Stroke(width = 7f, cap = StrokeCap.Round)
-                )
-                drawPath(
-                    path,
-                    lineColor.copy(alpha = 0.72f),
-                    style = Stroke(width = 1.55f, cap = StrokeCap.Round)
-                )
-            }
+            drawPath(
+                path,
+                band.color.copy(alpha = glowAlpha),
+                style = Stroke(width = 8f, cap = StrokeCap.Round)
+            )
+            drawPath(
+                path,
+                band.color.copy(alpha = lineAlpha),
+                style = Stroke(width = 1.7f, cap = StrokeCap.Round)
+            )
         }
 
         if (targetCurve.size > 1) {
