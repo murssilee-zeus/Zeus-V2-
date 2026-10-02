@@ -18,7 +18,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.pow
+import kotlin.math.pow\nimport kotlin.math.roundToInt
 
 @Composable
 fun EqGraph(
@@ -126,53 +126,75 @@ fun EqGraph(
             drawPath(zone, band.color.copy(alpha = .075f))
         }
 
-        // RTA spectrum. The source is still the live Android Visualizer, but the rendering is now closer to the supplied reference:
-        // soft white fill, luminous edge, stable bass and fast treble response.
+        // Reference-style multi-frequency visualizer.
+        // Each enabled EQ frequency gets its own flowing line. The live spectrum
+        // controls the amplitude, while the smooth carrier keeps the visual stable
+        // instead of turning it into a noisy FFT trace.
         if (spectrum.size > 1) {
-            val raw = ArrayList<Offset>(spectrum.size)
-            spectrum.forEachIndexed { index, value ->
-                val t = index.toFloat() / (spectrum.size - 1)
-                val frequency = 18f * (20000f / 18f).pow(t)
-                val x = freqToX(frequency, w)
-                val displayDb = ((value + 72f) * .56f - 30f).coerceIn(-30f, 8f)
-                raw += Offset(x, dbToY(displayDb, h))
+            val lineBands = bands.filter { it.enabled }.take(16)
+            val lineCount = lineBands.size.coerceAtLeast(4)
+            val laneHeight = h / lineCount.toFloat()
+
+            fun spectrumLevelAt(freq: Float): Float {
+                val lo = ln(18f)
+                val hi = ln(20000f)
+                val t = ((ln(freq.coerceIn(18f, 20000f)) - lo) / (hi - lo))
+                    .coerceIn(0f, 1f)
+                val index = (t * (spectrum.size - 1)).roundToInt()
+                    .coerceIn(0, spectrum.lastIndex)
+                return ((spectrum[index] + 72f) / 72f).coerceIn(0f, 1f)
             }
 
-            val spectrumPath = Path()
-            spectrumPath.moveTo(raw.first().x, raw.first().y)
-            for (i in 1 until raw.size) {
-                val previous = raw[i - 1]
-                val current = raw[i]
-                val midpoint = Offset((previous.x + current.x) * .5f, (previous.y + current.y) * .5f)
-                spectrumPath.quadraticBezierTo(previous.x, previous.y, midpoint.x, midpoint.y)
-            }
-            spectrumPath.lineTo(raw.last().x, raw.last().y)
+            lineBands.forEachIndexed { lineIndex, band ->
+                val centerY = laneHeight * (lineIndex + 0.5f)
+                val localEnergy = spectrumLevelAt(band.frequency)
+                val amplitude = (laneHeight * (0.22f + localEnergy * 0.28f))
+                    .coerceIn(3f, laneHeight * 0.46f)
+                val cycles = 1.15f + lineIndex * 0.055f
+                val phase = localEnergy * 2.2f + band.gain * 0.025f
+                val path = Path()
+                val samples = 180
 
-            val fill = Path().apply {
-                addPath(spectrumPath)
-                lineTo(w, h)
-                lineTo(0f, h)
-                close()
-            }
-            drawPath(
-                fill,
-                Brush.verticalGradient(
-                    0f to Color.White.copy(alpha = .20f),
-                    h * .35f to Color(0xFFBFC5CC).copy(alpha = .11f),
-                    h * .72f to Color(0xFF7C858F).copy(alpha = .045f),
-                    h to Color.Transparent
+                for (sample in 0 until samples) {
+                    val t = sample.toFloat() / (samples - 1)
+                    val x = t * w
+
+                    val localFreq = band.frequency *
+                        (0.55f + t * 1.9f)
+                    val energy = spectrumLevelAt(localFreq)
+
+                    val waveA = kotlin.math.sin(
+                        t * cycles * (2f * Math.PI.toFloat()) + phase
+                    )
+                    val waveB = kotlin.math.sin(
+                        t * (cycles * 0.53f) * (2f * Math.PI.toFloat()) -
+                            phase * 0.7f
+                    ) * 0.34f
+                    val movement = (waveA + waveB) * (0.38f + energy * 0.62f)
+                    val y = centerY + movement * amplitude
+
+                    if (sample == 0) path.moveTo(x, y)
+                    else path.lineTo(x, y)
+                }
+
+                val progress = if (lineCount <= 1) 0f
+                else lineIndex.toFloat() / (lineCount - 1).toFloat()
+                val r = (52f + (222f - 52f) * progress).roundToInt()
+                val g = (168f + (105f - 168f) * progress).roundToInt()
+                val b = (255f + (255f - 255f) * progress).roundToInt()
+                val lineColor = Color(r, g, b)
+
+                drawPath(
+                    path,
+                    lineColor.copy(alpha = 0.18f),
+                    style = Stroke(width = 7f, cap = StrokeCap.Round)
                 )
-            )
-            drawPath(
-                spectrumPath,
-                Color.White.copy(alpha = .14f),
-                style = Stroke(width = 7f, cap = StrokeCap.Round)
-            )
-            drawPath(
-                spectrumPath,
-                Color(0xFFE9EDF1).copy(alpha = .86f),
-                style = Stroke(width = 1.25f, cap = StrokeCap.Round)
-            )
+                drawPath(
+                    path,
+                    lineColor.copy(alpha = 0.72f),
+                    style = Stroke(width = 1.55f, cap = StrokeCap.Round)
+                )
+            }
         }
 
         if (targetCurve.size > 1) {
