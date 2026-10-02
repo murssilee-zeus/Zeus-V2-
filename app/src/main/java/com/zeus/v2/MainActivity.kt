@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
         val context = this
 
         LaunchedEffect(Unit) {
-            delay(4500L)
+            delay(3500L)
             onFinished()
         }
 
@@ -88,34 +88,46 @@ class MainActivity : ComponentActivity() {
                 factory = {
                     SurfaceView(context).apply {
                         setBackgroundColor(android.graphics.Color.BLACK)
+
                         holder.addCallback(object : SurfaceHolder.Callback {
                             private var player: MediaPlayer? = null
+                            private var tempVideo: java.io.File? = null
 
                             override fun surfaceCreated(surface: SurfaceHolder) {
-                                player = runCatching {
-                                    val media = MediaPlayer()
-                                    val afd = context.assets.openFd(
-                                        "ui_reference/Screen_Recording_20261002_100912_Google_1.mp4"
-                                    )
-                                    media.setDataSource(
-                                        afd.fileDescriptor,
-                                        afd.startOffset,
-                                        afd.length
-                                    )
-                                    afd.close()
-                                    media.setDisplay(surface)
-                                    media.isLooping = true
-                                    media.setOnPreparedListener { it.start() }
-                                    media.setOnErrorListener { _, _, _ ->
+                                Thread {
+                                    runCatching {
+                                        val file = java.io.File(
+                                            context.cacheDir,
+                                            "zeus_splash.mp4"
+                                        )
+
+                                        context.assets.open(
+                                            "ui_reference/Screen_Recording_20261002_100912_Google_1.mp4"
+                                        ).use { input ->
+                                            java.io.FileOutputStream(file).use { output ->
+                                                input.copyTo(output)
+                                            }
+                                        }
+
+                                        tempVideo = file
+
+                                        context.runOnUiThread {
+                                            player = MediaPlayer().apply {
+                                                setDataSource(file.absolutePath)
+                                                setDisplay(surface)
+                                                isLooping = true
+                                                setOnPreparedListener { it.start() }
+                                                setOnErrorListener { _, _, _ ->
+                                                    onFinished()
+                                                    true
+                                                }
+                                                prepareAsync()
+                                            }
+                                        }
+                                    }.onFailure {
                                         onFinished()
-                                        true
                                     }
-                                    media.prepareAsync()
-                                    media
-                                }.getOrElse {
-                                    onFinished()
-                                    null
-                                }
+                                }.start()
                             }
 
                             override fun surfaceChanged(
@@ -129,6 +141,8 @@ class MainActivity : ComponentActivity() {
                                 player?.runCatching { stop() }
                                 player?.release()
                                 player = null
+                                tempVideo?.delete()
+                                tempVideo = null
                             }
                         })
                     }
@@ -137,7 +151,6 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-
     @Composable private fun ComposeRoot() {
         val vm: EqViewModel = viewModel(factory = EqViewModel.Factory)
         val punch: PunchViewModel = viewModel()
