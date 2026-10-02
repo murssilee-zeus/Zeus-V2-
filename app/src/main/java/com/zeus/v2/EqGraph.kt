@@ -180,6 +180,36 @@ fun EqGraph(
             )
         }
 
+        // Live RTA spectrum: the actual FFT data supplied by AudioEngine.
+        // It is drawn independently from the static EQ/filter curves so the
+        // frequency response remains visible while the music moves underneath it.
+        if (spectrum.size > 1) {
+            val spectrumPath = Path()
+            val spectrumSamples = spectrum.size
+
+            for (i in 0 until spectrumSamples) {
+                val t = i.toFloat() / (spectrumSamples - 1)
+                val frequency = 18f * (20000f / 18f).pow(t)
+                val db = spectrum[i].coerceIn(-30f, 6f)
+                val point = Offset(freqToX(frequency, w), dbToY(db, h))
+                if (i == 0) spectrumPath.moveTo(point.x, point.y)
+                else spectrumPath.lineTo(point.x, point.y)
+            }
+
+            // Soft glow makes the live movement easy to see without hiding
+            // the individual filter curves beneath it.
+            drawPath(
+                spectrumPath,
+                Color(0xFF28D7FF).copy(alpha = .18f),
+                style = Stroke(width = 10f, cap = StrokeCap.Round)
+            )
+            drawPath(
+                spectrumPath,
+                Color(0xFF54E7FF).copy(alpha = .85f),
+                style = Stroke(width = 2.1f, cap = StrokeCap.Round)
+            )
+        }
+
         if (targetCurve.size > 1) {
             val targetPath = Path()
             targetCurve.forEachIndexed { index, point ->
