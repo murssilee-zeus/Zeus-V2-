@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
+import android.widget.VideoView
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -15,6 +17,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
@@ -46,8 +52,57 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try { requestNeededPermissions(); setContent { ComposeRoot() } }
-        catch (e: Throwable) { android.util.Log.e("ZeusMain", "onCreate fatal: ${android.util.Log.getStackTraceString(e)}"); Toast.makeText(this, "Error: ${e.javaClass.simpleName}", Toast.LENGTH_LONG).show() }
+        try {
+            setContent {
+                var showSplash by remember { mutableStateOf(true) }
+                if (showSplash) {
+                    ZeusSplash {
+                        showSplash = false
+                        requestNeededPermissions()
+                    }
+                } else {
+                    ComposeRoot()
+                }
+            }
+        } catch (e: Throwable) {
+            android.util.Log.e("ZeusMain", "onCreate fatal: " + android.util.Log.getStackTraceString(e))
+            Toast.makeText(this, "Error: " + e.javaClass.simpleName, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    @Composable
+    private fun ZeusSplash(onFinished: () -> Unit) {
+        val context = this
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(3500L)
+            onFinished()
+        }
+
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            AndroidView(
+                factory = {
+                    VideoView(context).apply {
+                        setVideoURI(
+                            Uri.parse(
+                                "file:///android_asset/ui_reference/Screen_Recording_20261002_100912_Google_1.mp4"
+                            )
+                        )
+                        setOnPreparedListener { player ->
+                            player.isLooping = true
+                            player.start()
+                        }
+                        setOnErrorListener { _, _, _ ->
+                            onFinished()
+                            true
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 
     @Composable private fun ComposeRoot() {
