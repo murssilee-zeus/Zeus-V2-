@@ -18,7 +18,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.pow\n
+import kotlin.math.pow
+import kotlin.math.roundToInt
 @Composable
 fun EqGraph(
     bands: List<EqBand>,
