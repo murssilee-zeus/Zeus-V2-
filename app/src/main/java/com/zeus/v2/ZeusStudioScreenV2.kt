@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 
 private val ZBG=Color(0xFF05070B); private val ZSUR=Color(0xFF0D1118); private val ZBR=Color(0xFF263241)
 private val ZP=Color(0xFF9B5CFF); private val ZPK=Color(0xFFFF4FA3); private val ZG=Color(0xFF24E58A)
@@ -34,11 +35,11 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
  Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=8.dp,vertical=5.dp)){
-  Row(Modifier.fillMaxWidth().height(48.dp).background(ZSUR,RoundedCornerShape(9.dp)).border(1.dp,ZBR,RoundedCornerShape(9.dp)).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically){
+  Row(Modifier.fillMaxWidth().height(64.dp).background(ZSUR,RoundedCornerShape(9.dp)).border(1.dp,ZBR,RoundedCornerShape(9.dp)).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showMenu=true})
    Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
     if(zeusLogo!=null){
-     Image(bitmap=zeusLogo,contentDescription="Zeus",modifier=Modifier.height(38.dp).width(38.dp))
+     Image(bitmap=zeusLogo,contentDescription="Zeus",contentScale=ContentScale.Fit,modifier=Modifier.height(52.dp).width(105.dp))
     } else {
      Text("ZEUS",color=ZT,fontSize=15.sp,fontWeight=FontWeight.ExtraBold)
     }
