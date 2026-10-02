@@ -7,8 +7,9 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
-import android.net.Uri
-import android.widget.VideoView
+import android.media.MediaPlayer
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -73,8 +74,9 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ZeusSplash(onFinished: () -> Unit) {
         val context = this
+
         LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(3500L)
+            delay(4500L)
             onFinished()
         }
 
@@ -84,20 +86,51 @@ class MainActivity : ComponentActivity() {
         ) {
             AndroidView(
                 factory = {
-                    VideoView(context).apply {
-                        setVideoURI(
-                            Uri.parse(
-                                "file:///android_asset/ui_reference/Screen_Recording_20261002_100912_Google_1.mp4"
-                            )
-                        )
-                        setOnPreparedListener { player ->
-                            player.isLooping = true
-                            player.start()
-                        }
-                        setOnErrorListener { _, _, _ ->
-                            onFinished()
-                            true
-                        }
+                    SurfaceView(context).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        holder.addCallback(object : SurfaceHolder.Callback {
+                            private var player: MediaPlayer? = null
+
+                            override fun surfaceCreated(surface: SurfaceHolder) {
+                                player = runCatching {
+                                    val media = MediaPlayer()
+                                    val afd = context.assets.openFd(
+                                        "ui_reference/Screen_Recording_20261002_100912_Google_1.mp4"
+                                    )
+                                    media.setDataSource(
+                                        afd.fileDescriptor,
+                                        afd.startOffset,
+                                        afd.length
+                                    )
+                                    afd.close()
+                                    media.setDisplay(surface)
+                                    media.isLooping = true
+                                    media.setOnPreparedListener { it.start() }
+                                    media.setOnErrorListener { _, _, _ ->
+                                        onFinished()
+                                        true
+                                    }
+                                    media.prepareAsync()
+                                    media
+                                }.getOrElse {
+                                    onFinished()
+                                    null
+                                }
+                            }
+
+                            override fun surfaceChanged(
+                                surface: SurfaceHolder,
+                                format: Int,
+                                width: Int,
+                                height: Int
+                            ) = Unit
+
+                            override fun surfaceDestroyed(surface: SurfaceHolder) {
+                                player?.runCatching { stop() }
+                                player?.release()
+                                player = null
+                            }
+                        })
                     }
                 },
                 modifier = Modifier.fillMaxSize()
