@@ -17,6 +17,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 
 private val ZBG=Color(0xFF05070B); private val ZSUR=Color(0xFF0D1118); private val ZBR=Color(0xFF263241)
 private val ZP=Color(0xFF9B5CFF); private val ZPK=Color(0xFFFF4FA3); private val ZG=Color(0xFF24E58A)
@@ -26,13 +29,19 @@ private val ZCY=Color(0xFF20C7E8); private val ZOR=Color(0xFFFFC857)
 @Composable
 fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit,onExport:()->Unit,onImport:()->Unit){
  var page by remember{mutableIntStateOf(0)}
+ val context=LocalContext.current
+ val zeusLogo=remember{runCatching{context.assets.open("ui_reference/render.png").use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()}
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
  Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=8.dp,vertical=5.dp)){
-  Row(Modifier.fillMaxWidth().height(38.dp).background(ZSUR,RoundedCornerShape(9.dp)).border(1.dp,ZBR,RoundedCornerShape(9.dp)).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically){
+  Row(Modifier.fillMaxWidth().height(48.dp).background(ZSUR,RoundedCornerShape(9.dp)).border(1.dp,ZBR,RoundedCornerShape(9.dp)).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showMenu=true})
    Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
-    Text("ZEUS EQ PRO18",color=ZT,fontSize=17.sp,fontWeight=FontWeight.ExtraBold)
+    if(zeusLogo!=null){
+     Image(bitmap=zeusLogo,contentDescription="Zeus",modifier=Modifier.height(38.dp).width(38.dp))
+    } else {
+     Text("ZEUS",color=ZT,fontSize=15.sp,fontWeight=FontWeight.ExtraBold)
+    }
     Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
    }
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
