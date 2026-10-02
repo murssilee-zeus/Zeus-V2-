@@ -18,8 +18,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
-import kotlin.math.pow\nimport kotlin.math.roundToInt
-
+import kotlin.math.pow\n
 @Composable
 fun EqGraph(
     bands: List<EqBand>,
@@ -179,9 +178,9 @@ fun EqGraph(
 
                 val progress = if (lineCount <= 1) 0f
                 else lineIndex.toFloat() / (lineCount - 1).toFloat()
-                val r = (52f + (222f - 52f) * progress).roundToInt()
-                val g = (168f + (105f - 168f) * progress).roundToInt()
-                val b = (255f + (255f - 255f) * progress).roundToInt()
+                val r = (52f + (222f - 52f) * progress) / 255f
+                val g = (168f + (105f - 168f) * progress) / 255f
+                val b = 1f
                 val lineColor = Color(r, g, b)
 
                 drawPath(
