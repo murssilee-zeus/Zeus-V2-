@@ -75,11 +75,6 @@ class MainActivity : ComponentActivity() {
     private fun ZeusSplash(onFinished: () -> Unit) {
         val context = this
 
-        LaunchedEffect(Unit) {
-            delay(3500L)
-            onFinished()
-        }
-
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -116,7 +111,12 @@ class MainActivity : ComponentActivity() {
                                                 setDataSource(file.absolutePath)
                                                 setDisplay(surface)
                                                 isLooping = true
-                                                setOnPreparedListener { it.start() }
+                                                setOnPreparedListener {
+                                                    it.start()
+                                                    postDelayed({
+                                                        onFinished()
+                                                    }, 3500L)
+                                                }
                                                 setOnErrorListener { _, _, _ ->
                                                     onFinished()
                                                     true
