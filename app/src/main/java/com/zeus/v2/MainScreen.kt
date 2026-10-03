@@ -307,7 +307,7 @@ private fun EmptyPanel(message: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f)
+            .height(180.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(SURFACE)
             .border(1.dp, CARD_BORDER, RoundedCornerShape(12.dp)),
