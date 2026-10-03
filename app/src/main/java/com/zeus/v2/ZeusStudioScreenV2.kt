@@ -98,66 +98,70 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
 @Composable
 private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
  val scroll=rememberScrollState()
- Row(
-  Modifier.fillMaxSize().horizontalScroll(scroll).padding(bottom=2.dp),
-  horizontalArrangement=Arrangement.spacedBy(6.dp)
- ){
-  // 1. EQ MASTER / RTA
-  Column(Modifier.width(650.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+ Row(Modifier.fillMaxSize().horizontalScroll(scroll).background(ZBG).padding(3.dp),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+  Column(Modifier.width(690.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
    Card("SPECTRUM / EQ CURVE / RTA"){
-    Row(verticalAlignment=Alignment.CenterVertically){
-     Column(Modifier.weight(1f)){Text("ZEUS MASTER EQ",color=ZT,fontSize=12.sp,fontWeight=FontWeight.Bold);Text("18 Hz — 20 kHz  ·  CURVAS + FFT EN TIEMPO REAL",color=ZM,fontSize=7.sp)}
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+     Column(Modifier.weight(1f)){Text("ZEUS MASTER",color=ZT,fontSize=11.sp,fontWeight=FontWeight.ExtraBold);Text("18 Hz — 20 kHz   •   EQ RESPONSE + REAL-TIME SPECTRUM",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)}
+     Text("● RTA",color=if(vm.isEngineRunning)ZG else ZM,fontSize=8.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.width(8.dp))
      Text("+ BANDA",color=Color.White,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(4.dp)).clickable{vm.addBand()}.padding(horizontal=9.dp,vertical=5.dp))
     }
-    EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxWidth().height(300.dp))
+    Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFF04070C)).border(1.dp,ZEDGE,RoundedCornerShape(4.dp))){
+     EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxSize())
+    }
    }
-   Card("PREAMP / BANDA SELECCIONADA"){
+   Card("PREAMP / BAND CONTROL"){
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
      EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
      EditableBox("FREQ",vm.selectedBand()?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
      EditableBox("GAIN",vm.selectedBand()?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
      EditableBox("Q",vm.selectedBand()?.q?:1f,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
     }
-    Spacer(Modifier.height(2.dp)); Filters(vm); Bands(vm)
+    Filters(vm);Bands(vm)
    }
-   Presets(vm)
+   Card("PRESETS"){Presets(vm)}
   }
 
-  // 2. LOW END / PUNCH
-  Column(Modifier.width(300.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
-   SubSismoCard(vm)
-   PunchCard(punch,vm)
-   SpatialCard(vm)
-   Card("HEADROOM"){S("OUTPUT",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it};Text("Protección de salida antes del limitador",color=ZM,fontSize=8.sp)}
+  Column(Modifier.width(310.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   SubSismoCard(vm);PunchCard(punch,vm);SpatialCard(vm)
+   Card("HEADROOM / GAIN"){S("OUTPUT",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it};Text("18 Hz protection → final limiter",color=ZM,fontSize=7.sp)}
   }
 
-  // 3. MULTIBAND COMPRESSOR, all four strips visible
-  Column(Modifier.width(610.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
-   CompCard(vm)
+  Column(Modifier.width(660.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   Card("MULTIBAND COMPRESSOR"){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+     listOf("LOW","LOW-MID","MID","HIGH").forEachIndexed{i,label->
+      val ranges=listOf(40f..1000f,100f..5000f,1000f..19500f,8000f..20000f)
+      val value=vm.crossoverFrequencies.getOrElse(i){ranges[i].start}
+      Column(Modifier.weight(1f).background(if(i==3)ZPK.copy(alpha=.08f) else Color(0xFF080D14),RoundedCornerShape(4.dp)).border(1.dp,if(i==3)ZPK.copy(alpha=.45f) else ZBR,RoundedCornerShape(4.dp)).padding(4.dp)){
+       Text(label,color=if(i==3)ZPK else ZCY,fontSize=7.sp,fontWeight=FontWeight.ExtraBold)
+       Text("CROSS "+(i+1),color=ZM,fontSize=6.sp);Text(fmt(value)+" Hz",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+       Slider(value=value.coerceIn(ranges[i].start,ranges[i].endInclusive),onValueChange={vm.setCrossover(i,it)},valueRange=ranges[i],modifier=Modifier.height(24.dp),colors=SliderDefaults.colors(thumbColor=if(i==3)ZPK else ZP,activeTrackColor=if(i==3)ZPK else ZP,inactiveTrackColor=ZBR))
+       Text("S   B",color=ZM,fontSize=7.sp,fontWeight=FontWeight.Bold)
+      }
+     }
+    }
+    Spacer(Modifier.height(4.dp));CompCard(vm)
+   }
    Card("SIGNAL FLOW"){
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
-     Text("SUB / SISMO",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold)
-     Text("→",color=ZM); Text("MBC",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
-     Text("→",color=ZM); Text("PUNCH",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
-     Text("→",color=ZM); Text("LIMITER",color=ZG,fontSize=8.sp,fontWeight=FontWeight.Bold)
+     Text("SUB / SISMO",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold);Text("→",color=ZM);Text("MBC",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold);Text("→",color=ZM);Text("PUNCH",color=ZPK,fontSize=8.sp,fontWeight=FontWeight.Bold);Text("→",color=ZM);Text("LIMITER",color=ZG,fontSize=8.sp,fontWeight=FontWeight.Bold)
     }
    }
   }
 
-  // 4. LIMITER / OUTPUT
-  Column(Modifier.width(290.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+  Column(Modifier.width(315.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
    LimCard(vm)
-   Card("OUTPUT METER"){
-    Text(if(vm.isEngineRunning)"● ENGINE ONLINE" else "○ ENGINE OFF",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,fontWeight=FontWeight.Bold)
-    Text("REAL-TIME PROCESSING",color=ZCY,fontSize=8.sp)
-    Spacer(Modifier.height(8.dp))
-    repeat(12){i->Box(Modifier.fillMaxWidth().height(7.dp).padding(vertical=1.dp).background(if(i>7)ZG else ZBR,RoundedCornerShape(2.dp)))}
+   Card("OUTPUT / METER"){
+    Row(verticalAlignment=Alignment.CenterVertically){Text(if(vm.isEngineRunning)"ENGINE ONLINE" else "ENGINE OFF",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));Text("dBFS",color=ZM,fontSize=7.sp)}
+    Spacer(Modifier.height(5.dp))
+    repeat(16){i->Box(Modifier.fillMaxWidth().height(5.dp).padding(vertical=1.dp).background(if(i>11)ZG else ZBR,RoundedCornerShape(2.dp)))}
+    Text("OUTPUT GAIN  "+fmt(vm.limiterPostGain)+" dB",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
    }
   }
 
-  // 5. AUTOEQ / PRESETS
-  Column(Modifier.width(440.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
-   AutoEqPage(vm)
+  Column(Modifier.width(450.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   Card("AUTOEQ / TARGET / PRESETS"){AutoEqPage(vm)}
   }
  }
 }
