@@ -61,63 +61,69 @@ fun MainScreen(
         modifier = modifier
             .fillMaxSize()
             .background(BG)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(SURFACE)
-                    .border(1.dp, CARD_BORDER, RoundedCornerShape(22.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { viewModel.previousSection() }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = TXT_MUTED)
+                Text("ZEUS", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SURFACE)
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(12.dp))
+                        .clickable { viewModel.previousSection() }
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = TXT_MUTED, modifier = Modifier.size(18.dp))
                 }
                 Text(
-                    text = viewModel.sectionTitle(),
+                    viewModel.sectionTitle(),
                     color = TXT_PRIMARY,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                )
-                IconButton(onClick = { viewModel.nextSection() }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TXT_MUTED)
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Guardar",
-                    color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0E4D3A))
-                        .border(1.dp, Color(0xFF2ECC71), RoundedCornerShape(16.dp))
-                        .clickable { onSave() }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 )
-                IconButton(
-                    onClick = onToggleEngine,
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(if (viewModel.isEngineRunning) Color(0xFF2ECC71) else Color(0xFF333344))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SURFACE)
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(12.dp))
+                        .clickable { viewModel.nextSection() }
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
                 ) {
-                    Icon(Icons.Default.PowerSettingsNew, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TXT_MUTED, modifier = Modifier.size(18.dp))
                 }
+            }
+            Text(
+                "GUARDAR",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF0E4D3A))
+                    .border(1.dp, Color(0xFF2ECC71), RoundedCornerShape(12.dp))
+                    .clickable { onSave() }
+                    .padding(horizontal = 11.dp, vertical = 7.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            IconButton(
+                onClick = onToggleEngine,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(if (viewModel.isEngineRunning) Color(0xFF2ECC71) else Color(0xFF333344))
+            ) {
+                Icon(Icons.Default.PowerSettingsNew, null, tint = Color.White, modifier = Modifier.size(19.dp))
             }
         }
 
@@ -170,14 +176,20 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 @Composable
 private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
     val band = viewModel.selectedBand()
+    val scroll = rememberScrollState()
 
     Row(
-        modifier = modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = modifier
+            .fillMaxSize()
+            .horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // PANEL 1: curva + presets + bandas
         Column(
-            modifier = Modifier.weight(1.15f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(min = 420.dp, max = 620.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             EqGraph(
                 bands = viewModel.bands,
@@ -191,28 +203,32 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(SURFACE)
+                    .border(1.dp, CARD_BORDER, RoundedCornerShape(14.dp))
             )
             PresetRow(viewModel)
             BandSelectorRow(viewModel)
         }
 
+        // PANEL 2: filtros, diseñado como selector compacto y táctil
         Column(
             modifier = Modifier
-                .weight(0.85f)
-                .fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .fillMaxHeight()
+                .widthIn(min = 330.dp, max = 430.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             FilterTypeRow(viewModel)
             if (band != null) {
                 BandControlsCard(viewModel, band, Modifier.weight(1f))
             } else {
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
+                    Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
                         .background(SURFACE)
-                        .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp)),
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("Selecciona una banda", color = TXT_MUTED, fontSize = 13.sp)
@@ -220,6 +236,13 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
             }
             PreampRow(viewModel)
         }
+
+        // Panel final para que el desplazamiento sea deliberado y no accidental.
+        Box(
+            Modifier
+                .fillMaxHeight()
+                .width(24.dp)
+        )
     }
 }
 
