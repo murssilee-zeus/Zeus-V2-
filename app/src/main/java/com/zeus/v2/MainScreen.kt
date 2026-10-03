@@ -170,15 +170,21 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 @Composable
 private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) {
     val band = viewModel.selectedBand()
+    val scroll = rememberScrollState()
 
     Row(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .horizontalScroll(scroll),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Column(
-            modifier = Modifier.weight(1.15f),
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(min = 430.dp, max = 620.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            PanelHeader("EQUALIZER", "Respuesta y bandas")
             EqGraph(
                 bands = viewModel.bands,
                 selectedBandIndex = viewModel.selectedBandIndex,
@@ -191,35 +197,127 @@ private fun EqualizerScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, CARD_BORDER, RoundedCornerShape(14.dp))
             )
-            PresetRow(viewModel)
             BandSelectorRow(viewModel)
+            PresetRow(viewModel)
         }
 
         Column(
             modifier = Modifier
-                .weight(0.85f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .widthIn(min = 360.dp, max = 470.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            PanelHeader(
+                "FILTER",
+                if (band == null) "Selecciona una banda" else "Banda ${viewModel.selectedBandIndex + 1}"
+            )
             FilterTypeRow(viewModel)
             if (band != null) {
-                BandControlsCard(viewModel, band, Modifier.weight(1f))
-            } else {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
+                BandControlsCard(
+                    viewModel,
+                    band,
+                    Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(SURFACE)
-                        .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Selecciona una banda", color = TXT_MUTED, fontSize = 13.sp)
-                }
+                        .weight(1f)
+                )
+            } else {
+                EmptyPanel("Selecciona una banda para editar Freq, Gain y Q")
             }
             PreampRow(viewModel)
         }
+
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(min = 320.dp, max = 420.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PanelHeader("ZEUS", "Procesamiento")
+            SectionCard("CONTROLES") {
+                Text(
+                    "Los controles de procesamiento se mantienen en su sección correspondiente.",
+                    color = TXT_MUTED,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "Esta pantalla no duplica parámetros de Bass.",
+                    color = TXT_PRIMARY,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            SectionCard("NAVEGACIÓN") {
+                Text(
+                    "Desliza horizontalmente para cambiar de panel.",
+                    color = TXT_MUTED,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "EQ  →  FILTER  →  ZEUS",
+                    color = PINK_ACCENT,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.weight(1f))
+        }
+
+        Spacer(Modifier.width(8.dp))
+    }
+}
+
+@Composable
+private fun PanelHeader(title: String, subtitle: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(SURFACE)
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                color = TXT_PRIMARY,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                subtitle,
+                color = TXT_MUTED,
+                fontSize = 10.sp
+            )
+        }
+        Text(
+            "ZEUS",
+            color = PINK_ACCENT,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun EmptyPanel(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(SURFACE)
+            .border(1.dp, CARD_BORDER, RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            message,
+            color = TXT_MUTED,
+            fontSize = 12.sp
+        )
     }
 }
 
