@@ -22,7 +22,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 
-private val ZBG=Color(0xFF05070B); private val ZSUR=Color(0xFF0D1118); private val ZBR=Color(0xFF263241)
+private val ZBG=Color(0xFF03060A); private val ZSUR=Color(0xFF0A0F16); private val ZBR=Color(0xFF1C2938); private val ZGRID=Color(0xFF111B27); private val ZEDGE=Color(0xFF344356)
 private val ZP=Color(0xFF9B5CFF); private val ZPK=Color(0xFFFF4FA3); private val ZG=Color(0xFF24E58A)
 private val ZT=Color(0xFFF5F7FA); private val ZM=Color(0xFF8490A0)
 private val ZCY=Color(0xFF20C7E8); private val ZOR=Color(0xFFFFC857)
@@ -34,16 +34,16 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  val zeusLogo=remember{runCatching{context.assets.open("ui_reference/render.png").use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()}
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
- Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=8.dp,vertical=5.dp)){
-  Row(Modifier.fillMaxWidth().height(64.dp).background(ZSUR,RoundedCornerShape(9.dp)).border(1.dp,ZBR,RoundedCornerShape(9.dp)).padding(horizontal=4.dp),verticalAlignment=Alignment.CenterVertically){
+ Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=6.dp,vertical=4.dp)){
+  Row(Modifier.fillMaxWidth().height(58.dp).background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZEDGE,RoundedCornerShape(7.dp)).padding(horizontal=2.dp),verticalAlignment=Alignment.CenterVertically){
    Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showMenu=true})
    Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally){
     if(zeusLogo!=null){
-     Image(bitmap=zeusLogo,contentDescription="Zeus",contentScale=ContentScale.Fit,modifier=Modifier.height(52.dp).width(105.dp))
+     Image(bitmap=zeusLogo,contentDescription="Zeus",contentScale=ContentScale.Fit,modifier=Modifier.height(46.dp).width(118.dp))
     } else {
      Text("ZEUS",color=ZT,fontSize=15.sp,fontWeight=FontWeight.ExtraBold)
     }
-    Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
+    Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=6.sp,fontWeight=FontWeight.Bold)
    }
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
     Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)
@@ -55,7 +55,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   }
   Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
    listOf("EQ / PUNCH","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
-    Text(label,color=if(page==i)Color.Black else ZT,fontSize=8.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(6.dp)).clickable{page=i}.padding(vertical=7.dp))
+    Text(label,color=if(page==i)Color.Black else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(5.dp)).clickable{page=i}.padding(vertical=6.dp))
    }
   }
   Box(Modifier.weight(1f).fillMaxWidth()){
@@ -149,9 +149,14 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text("+ BANDA",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(7.dp)).clickable{vm.addBand()}.padding(horizontal=11.dp,vertical=7.dp))
    }
    Spacer(Modifier.height(5.dp))
-   Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF080B12))){
+   Box(Modifier.fillMaxWidth().height(315.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFF05080D)).border(1.dp,ZEDGE,RoundedCornerShape(6.dp))){
     EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxSize())
    }
+  }
+
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+   Card("SUB / SISMO"){S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it};S("FREQ",vm.subFrequencyHz,18f..90f," Hz"){vm.subFrequencyHz=it}}
+   Card("BASS / PUNCH"){S("BASS",punch.bassAmount,0f..100f," %"){punch.updateBassAmount(it)};S("CENTER",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)}}
   }
 
   Card("PREAMP / EQ CURVE / BANDAS"){
@@ -316,8 +321,8 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   Presets(vm)
  }
 }
-@Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(10.dp)).border(1.dp,ZBR,RoundedCornerShape(10.dp)).padding(8.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(title,color=ZP,fontSize=13.sp,fontWeight=FontWeight.Bold);content()}}
-@Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZBR))}}
+@Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZBR,RoundedCornerShape(7.dp)).padding(horizontal=8.dp,vertical=7.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.width(3.dp).height(13.dp).background(ZP,RoundedCornerShape(2.dp)));Spacer(Modifier.width(6.dp));Text(title,color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));Text("●",color=ZP.copy(alpha=.55f),fontSize=7.sp)};content()}}
+@Composable private fun S(label:String,value:Float,range:ClosedFloatingPointRange<Float>,unit:String="",modifier:Modifier=Modifier.fillMaxWidth(),change:(Float)->Unit){Column(modifier){Row{Text(label,color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));var show by remember{mutableStateOf(false)}; Text(fmt(value)+unit,color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.clickable{show=true}.padding(4.dp)); if(show){NumberDialog(label,value,range.start,range.endInclusive,unit,{change(it);show=false},{show=false})}};Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange=change,valueRange=range,modifier=Modifier.height(26.dp),colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZGRID))}}
 
 @Composable private fun SubSismoCard(vm:EqViewModel){
  Card("SUB / SISMO (18Hz - 90Hz)"){
@@ -359,7 +364,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  val post=listOf(vm.compMbPostGainLow,vm.compMbPostGainLoMid,vm.compMbPostGainHiMid,vm.compMbPostGainHigh)
  Card("COMPRESOR MULTIBANDA"){
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)){n.forEachIndexed{i,x->Text(x,color=if(b==i)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(b==i)ZP else Color(0xFF1A1B22),RoundedCornerShape(5.dp)).clickable{b=i}.padding(vertical=6.dp))}}
-  Row(Modifier.fillMaxWidth().height(72.dp),horizontalArrangement=Arrangement.spacedBy(3.dp)){
+  Row(Modifier.fillMaxWidth().height(66.dp),horizontalArrangement=Arrangement.spacedBy(3.dp)){
    listOf("20Hz–120Hz","120Hz–1.2k","1.2k–8k","8k–20k").forEachIndexed{i,label->Box(Modifier.weight(1f).fillMaxHeight().background(if(i==b)ZP.copy(alpha=.22f) else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(i==b)ZP else ZBR,RoundedCornerShape(5.dp)).clickable{b=i},contentAlignment=Alignment.Center){Text(label,color=if(i==b)ZP else ZM,fontSize=8.sp,textAlign=TextAlign.Center)}}}
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
    S("PRE",pre[b],-12f..12f," dB",Modifier.weight(1f)){uPre(vm,b,it)}
@@ -372,10 +377,19 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    S("ATTACK",at[b],1f..100f," ms",Modifier.weight(1f)){uAt(vm,b,it)}
    S("RELEASE",re[b],20f..500f," ms",Modifier.weight(1f)){uRe(vm,b,it)}
   }
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-   S("CROSS 1",vm.crossoverFrequencies[0],40f..1000f," Hz",Modifier.weight(1f)){vm.setCrossover(0,it)}
-   S("CROSS 2",vm.crossoverFrequencies[1],100f..5000f," Hz",Modifier.weight(1f)){vm.setCrossover(1,it)}
-   S("CROSS 3",vm.crossoverFrequencies[2],1000f..19500f," Hz",Modifier.weight(1f)){vm.setCrossover(2,it)}
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+   listOf(
+    Triple("CROSS 1",vm.crossoverFrequencies.getOrElse(0){120f},40f..1000f),
+    Triple("CROSS 2",vm.crossoverFrequencies.getOrElse(1){2000f},100f..5000f),
+    Triple("CROSS 3",vm.crossoverFrequencies.getOrElse(2){8000f},1000f..19500f),
+    Triple("CROSS 4",vm.crossoverFrequencies.getOrElse(3){10000f},8000f..20000f)
+   ).forEachIndexed{i,(label,value,range)->
+    Column(Modifier.weight(1f).background(if(i==3)ZP.copy(alpha=.07f) else ZGRID,RoundedCornerShape(5.dp)).border(1.dp,if(i==3)ZP.copy(alpha=.45f) else ZBR,RoundedCornerShape(5.dp)).padding(horizontal=4.dp,vertical=3.dp)){
+     Text(label,color=if(i==3)ZP else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold)
+     Text(fmt(value)+" Hz",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+     Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange={vm.setCrossover(i,it)},valueRange=range,modifier=Modifier.height(25.dp),colors=SliderDefaults.colors(thumbColor=if(i==3)ZPK else ZP,activeTrackColor=if(i==3)ZPK else ZP,inactiveTrackColor=ZBR))
+    }
+   }
   }
   Row(verticalAlignment=Alignment.CenterVertically){Text("COMPRESSOR",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));Switch(checked=vm.compressorMultibandEnabled,onCheckedChange={vm.compressorMultibandEnabled=it})}
  }
@@ -425,7 +439,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
 @Composable private fun Bands(vm:EqViewModel){
  Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(3.dp)){
-   vm.bands.forEachIndexed{i,b->Text("${i+1}\n${if(b.frequency>=1000)(b.frequency/1000).toString()+"k" else b.frequency.toInt().toString()}",color=if(i==vm.selectedBandIndex)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.width(42.dp).background(if(i==vm.selectedBandIndex)b.color else ZSUR,RoundedCornerShape(6.dp)).clickable{vm.selectBand(i)}.padding(vertical=5.dp))}
+   vm.bands.forEachIndexed{i,b->Text("${i+1}\n${if(b.frequency>=1000)(b.frequency/1000).toString()+"k" else b.frequency.toInt().toString()}",color=if(i==vm.selectedBandIndex)Color.Black else ZT,fontSize=8.sp,textAlign=TextAlign.Center,modifier=Modifier.width(42.dp).background(if(i==vm.selectedBandIndex)b.color else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(i==vm.selectedBandIndex)b.color else ZBR,RoundedCornerShape(5.dp)).clickable{vm.selectBand(i)}.padding(vertical=5.dp))}
   }
   Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(5.dp)){
    Text("BANDAS ${vm.bands.size}/${EqViewModel.MAX_BANDS}",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f))
