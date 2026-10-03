@@ -29,6 +29,7 @@ private val ZCY=Color(0xFF20C7E8); private val ZOR=Color(0xFFFFC857)
 
 @Composable
 fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Unit,onSave:()->Unit,onExport:()->Unit,onImport:()->Unit){
+ val cfg=LocalConfiguration.current
  var page by remember{mutableIntStateOf(0)}
  val context=LocalContext.current
  val zeusLogo=remember{runCatching{context.assets.open("ui_reference/render.png").use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()}
@@ -53,13 +54,19 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
-  Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-   listOf("EQ / PUNCH","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
-    Text(label,color=if(page==i)Color.Black else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(5.dp)).clickable{page=i}.padding(vertical=6.dp))
+  if(cfg.screenWidthDp <= cfg.screenHeightDp){
+   Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+    listOf("EQ / PUNCH","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
+     Text(label,color=if(page==i)Color.Black else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(5.dp)).clickable{page=i}.padding(vertical=6.dp))
+    }
    }
   }
   Box(Modifier.weight(1f).fillMaxWidth()){
-   when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm)}
+   if(cfg.screenWidthDp > cfg.screenHeightDp){
+    ZeusConsoleLandscape(vm,punch)
+   } else {
+    when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm)}
+   }
   }
   Row(Modifier.fillMaxWidth().padding(top=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{onToggleEngine()})
@@ -84,6 +91,73 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
    }},confirmButton={TextButton(onClick={showSettings=false}){Text("Cerrar")}})
+  }
+ }
+}
+
+@Composable
+private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
+ val scroll=rememberScrollState()
+ Row(
+  Modifier.fillMaxSize().horizontalScroll(scroll).padding(bottom=2.dp),
+  horizontalArrangement=Arrangement.spacedBy(6.dp)
+ ){
+  // 1. EQ MASTER / RTA
+  Column(Modifier.width(650.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   Card("SPECTRUM / EQ CURVE / RTA"){
+    Row(verticalAlignment=Alignment.CenterVertically){
+     Column(Modifier.weight(1f)){Text("ZEUS MASTER EQ",color=ZT,fontSize=12.sp,fontWeight=FontWeight.Bold);Text("18 Hz — 20 kHz  ·  CURVAS + FFT EN TIEMPO REAL",color=ZM,fontSize=7.sp)}
+     Text("+ BANDA",color=Color.White,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(4.dp)).clickable{vm.addBand()}.padding(horizontal=9.dp,vertical=5.dp))
+    }
+    EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxWidth().height(300.dp))
+   }
+   Card("PREAMP / BANDA SELECCIONADA"){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+     EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
+     EditableBox("FREQ",vm.selectedBand()?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
+     EditableBox("GAIN",vm.selectedBand()?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
+     EditableBox("Q",vm.selectedBand()?.q?:1f,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
+    }
+    Spacer(Modifier.height(2.dp)); Filters(vm); Bands(vm)
+   }
+   Presets(vm)
+  }
+
+  // 2. LOW END / PUNCH
+  Column(Modifier.width(300.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   SubSismoCard(vm)
+   PunchCard(punch,vm)
+   SpatialCard(vm)
+   Card("HEADROOM"){S("OUTPUT",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it};Text("Protección de salida antes del limitador",color=ZM,fontSize=8.sp)}
+  }
+
+  // 3. MULTIBAND COMPRESSOR, all four strips visible
+  Column(Modifier.width(610.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   CompCard(vm)
+   Card("SIGNAL FLOW"){
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
+     Text("SUB / SISMO",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold)
+     Text("→",color=ZM); Text("MBC",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+     Text("→",color=ZM); Text("PUNCH",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+     Text("→",color=ZM); Text("LIMITER",color=ZG,fontSize=8.sp,fontWeight=FontWeight.Bold)
+    }
+   }
+  }
+
+  // 4. LIMITER / OUTPUT
+  Column(Modifier.width(290.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   LimCard(vm)
+   Card("OUTPUT METER"){
+    Text(if(vm.isEngineRunning)"● ENGINE ONLINE" else "○ ENGINE OFF",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,fontWeight=FontWeight.Bold)
+    Text("REAL-TIME PROCESSING",color=ZCY,fontSize=8.sp)
+    Spacer(Modifier.height(8.dp))
+    repeat(12){i->Box(Modifier.fillMaxWidth().height(7.dp).padding(vertical=1.dp).background(if(i>7)ZG else ZBR,RoundedCornerShape(2.dp)))}
+   }
+  }
+
+  // 5. AUTOEQ / PRESETS
+  Column(Modifier.width(440.dp).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
+   AutoEqPage(vm)
   }
  }
 }
