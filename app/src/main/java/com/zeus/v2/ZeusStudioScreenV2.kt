@@ -523,3 +523,5 @@ private fun uAt(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbAttackLow=x;1->v
 private fun uRe(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbReleaseLow=x;1->v.compMbReleaseLoMid=x;2->v.compMbReleaseHiMid=x;3->v.compMbReleaseHigh=x}}
 
 private fun fmt(v:Float):String = if (kotlin.math.abs(v) >= 1000f) "%.1fk".format(v/1000f) else "%.2f".format(v)
+
+// ZEUS_UI_CONSOLE_V1
