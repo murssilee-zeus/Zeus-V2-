@@ -228,11 +228,6 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
    }
   }
 
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-   Card("SUB / SISMO"){S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it};S("FREQ",vm.subFrequencyHz,18f..90f," Hz"){vm.subFrequencyHz=it}}
-   Card("BASS / PUNCH"){S("BASS",punch.bassAmount,0f..100f," %"){punch.updateBassAmount(it)};S("CENTER",punch.centerHz,35f..65f," Hz"){punch.updatePunchCenter(it)}}
-  }
-
   Card("PREAMP / EQ CURVE / BANDAS"){
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
     EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
@@ -255,16 +250,6 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.Top){
    Column(Modifier.weight(1f)){
     SubSismoCard(vm)
-    Card("BASS") {
-     Text("Bass controls",color=ZM,fontSize=9.sp)
-     S("BASS AMOUNT",punch.bassAmount,0f..100f," %"){punch.updateBassAmount(it)}
-     S("BASS FREQ",punch.bassFrequencyHz,25f..120f," Hz"){punch.updateBassFrequency(it)}
-     Row(verticalAlignment=Alignment.CenterVertically){
-      Text("BASS MONO",color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
-      Switch(checked=punch.bassMono,onCheckedChange=punch::updateBassMono)
-     }
-     S("HARMONICS",punch.bassHarmonics,0f..100f," %"){punch.updateBassHarmonics(it)}
-    }
    }
    Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); SpatialCard(vm) }
    Column(Modifier.weight(.9f)){ Card("HEADROOM") {
