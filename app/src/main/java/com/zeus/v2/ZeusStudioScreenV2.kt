@@ -168,7 +168,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
                     Spacer(Modifier.height(8.dp));repeat(16){i->Box(Modifier.fillMaxWidth().height(7.dp).padding(vertical=1.dp).background(if(i>11)ZG else ZBR,RoundedCornerShape(2.dp)))};Spacer(Modifier.height(4.dp));Text("OUTPUT GAIN  "+fmt(vm.limiterPostGain)+" dB",color=ZCY,fontSize=8.sp,fontWeight=FontWeight.Bold)
                 }}
             }
-            Card("AUTOEQ / TARGET / PRESETS"){AutoEqPage(vm)}
+            Card("AUTOEQ / TARGET / PRESETS"){AutoEqPage(vm, embedded = true)}
         }
     }
 }
@@ -225,7 +225,7 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
 @Composable private fun DynPage(vm:EqViewModel){
  val cfg=LocalConfiguration.current
  if(cfg.screenHeightDp > cfg.screenWidthDp){
-  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm);LimCard(vm)}
+  Column((if(embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState())),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm);LimCard(vm)}
  } else { DynPageLandscape(vm) }
 }
 
@@ -317,7 +317,7 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
  }
 }
 
-@Composable private fun AutoEqPage(vm:EqViewModel){
+@Composable private fun AutoEqPage(vm:EqViewModel, embedded:Boolean = false){
  val ctx=LocalContext.current
  val scope=rememberCoroutineScope()
  var query by remember{mutableStateOf("")}
