@@ -74,6 +74,14 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun ZeusSplash(onFinished: () -> Unit) {
         val context = this
+        val finished = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+        val finishOnce = remember(onFinished) {
+            {
+                if (finished.compareAndSet(false, true)) {
+                    context.runOnUiThread { onFinished() }
+                }
+            }
+        }
 
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -83,49 +91,45 @@ class MainActivity : ComponentActivity() {
                 factory = {
                     SurfaceView(context).apply {
                         setBackgroundColor(android.graphics.Color.BLACK)
-
                         holder.addCallback(object : SurfaceHolder.Callback {
                             private var player: MediaPlayer? = null
                             private var tempVideo: java.io.File? = null
+                            private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
                             override fun surfaceCreated(surface: SurfaceHolder) {
                                 Thread {
                                     runCatching {
-                                        val file = java.io.File(
-                                            context.cacheDir,
-                                            "zeus_splash.mp4"
-                                        )
-
+                                        val file = java.io.File(context.cacheDir, "zeus_splash.mp4")
                                         context.assets.open(
                                             "ui_reference/Screen_Recording_20261002_100912_Google_1.mp4"
                                         ).use { input ->
-                                            java.io.FileOutputStream(file).use { output ->
-                                                input.copyTo(output)
-                                            }
+                                            java.io.FileOutputStream(file).use { output -> input.copyTo(output) }
                                         }
-
                                         tempVideo = file
-
                                         context.runOnUiThread {
+                                            if (finished.get()) return@runOnUiThread
                                             player = MediaPlayer().apply {
                                                 setDataSource(file.absolutePath)
                                                 setDisplay(surface)
-                                                isLooping = true
-                                                setOnPreparedListener {
-                                                    it.start()
-                                                    postDelayed({
-                                                        onFinished()
-                                                    }, 3500L)
+                                                isLooping = false
+                                                setOnPreparedListener { mp ->
+                                                    if (!finished.get()) {
+                                                        mp.start()
+                                                        handler.postDelayed({ finishOnce() }, 3500L)
+                                                    }
                                                 }
-                                                setOnErrorListener { _, _, _ ->
-                                                    onFinished()
+                                                setOnCompletionListener { finishOnce() }
+                                                setOnErrorListener { _, what, extra ->
+                                                    android.util.Log.e("ZeusSplash", "Video error what=$what extra=$extra")
+                                                    finishOnce()
                                                     true
                                                 }
                                                 prepareAsync()
                                             }
                                         }
-                                    }.onFailure {
-                                        onFinished()
+                                    }.onFailure { error ->
+                                        android.util.Log.e("ZeusSplash", "Could not load splash video", error)
+                                        finishOnce()
                                     }
                                 }.start()
                             }
@@ -138,8 +142,12 @@ class MainActivity : ComponentActivity() {
                             ) = Unit
 
                             override fun surfaceDestroyed(surface: SurfaceHolder) {
-                                player?.runCatching { stop() }
-                                player?.release()
+                                handler.removeCallbacksAndMessages(null)
+                                player?.runCatching {
+                                    if (isPlaying) stop()
+                                    reset()
+                                    release()
+                                }
                                 player = null
                                 tempVideo?.delete()
                                 tempVideo = null
@@ -151,6 +159,7 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
     @Composable private fun ComposeRoot() {
         val vm: EqViewModel = viewModel(factory = EqViewModel.Factory)
         val punch: PunchViewModel = viewModel()
