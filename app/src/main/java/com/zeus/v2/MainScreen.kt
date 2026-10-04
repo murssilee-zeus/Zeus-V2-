@@ -912,12 +912,58 @@ private fun CompFreqColumn(
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(4.dp))
-            Text(
-                formatFreq(freq),
-                color = color,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            var editingFreq by remember { mutableStateOf(false) }
+            var freqText by remember(freq) {
+                mutableStateOf(if (freq >= 1000f) String.format("%.1f", freq / 1000f) else String.format("%.0f", freq))
+            }
+
+            if (editingFreq && enabled) {
+                OutlinedTextField(
+                    value = freqText,
+                    onValueChange = { freqText = it },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    textStyle = LocalTextStyle.current.copy(
+                        color = TXT_PRIMARY,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = color,
+                        unfocusedBorderColor = CARD_BORDER,
+                        focusedTextColor = TXT_PRIMARY,
+                        unfocusedTextColor = TXT_PRIMARY,
+                        cursorColor = color
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardActions = KeyboardActions(onDone = {
+                        val typed = freqText.toFloatOrNull()
+                        if (typed != null) {
+                            val hz = if (freq >= 1000f && typed < 1000f) typed * 1000f else typed
+                            onFreq(hz.coerceIn(range.start, range.endInclusive))
+                        }
+                        editingFreq = false
+                    })
+                )
+            } else {
+                Text(
+                    formatFreq(freq),
+                    color = color,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF1A1A20))
+                        .clickable(enabled = enabled) {
+                            freqText = if (freq >= 1000f) String.format("%.1f", freq / 1000f)
+                            else String.format("%.0f", freq)
+                            editingFreq = true
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                )
+            }
             if (enabled && range.endInclusive > range.start) {
                 Slider(
                     value = freq.coerceIn(range.start, range.endInclusive),
