@@ -58,8 +58,16 @@ class MainActivity : ComponentActivity() {
                 var showSplash by remember { mutableStateOf(true) }
                 if (showSplash) {
                     ZeusSplash {
-                        showSplash = false
-                        requestNeededPermissions()
+                        // Give SurfaceView/MediaPlayer a moment to detach before building
+                        // the full Compose console. This avoids the splash-to-UI crash.
+                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                            if (!isFinishing && !isDestroyed) {
+                                showSplash = false
+                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                    if (!isFinishing && !isDestroyed) requestNeededPermissions()
+                                }, 250L)
+                            }
+                        }, 120L)
                     }
                 } else {
                     ComposeRoot()
