@@ -34,7 +34,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:theme="@style/Theme.ZeusV2">
             <intent-filter>
