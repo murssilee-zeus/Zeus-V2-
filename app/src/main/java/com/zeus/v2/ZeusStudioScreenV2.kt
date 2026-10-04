@@ -100,124 +100,56 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
     val screen=LocalConfiguration.current.screenWidthDp.dp
     val pageWidth=(screen-18.dp).coerceAtLeast(520.dp)
     val scroll=rememberScrollState()
-
-    Row(
-        Modifier.fillMaxSize()
-            .horizontalScroll(scroll)
-            .background(ZBG)
-            .padding(5.dp),
-        horizontalArrangement=Arrangement.spacedBy(8.dp)
-    ){
-        // PAGE 1: EQ / PUNCH
-        Column(
-            Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),
-            verticalArrangement=Arrangement.spacedBy(7.dp)
-        ){
-            ConsolePageHeader("01","ZEUS EQ","SPECTRUM + BAND CONTROL","EQ / PUNCH",ZP)
-            Card("SPECTRUM / REAL-TIME RTA"){
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-                    Column(Modifier.weight(1f)){
-                        Text("ZEUS MASTER",color=ZT,fontSize=14.sp,fontWeight=FontWeight.ExtraBold)
-                        Text("18 Hz — 20 kHz  •  ENGINE PROCESSING",color=ZCY,fontSize=8.sp,fontWeight=FontWeight.Bold)
-                    }
-                    Text("● "+if(vm.isEngineRunning)"ONLINE" else "OFFLINE",color=if(vm.isEngineRunning)ZG else ZM,fontSize=8.sp,fontWeight=FontWeight.Bold)
-                    Spacer(Modifier.width(8.dp))
-                    Text("+ BANDA",color=Color.White,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{vm.addBand()}.padding(horizontal=10.dp,vertical=7.dp))
-                }
-                Spacer(Modifier.height(5.dp))
-                Box(Modifier.fillMaxWidth().height(245.dp).clip(RoundedCornerShape(7.dp)).background(Color(0xFF04070C)).border(1.dp,ZEDGE,RoundedCornerShape(7.dp))){
-                    EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},Modifier.fillMaxSize())
+    Row(Modifier.fillMaxSize().background(ZBG).horizontalScroll(scroll).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
+        Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            ConsolePageHeader("01","ZEUS EQ","BANDS + PUNCH","EQ",ZP)
+            Card("EQ / MASTER"){
+                Text("Engine: "+if(vm.isEngineRunning)"ONLINE" else "OFFLINE",color=if(vm.isEngineRunning)ZG else ZM,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                    EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
+                    EditableBox("HEADROOM",vm.headroomTrim,"dB",-12f,6f,Modifier.weight(1f)){vm.headroomTrim=it}
                 }
             }
             Card("SELECTED BAND"){
+                val band=vm.selectedBand()
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
-                    EditableBox("FREQ",vm.selectedBand()?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
-                    EditableBox("GAIN",vm.selectedBand()?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
-                    EditableBox("Q",vm.selectedBand()?.q?:1f,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
+                    EditableBox("FREQ",band?.frequency?:125f,"Hz",1f,30000f,Modifier.weight(1f)){vm.updateSelectedBand(frequency=it)}
+                    EditableBox("GAIN",band?.gain?:0f,"dB",-30f,30f,Modifier.weight(1f)){vm.updateSelectedBand(gain=it)}
+                    EditableBox("Q",band?.q?:1f,"",.1f,40f,Modifier.weight(1f)){vm.updateSelectedBand(q=it)}
                 }
-                Spacer(Modifier.height(4.dp))
-                Filters(vm)
-                Bands(vm)
+                Spacer(Modifier.height(5.dp)); Filters(vm)
             }
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.Top){
-                Column(Modifier.weight(1f)){SubSismoCard(vm)}
-                Column(Modifier.weight(1f)){PunchCard(punch,vm)}
-                Column(Modifier.weight(1f)){SpatialCard(vm)}
-            }
-            Card("PRESETS"){Presets(vm)}
+            SubSismoCard(vm); PunchCard(punch,vm)
         }
-
-        // PAGE 2: DYNAMICS / LIMITER
-        Column(
-            Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),
-            verticalArrangement=Arrangement.spacedBy(7.dp)
-        ){
-            ConsolePageHeader("02","DYNAMICS","CROSSOVER + MULTIBAND + LIMITER","PROCESSING",ZCY)
+        Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            ConsolePageHeader("02","DYNAMICS","CROSSOVER + COMPRESSOR","PROCESSING",ZCY)
             Card("CROSSOVER 1 — 4"){
-                Text("Ajuste por toque o deslizador. Los cruces se mantienen ordenados.",color=ZM,fontSize=9.sp)
-                Spacer(Modifier.height(4.dp))
+                Text("Toca una frecuencia para editarla.",color=ZM,fontSize=9.sp); Spacer(Modifier.height(5.dp))
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    val labels=listOf("LOW","LOW-MID","MID","HIGH")
                     val ranges=listOf(40f..1000f,100f..5000f,1000f..19500f,8000f..20000f)
-                    labels.forEachIndexed{i,label->
-                        val value=vm.crossoverFrequencies.getOrElse(i){ranges[i].start}
-                        Column(Modifier.weight(1f).background(if(i==3)ZPK.copy(alpha=.09f) else ZGRID,RoundedCornerShape(7.dp)).border(1.dp,if(i==3)ZPK else ZBR,RoundedCornerShape(7.dp)).padding(5.dp)){
-                            Text("CROSS "+(i+1),color=if(i==3)ZPK else ZCY,fontSize=9.sp,fontWeight=FontWeight.ExtraBold)
-                            Text(label,color=ZM,fontSize=7.sp)
-                            EditableBox("FREQ",value,"Hz",ranges[i].start,ranges[i].endInclusive,Modifier.fillMaxWidth()){vm.setCrossover(i,it)}
-                            Slider(value=value.coerceIn(ranges[i].start,ranges[i].endInclusive),onValueChange={vm.setCrossover(i,it)},valueRange=ranges[i],modifier=Modifier.height(26.dp),colors=SliderDefaults.colors(thumbColor=if(i==3)ZPK else ZP,activeTrackColor=if(i==3)ZPK else ZP,inactiveTrackColor=ZBR))
+                    ranges.forEachIndexed { idx, range ->
+                        val value=vm.crossoverFrequencies.getOrElse(idx){range.start}
+                        Column(Modifier.weight(1f)){
+                            Text("CROSS "+(idx+1),color=ZCY,fontSize=8.sp,fontWeight=FontWeight.Bold)
+                            EditableBox("Hz",value,"",range.start,range.endInclusive,Modifier.fillMaxWidth()){vm.setCrossover(idx,it)}
                         }
                     }
                 }
             }
             CompCard(vm)
-            LimCard(vm)
-            Card("SIGNAL PATH"){
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
-                    Text("SUB / SISMO",color=ZP,fontSize=9.sp,fontWeight=FontWeight.Bold)
-                    Text("→",color=ZM,fontSize=16.sp)
-                    Text("MBC",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)
-                    Text("→",color=ZM,fontSize=16.sp)
-                    Text("PUNCH",color=ZPK,fontSize=9.sp,fontWeight=FontWeight.Bold)
-                    Text("→",color=ZM,fontSize=16.sp)
-                    Text("SPATIAL",color=ZCY,fontSize=9.sp,fontWeight=FontWeight.Bold)
-                    Text("→",color=ZM,fontSize=16.sp)
-                    Text("LIMITER",color=ZG,fontSize=9.sp,fontWeight=FontWeight.Bold)
-                }
-            }
         }
-
-        // PAGE 3: AUTOEQ / PRESETS / OUTPUT
-        Column(
-            Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),
-            verticalArrangement=Arrangement.spacedBy(7.dp)
-        ){
-            ConsolePageHeader("03","AUTOEQ + OUTPUT","TARGETS + HEADROOM + FINAL CHAIN","FINAL",ZG)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.Top){
-                Column(Modifier.weight(1f)){
-                    Card("HEADROOM"){
-                        S("OUTPUT",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
-                        Text("18 Hz protection → final limiter",color=ZM,fontSize=8.sp)
-                    }
-                }
-                Column(Modifier.weight(1f)){
-                    Card("OUTPUT"){
-                        Text(if(vm.isEngineRunning)"ENGINE ONLINE" else "ENGINE OFF",color=if(vm.isEngineRunning)ZG else ZM,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                        Spacer(Modifier.height(6.dp))
-                        repeat(12){i->Box(Modifier.fillMaxWidth().height(7.dp).padding(vertical=1.dp).background(if(i>8)ZG else ZBR,RoundedCornerShape(2.dp)))}
-                        Text("OUTPUT GAIN  "+fmt(vm.limiterPostGain)+" dB",color=ZCY,fontSize=8.sp,fontWeight=FontWeight.Bold)
-                    }
-                }
-            }
-            AutoEqPage(vm)
-            Card("PRESETS"){
-                Presets(vm)
+        Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+            ConsolePageHeader("03","OUTPUT","LIMITER + SPATIAL","FINAL",ZG)
+            LimCard(vm); SpatialCard(vm)
+            Card("ENGINE STATUS"){
+                Text(if(vm.isEngineRunning)"ZEUS ENGINE ACTIVE" else "ZEUS ENGINE READY",color=if(vm.isEngineRunning)ZG else ZM,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                Spacer(Modifier.height(6.dp)); Text("Tres páginas horizontales activas.",color=ZM,fontSize=9.sp)
+                Text("AutoEQ queda fuera de esta prueba para aislar el cierre.",color=ZM,fontSize=9.sp)
             }
         }
     }
 }
-
 @Composable
 private fun ConsolePageHeader(index:String,title:String,subtitle:String,tag:String,accent:Color){
     Row(Modifier.fillMaxWidth().background(Color(0xFF080D14),RoundedCornerShape(8.dp)).border(1.dp,ZEDGE,RoundedCornerShape(8.dp)).padding(horizontal=12.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically){
