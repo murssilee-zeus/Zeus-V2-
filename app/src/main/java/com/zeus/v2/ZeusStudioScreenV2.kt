@@ -609,3 +609,4 @@ private fun uRe(v:EqViewModel,i:Int,x:Float){when(i){0->v.compMbReleaseLow=x;1->
 private fun fmt(v:Float):String = if (kotlin.math.abs(v) >= 1000f) "%.1fk".format(v/1000f) else "%.2f".format(v)
 
 // ZEUS_UI_CONSOLE_V1
+// Build trigger: keep UI changes on the fix branch.
