@@ -225,7 +225,7 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
 @Composable private fun DynPage(vm:EqViewModel){
  val cfg=LocalConfiguration.current
  if(cfg.screenHeightDp > cfg.screenWidthDp){
-  Column((if(embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState())),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm);LimCard(vm)}
+  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){CompCard(vm);LimCard(vm)}
  } else { DynPageLandscape(vm) }
 }
 
