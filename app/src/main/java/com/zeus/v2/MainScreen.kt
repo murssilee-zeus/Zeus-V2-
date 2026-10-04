@@ -67,6 +67,7 @@ fun MainScreen(
     ) {
         val pageWidth = maxWidth * 0.92f
         val pageGap = 10.dp
+        val density = androidx.compose.ui.platform.LocalDensity.current
 
         LaunchedEffect(viewModel.currentSection, maxWidth) {
             val index = when (viewModel.currentSection) {
@@ -75,7 +76,7 @@ fun MainScreen(
                 EqSection.LIMITER -> 2
                 EqSection.AUTOEQ -> 3
             }
-            val offset = with(androidx.compose.ui.platform.LocalDensity.current) {
+            val offset = with(density) {
                 ((pageWidth + pageGap) * index).roundToPx()
             }
             workspaceScroll.animateScrollTo(offset)
@@ -123,8 +124,7 @@ fun MainScreen(
                                 .clickable {
                                     when (section) {
                                         EqSection.EQUALIZER -> {
-                                            repeat(4) { viewModel.previousSection() }
-                                            if (viewModel.currentSection != EqSection.EQUALIZER && viewModel.currentSection != EqSection.PIPELINE) {
+                                            while (viewModel.currentSection != EqSection.EQUALIZER && viewModel.currentSection != EqSection.PIPELINE) {
                                                 viewModel.previousSection()
                                             }
                                         }
