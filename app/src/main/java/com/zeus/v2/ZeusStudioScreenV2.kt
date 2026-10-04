@@ -85,7 +85,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    AlertDialog(onDismissRequest={showSettings=false},title={Text("Configuración")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
     Row(verticalAlignment=Alignment.CenterVertically){Text("Procesamiento de audio",modifier=Modifier.weight(1f));Switch(checked=vm.isEngineRunning,onCheckedChange={onToggleEngine()})}
     Text("EQ, FFT, Punch, Dynamics y Limiter mantienen sus parámetros actuales.",fontSize=10.sp,color=ZM)
-    Text("Interfaz: vertical / 3 páginas",fontSize=10.sp,color=ZM)
+    Text("Interfaz: consola horizontal / paneles deslizables",fontSize=10.sp,color=ZM)
     Text("Configuraciones: JSON compatible para exportación",fontSize=10.sp,color=ZM)
     Text("EXPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onExport()}.padding(8.dp))
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
@@ -449,7 +449,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
    ).forEachIndexed{i,(label,value,range)->
     Column(Modifier.weight(1f).background(if(i==3)ZP.copy(alpha=.07f) else ZGRID,RoundedCornerShape(5.dp)).border(1.dp,if(i==3)ZP.copy(alpha=.45f) else ZBR,RoundedCornerShape(5.dp)).padding(horizontal=4.dp,vertical=3.dp)){
      Text(label,color=if(i==3)ZP else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold)
-     Text(fmt(value)+" Hz",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+     EditableBox("FREQ",value,"Hz",range.start,range.endInclusive,Modifier.fillMaxWidth()){vm.setCrossover(i,it)}
      Slider(value=value.coerceIn(range.start,range.endInclusive),onValueChange={vm.setCrossover(i,it)},valueRange=range,modifier=Modifier.height(25.dp),colors=SliderDefaults.colors(thumbColor=if(i==3)ZPK else ZP,activeTrackColor=if(i==3)ZPK else ZP,inactiveTrackColor=ZBR))
     }
    }
