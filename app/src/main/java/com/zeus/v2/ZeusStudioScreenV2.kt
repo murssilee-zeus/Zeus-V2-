@@ -102,14 +102,20 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
     val scroll=rememberScrollState()
     Row(Modifier.fillMaxSize().background(ZBG).horizontalScroll(scroll).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
-            ConsolePageHeader("01","ZEUS EQ","BANDS + PUNCH","EQ",ZP)
-            Card("EQ / MASTER"){
-                Text("Engine: "+if(vm.isEngineRunning)"ONLINE" else "OFFLINE",color=if(vm.isEngineRunning)ZG else ZM,fontSize=10.sp,fontWeight=FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.weight(1f)){vm.preamp=it}
-                    EditableBox("HEADROOM",vm.headroomTrim,"dB",-12f,6f,Modifier.weight(1f)){vm.headroomTrim=it}
-                }
+            ConsolePageHeader("01","ZEUS EQ","SPECTRUM + BANDS","EQ",ZP)
+            Card("SPECTRUM / EQ CURVE"){
+                Text("EQ GRAPH — prueba de estabilidad",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold)
+                Text("18 Hz • 20 kHz • REAL-TIME",color=ZM,fontSize=7.sp)
+                Spacer(Modifier.height(5.dp))
+                EqGraph(
+                    vm.bands,
+                    vm.selectedBandIndex,
+                    vm.spectrum,
+                    vm.targetCurve,
+                    {vm.selectBand(it)},
+                    {i,f,g->{vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)}},
+                    Modifier.fillMaxWidth().height(300.dp)
+                )
             }
             Card("SELECTED BAND"){
                 val band=vm.selectedBand()
@@ -120,7 +126,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
                 }
                 Spacer(Modifier.height(5.dp)); Filters(vm)
             }
-            SubSismoCard(vm); PunchCard(punch,vm)
+            Bands(vm)
         }
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("02","DYNAMICS","CROSSOVER + COMPRESSOR","PROCESSING",ZCY)
@@ -144,8 +150,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             LimCard(vm); SpatialCard(vm)
             Card("ENGINE STATUS"){
                 Text(if(vm.isEngineRunning)"ZEUS ENGINE ACTIVE" else "ZEUS ENGINE READY",color=if(vm.isEngineRunning)ZG else ZM,fontSize=12.sp,fontWeight=FontWeight.Bold)
-                Spacer(Modifier.height(6.dp)); Text("Tres páginas horizontales activas.",color=ZM,fontSize=9.sp)
-                Text("AutoEQ queda fuera de esta prueba para aislar el cierre.",color=ZM,fontSize=9.sp)
+                Spacer(Modifier.height(6.dp)); Text("EQ Graph integrado en esta prueba.",color=ZM,fontSize=9.sp)
             }
         }
     }
