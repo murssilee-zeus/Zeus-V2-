@@ -57,75 +57,196 @@ fun MainScreen(
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    val workspaceScroll = rememberScrollState()
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(BG)
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(SURFACE)
-                    .border(1.dp, CARD_BORDER, RoundedCornerShape(22.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-            ) {
-                IconButton(onClick = { viewModel.previousSection() }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = TXT_MUTED)
-                }
-                Text(
-                    text = viewModel.sectionTitle(),
-                    color = TXT_PRIMARY,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 6.dp)
-                )
-                IconButton(onClick = { viewModel.nextSection() }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TXT_MUTED)
-                }
-            }
+        val pageWidth = maxWidth * 0.92f
+        val pageGap = 10.dp
 
+        LaunchedEffect(viewModel.currentSection, maxWidth) {
+            val index = when (viewModel.currentSection) {
+                EqSection.EQUALIZER, EqSection.PIPELINE -> 0
+                EqSection.CROSSOVER -> 1
+                EqSection.LIMITER -> 2
+                EqSection.AUTOEQ -> 3
+            }
+            val offset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                ((pageWidth + pageGap) * index).roundToPx()
+            }
+            workspaceScroll.animateScrollTo(offset)
+        }
+
+        Column(Modifier.fillMaxSize()) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SURFACE)
+                    .border(1.dp, CARD_BORDER, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "ZEUS AUDIO",
+                        color = TXT_PRIMARY,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Control total · desliza horizontalmente",
+                        color = TXT_MUTED,
+                        fontSize = 9.sp
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf(
+                        "EQ" to EqSection.EQUALIZER,
+                        "X-OVER" to EqSection.CROSSOVER,
+                        "LIMIT" to EqSection.LIMITER,
+                        "AUTOEQ" to EqSection.AUTOEQ
+                    ).forEach { (label, section) ->
+                        val active = when (section) {
+                            EqSection.EQUALIZER -> viewModel.currentSection == EqSection.EQUALIZER || viewModel.currentSection == EqSection.PIPELINE
+                            else -> viewModel.currentSection == section
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (active) PINK_ACCENT else Color(0xFF1A1A20))
+                                .clickable {
+                                    when (section) {
+                                        EqSection.EQUALIZER -> {
+                                            repeat(4) { viewModel.previousSection() }
+                                            if (viewModel.currentSection != EqSection.EQUALIZER && viewModel.currentSection != EqSection.PIPELINE) {
+                                                viewModel.previousSection()
+                                            }
+                                        }
+                                        EqSection.CROSSOVER -> {
+                                            while (viewModel.currentSection != EqSection.CROSSOVER) viewModel.nextSection()
+                                        }
+                                        EqSection.LIMITER -> {
+                                            while (viewModel.currentSection != EqSection.LIMITER) viewModel.nextSection()
+                                        }
+                                        EqSection.AUTOEQ -> {
+                                            while (viewModel.currentSection != EqSection.AUTOEQ) viewModel.nextSection()
+                                        }
+                                        else -> Unit
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                label,
+                                color = if (active) Color.Black else TXT_MUTED,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(6.dp))
+
                 Text(
-                    text = "Guardar",
+                    "Guardar",
                     color = Color.White,
-                    fontSize = 12.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFF0E4D3A))
-                        .border(1.dp, Color(0xFF2ECC71), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFF2ECC71), RoundedCornerShape(12.dp))
                         .clickable { onSave() }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
                 )
+
+                Spacer(Modifier.width(5.dp))
+
                 IconButton(
                     onClick = onToggleEngine,
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(if (viewModel.isEngineRunning) Color(0xFF2ECC71) else Color(0xFF333344))
+                        .background(
+                            if (viewModel.isEngineRunning) Color(0xFF2ECC71)
+                            else Color(0xFF333344)
+                        )
                 ) {
-                    Icon(Icons.Default.PowerSettingsNew, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(
+                        Icons.Default.PowerSettingsNew,
+                        null,
+                        tint = Color.White,
+                        modifier = Modifier.size(19.dp)
+                    )
                 }
             }
-        }
 
-        when (viewModel.currentSection) {
-            EqSection.EQUALIZER, EqSection.PIPELINE -> EqualizerScreen(viewModel, Modifier.weight(1f))
-            EqSection.CROSSOVER -> CrossoverScreen(viewModel, Modifier.weight(1f))
-            EqSection.LIMITER -> LimiterScreen(viewModel, Modifier.weight(1f))
-            EqSection.AUTOEQ -> AutoEqScreen(viewModel, Modifier.weight(1f))
+            Spacer(Modifier.height(7.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .horizontalScroll(workspaceScroll),
+                horizontalArrangement = Arrangement.spacedBy(pageGap)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(pageWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF0E0E11))
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(18.dp))
+                        .padding(8.dp)
+                ) {
+                    EqualizerScreen(viewModel, Modifier.fillMaxSize())
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(pageWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF0E0E11))
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(18.dp))
+                        .padding(8.dp)
+                ) {
+                    CrossoverScreen(viewModel, Modifier.fillMaxSize())
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(pageWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF0E0E11))
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(18.dp))
+                        .padding(8.dp)
+                ) {
+                    LimiterScreen(viewModel, Modifier.fillMaxSize())
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(pageWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0xFF0E0E11))
+                        .border(1.dp, CARD_BORDER, RoundedCornerShape(18.dp))
+                        .padding(8.dp)
+                ) {
+                    AutoEqScreen(viewModel, Modifier.fillMaxSize())
+                }
+
+                Spacer(Modifier.width(2.dp))
+            }
         }
     }
 }
