@@ -127,6 +127,10 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
                 Spacer(Modifier.height(5.dp)); Filters(vm)
             }
             Bands(vm)
+            // Controles de graves recuperados en la página principal.
+            // Se reutilizan los componentes ya existentes para no tocar el motor.
+            SubSismoCard(vm)
+            PunchCard(punch,vm)
         }
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("02","DYNAMICS","CROSSOVER + COMPRESSOR","PROCESSING",ZCY)
