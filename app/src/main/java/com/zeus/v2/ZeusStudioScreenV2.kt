@@ -152,7 +152,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("03","OUTPUT","LIMITER + SPATIAL","FINAL",ZG)
             LimCard(vm); SpatialCard(vm)
-            AutoEqPage(vm, embedded = true)
+            AutoEqStub()
             Card("ENGINE STATUS"){
                 Text(if(vm.isEngineRunning)"ZEUS ENGINE ACTIVE" else "ZEUS ENGINE READY",color=if(vm.isEngineRunning)ZG else ZM,fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(6.dp)); Text("EQ Graph integrado en esta prueba.",color=ZM,fontSize=9.sp)
@@ -391,6 +391,14 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
    if(status.isNotBlank()) Text(status,color=ZG,fontSize=9.sp)
   }
   Presets(vm)
+ }
+}
+@Composable
+private fun AutoEqStub(){
+ Card("AUTOEQ"){
+  Text("AutoEQ aislado temporalmente para estabilidad.",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)
+  Text("El repositorio de modelos no se carga al entrar en la consola horizontal.",color=ZM,fontSize=8.sp)
+  Text("PERFILES DISPONIBLES EN LA PÁGINA AUTOEQ",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold)
  }
 }
 @Composable private fun Card(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZBR,RoundedCornerShape(7.dp)).padding(horizontal=8.dp,vertical=7.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.width(3.dp).height(13.dp).background(ZP,RoundedCornerShape(2.dp)));Spacer(Modifier.width(6.dp));Text(title,color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));Text("●",color=ZP.copy(alpha=.55f),fontSize=7.sp)};content()}}
