@@ -152,6 +152,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("03","OUTPUT","LIMITER + SPATIAL","FINAL",ZG)
             LimCard(vm); SpatialCard(vm)
+            AutoEqPage(vm, embedded = true)
             Card("ENGINE STATUS"){
                 Text(if(vm.isEngineRunning)"ZEUS ENGINE ACTIVE" else "ZEUS ENGINE READY",color=if(vm.isEngineRunning)ZG else ZM,fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(6.dp)); Text("EQ Graph integrado en esta prueba.",color=ZM,fontSize=9.sp)
