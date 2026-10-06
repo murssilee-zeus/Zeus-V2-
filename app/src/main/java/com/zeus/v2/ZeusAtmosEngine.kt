@@ -51,7 +51,7 @@ class ZeusAtmosEngine(
     var hrtfEndHz: Float = 12000f
         set(value) { field = value.coerceIn(hrtfStartHz + 500f, 18000f) }
 
-    private val maxDelaySamples = (sampleRate * 0.0008f).toInt().coerceAtLeast(2)
+    private val maxDelaySamples = (sampleRate * 0.0016f).toInt().coerceAtLeast(2)
     private val sideDelay = FloatArray(maxDelaySamples + 2)
     private var delayIndex = 0
 
@@ -90,10 +90,10 @@ class ZeusAtmosEngine(
             // Keep the low band out of ITD. Low-mid is introduced gently,
             // while upper bands receive progressively more spatial energy.
             val protectedLow = bands.low
-            val spatialInput =
-                bands.lowMid * 0.55f +
-                bands.highMid * 0.85f +
-                bands.high
+            val lowMidSpatial = bands.lowMid * (0.42f + 0.16f * immersion)
+            val highMidSpatial = bands.highMid * (0.95f + 0.30f * immersion)
+            val highSpatial = bands.high * (1.05f + 0.35f * immersion)
+            val spatialInput = lowMidSpatial + highMidSpatial + highSpatial
 
             // Fractional causal delay using linear interpolation in the ring buffer.
             sideDelay[delayIndex] = spatialInput
@@ -103,19 +103,21 @@ class ZeusAtmosEngine(
             val delayedA = sideDelay[wrap(base, sideDelay.size)]
             val delayedB = sideDelay[wrap(base - 1, sideDelay.size)]
             val delayedSide = delayedA * (1f - frac) + delayedB * frac
+            val depthDelaySamples = (sampleRate * (0.0010f + 0.00035f * height3D)).coerceIn(1f, maxDelaySamples.toFloat())
+            val depthRead = delayIndex - depthDelaySamples
+            val depthBase = kotlin.math.floor(depthRead).toInt()
+            val depthFrac = depthRead - depthBase
+            val depthA = sideDelay[wrap(depthBase, sideDelay.size)]
+            val depthB = sideDelay[wrap(depthBase - 1, sideDelay.size)]
+            val depthSide = depthA * (1f - depthFrac) + depthB * depthFrac
             delayIndex = (delayIndex + 1) % sideDelay.size
-
-            // High-band contribution provides a restrained height/air cue.
-            // This is an HRTF-like coloration, not a measured HRTF profile.
-            val delayedHigh =
-                bands.high * (0.08f + 0.10f * height3D) * height3D
-
-            val sideGain = 1f + immersion * 0.90f
-            val delayedMix = immersion * 0.30f
-
-            // Fixed direction for the first PCM core.
-            val sideLeft = spatialInput * sideGain + delayedSide * delayedMix + delayedHigh
-            val sideRight = delayedSide * sideGain + spatialInput * delayedMix + delayedHigh
+            val airCue = bands.high * (0.10f + 0.12f * height3D) * height3D
+            val sideGain = 1f + immersion * (1.15f + 0.25f * height3D)
+            val delayedMix = immersion * (0.34f + 0.10f * height3D)
+            val depthMix = immersion * (0.12f + 0.10f * height3D)
+            val ild = immersion * (0.045f + 0.035f * height3D)
+            val sideLeft = spatialInput * sideGain * (1f + ild) + delayedSide * delayedMix + depthSide * depthMix + airCue
+            val sideRight = delayedSide * sideGain * (1f + ild) + spatialInput * delayedMix + depthSide * depthMix + airCue
 
             // Reinsert the protected low band naturally. Mid receives center focus.
             val outMid = mid * centerGain
