@@ -103,6 +103,13 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
     Row(Modifier.fillMaxSize().background(ZBG).horizontalScroll(scroll).padding(5.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("01","ZEUS EQ","SPECTRUM + BANDS","EQ",ZP)
+            Card("PREAMP GENERAL"){
+                Row(verticalAlignment=Alignment.CenterVertically){
+                    Text("PREAMP",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
+                    Text(fmt(vm.preamp)+" dB",color=ZPK,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                }
+                Slider(value=vm.preamp.coerceIn(-30f,12f),onValueChange={vm.preamp=it},valueRange=-30f..12f,modifier=Modifier.fillMaxWidth().height(28.dp),colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZGRID))
+            }
             Card("SPECTRUM / EQ CURVE"){
                 Text("EQ GRAPH — prueba de estabilidad",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold)
                 Text("18 Hz • 20 kHz • REAL-TIME",color=ZM,fontSize=7.sp)
@@ -153,6 +160,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             ConsolePageHeader("03","OUTPUT","LIMITER + SPATIAL","FINAL",ZG)
             LimCard(vm); SpatialCard(vm)
             AutoEqSafeCard(vm)
+            HarmanTargetsCard(vm)
             Card("ENGINE STATUS"){
                 Text(if(vm.isEngineRunning)"ZEUS ENGINE ACTIVE" else "ZEUS ENGINE READY",color=if(vm.isEngineRunning)ZG else ZM,fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(6.dp)); Text("EQ Graph integrado en esta prueba.",color=ZM,fontSize=9.sp)
@@ -194,6 +202,46 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
    SubSismoCard(vm); PunchCard(punch,vm); SpatialCard(vm); Pipe(vm)
   }
  }
+}
+
+@Composable
+private fun HarmanTargetsCard(vm:EqViewModel){
+    var show by remember{mutableStateOf(false)}
+    var loading by remember{mutableStateOf(false)}
+    var targets by remember{mutableStateOf<List<TargetModel>>(emptyList())}
+    var error by remember{mutableStateOf<String?>(null)}
+    val ctx=LocalContext.current
+    val scope=rememberCoroutineScope()
+    Card("HARMAN TARGETS"){
+        Row(verticalAlignment=Alignment.CenterVertically){
+            Column(Modifier.weight(1f)){
+                Text("Curvas Harman disponibles en los targets de Zeus",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                Text("Activo: "+vm.selectedTargetName,color=ZM,fontSize=8.sp)
+            }
+            Text("VER HARMAN",color=Color.White,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZPK,RoundedCornerShape(6.dp)).clickable{
+                if(!loading){show=true;error=null;loading=true;scope.launch{
+                    try{targets=AutoEqRepository.targetModels(ctx).filter{it.name.contains("Harman",ignoreCase=true)};if(targets.isEmpty())error="No se encontraron targets Harman"}
+                    catch(t:Throwable){error=t.message ?: "No se pudieron cargar los targets"}finally{loading=false}
+                }}
+            }.padding(horizontal=8.dp,vertical=6.dp))
+        }
+        if(error!=null) Text(error!!,color=ZPK,fontSize=8.sp)
+    }
+    if(show){
+        AlertDialog(onDismissRequest={if(!loading)show=false},title={Text("Harman · Targets")},text={
+            Column(Modifier.heightIn(max=380.dp)){
+                if(loading){Text("Cargando targets Harman…",color=ZM,fontSize=9.sp,modifier=Modifier.padding(8.dp))}
+                else{androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)){
+                    items(targets){target->
+                        Row(Modifier.fillMaxWidth().clickable{vm.selectTarget(ctx,target);show=false}.padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically){
+                            Text(target.name,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f))
+                            Text("USAR",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold)
+                        }
+                    }
+                }}
+            }
+        },confirmButton={TextButton(onClick={if(!loading)show=false}){Text(if(loading)"Cargando…" else "Cerrar")}})
+    }
 }
 
 @Composable private fun SpatialCard(vm:EqViewModel){
