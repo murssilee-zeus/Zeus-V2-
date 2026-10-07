@@ -10,10 +10,6 @@ import kotlin.math.tanh
  * Epicenter-style bass enhancer used by Zeus Bass mode only.
  *
  * PCM IN -> sub/punch -> dynamic bass exciter -> controlled H2/H3 -> PCM OUT
- *
- * The exciter is dynamic: it follows the actual bass energy instead of
- * simply boosting fixed EQ bands. This creates the physical/rumbling
- * "rrrr" texture while keeping the sub itself intact.
  */
 class ZeusEpicenter(
     private val sampleRate: Int
@@ -29,7 +25,6 @@ class ZeusEpicenter(
     private val h3L = Biquad(sampleRate)
     private val h3R = Biquad(sampleRate)
 
-    // Dedicated bass followers for the dynamic Epicenter-style exciter.
     private val bassFollowL = OnePole(sampleRate)
     private val bassFollowR = OnePole(sampleRate)
     private val dcL = OnePole(sampleRate)
@@ -60,19 +55,16 @@ class ZeusEpicenter(
         lowR.lowShelf(sub, subGain)
         punchL.peak(bass, punchGain, .85f)
         punchR.peak(bass, punchGain, .85f)
-
         h2L.peak((bass * 2f).coerceIn(80f, 320f), h2Gain, .90f)
         h2R.peak((bass * 2f).coerceIn(80f, 320f), h2Gain, .90f)
         h3L.peak((bass * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
         h3R.peak((bass * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
 
-        // Dynamic nonlinear excitation. It is intentionally moderate so the
-        // original sub remains recognizable instead of turning into distortion.
+        // Dynamic nonlinear excitation, deliberately moderate to preserve the
+        // original sub while adding the physical rumble/texture.
         exciterDrive = 1f + amount * 2.5f + harmonics * 3.5f
         exciterMix = (amount * .10f + harmonics * .34f).coerceAtMost(.42f)
 
-        // Follow the bass region quickly enough to react to kick/bass hits,
-        // but not so quickly that individual samples become audible distortion.
         bassFollowL.configure(bass.coerceIn(55f, 150f))
         bassFollowR.configure(bass.coerceIn(55f, 150f))
         dcL.configure(18f)
@@ -87,31 +79,25 @@ class ZeusEpicenter(
             val inL = pcm[i] / 32768f
             val inR = pcm[i + 1] / 32768f
 
-            // Keep the existing Zeus bass shaping intact.
             var outL = lowL.process(inL)
             var outR = lowR.process(inR)
 
             outL = punchL.process(outL)
             outR = punchR.process(outR)
 
-            // Extract the actual bass energy and synthesize controlled
-            // even/odd harmonics from it. Unlike a static EQ boost, this
-            // only appears when bass is actually present.
+            // Generate harmonics only from actual bass energy.
             val bassL = bassFollowL.process(inL)
             val bassR = bassFollowR.process(inR)
 
-            val shapedL = tanh(bassL * exciterDrive)
-            val shapedR = tanh(bassR * exciterDrive)
+            val shapedL = tanh((bassL * exciterDrive).toDouble()).toFloat()
+            val shapedR = tanh((bassR * exciterDrive).toDouble()).toFloat()
 
-            // Squared term produces the even harmonic. Remove its DC component
-            // so the exciter cannot slowly shift the speaker/headphone driver.
+            // H2 is centered to remove the DC produced by squaring.
             val rawH2L = shapedL * shapedL
             val rawH2R = shapedR * shapedR
-            val h2DcL = dcL.process(rawH2L)
-            val h2DcR = dcR.process(rawH2R)
+            val dynamicH2L = rawH2L - dcL.process(rawH2L)
+            val dynamicH2R = rawH2R - dcR.process(rawH2R)
 
-            val dynamicH2L = rawH2L - h2DcL
-            val dynamicH2R = rawH2R - h2DcR
             val dynamicH3L = shapedL * shapedL * shapedL
             val dynamicH3R = shapedR * shapedR * shapedR
 
@@ -123,8 +109,6 @@ class ZeusEpicenter(
                 h2R.process(dynamicH2R) * exciterMix +
                 h3R.process(dynamicH3R) * (exciterMix * .72f)
 
-            // Small safety trim keeps the new nonlinear stage from eating all
-            // available headroom on heavily mastered tracks.
             outL += excitedL
             outR += excitedR
 
