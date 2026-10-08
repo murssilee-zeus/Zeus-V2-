@@ -761,7 +761,7 @@ class AudioEngine(private val context: Context) {
 
             val c1 =
                 s.cross1.coerceIn(
-                    40f,
+                    20f,
                     1000f
                 )
 
