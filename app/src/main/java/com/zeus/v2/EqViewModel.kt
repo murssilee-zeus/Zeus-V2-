@@ -211,7 +211,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         epicenterDrive = punch?.epicenterDrive ?: 0f,
         epicenterDepth = punch?.epicenterDepth ?: 0f,
         epicenterHarmonics = punch?.epicenterHarmonics ?: 0f,
-        epicenterFrequency = punch?.epicenterFrequencyHz ?: 36f
+        epicenterFrequency = punch?.epicenterFrequencyHz ?: 36f,
+        epicenterSweep = punch?.epicenterSweepHz ?: 72f
     )
 
     fun loadFrom(s: EqSettings) {
