@@ -568,7 +568,7 @@ private fun AutoEqSafeCard(vm:EqViewModel){
   }
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
    listOf(
-    Triple("CROSS 1",vm.crossoverFrequencies.getOrElse(0){120f},40f..1000f),
+    Triple("CROSS 1",vm.crossoverFrequencies.getOrElse(0){120f},20f..1000f),
     Triple("CROSS 2",vm.crossoverFrequencies.getOrElse(1){2000f},100f..5000f),
     Triple("CROSS 3",vm.crossoverFrequencies.getOrElse(2){8000f},1000f..19500f),
     Triple("CROSS 4",vm.crossoverFrequencies.getOrElse(3){10000f},8000f..20000f)
