@@ -623,7 +623,7 @@ class AudioEngine(private val context: Context) {
         applyZeusMbc()
 
         zeusEpicenter?.let {
-            it.enabled = !hiResEnabled && pipelineEnabled
+            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
             applyEpicenter(it)
         }
 
