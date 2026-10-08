@@ -31,10 +31,8 @@ class ZeusEpicenter(
     private val h3L = Biquad(sampleRate)
     private val h3R = Biquad(sampleRate)
 
-    private val bassLowL = OnePole(sampleRate)
-    private val bassLowR = OnePole(sampleRate)
-    private val bassFloorL = OnePole(sampleRate)
-    private val bassFloorR = OnePole(sampleRate)
+    private val bassBandL = Biquad(sampleRate)
+    private val bassBandR = Biquad(sampleRate)
 
     private val subL = SubHarmonic(sampleRate)
     private val subR = SubHarmonic(sampleRate)
@@ -54,13 +52,15 @@ class ZeusEpicenter(
         drivePercent: Float,
         depthPercent: Float,
         harmonicsPercent: Float,
-        frequencyHz: Float
+        frequencyHz: Float,
+        sweepHz: Float
     ) {
         epicenterAmount = epicenterPercent.coerceIn(0f, 100f) / 100f
         val drive = drivePercent.coerceIn(0f, 100f) / 100f
         val depth = depthPercent.coerceIn(0f, 100f) / 100f
         val harmonics = harmonicsPercent.coerceIn(0f, 100f) / 100f
-        val target = frequencyHz.coerceIn(18f, 80f)
+        val target = frequencyHz.coerceIn(18f, 65f)
+        val sweep = sweepHz.coerceIn(40f, 140f)
 
         if (epicenterAmount <= 0f) {
             exciterDrive = 1f
@@ -93,13 +93,10 @@ class ZeusEpicenter(
         h3L.peak((center * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
         h3R.peak((center * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
 
-        // Detect the source band around roughly twice the requested sub
-        // frequency, then synthesize at half the tracked source frequency.
-        val detectionCutoff = (subTarget * 2f).coerceIn(55f, 150f)
-        bassLowL.configure(detectionCutoff)
-        bassLowR.configure(detectionCutoff)
-        bassFloorL.configure(24f)
-        bassFloorR.configure(24f)
+        // SWEEP selects the source-bass band to analyze. FREQUENCY remains
+        // the desired sub output/fallback; they are independent controls.
+        bassBandL.bandPass(sweep, 0.85f)
+        bassBandR.bandPass(sweep, 0.85f)
 
         subL.configure(subTarget)
         subR.configure(subTarget)
@@ -120,10 +117,8 @@ class ZeusEpicenter(
             outR = punchR.process(outR)
 
             // Isolate useful bass energy for both synthesis stages.
-            val lowBandL = bassLowL.process(inL)
-            val lowBandR = bassLowR.process(inR)
-            val bassL = lowBandL - bassFloorL.process(lowBandL)
-            val bassR = lowBandR - bassFloorR.process(lowBandR)
+            val bassL = bassBandL.process(inL)
+            val bassR = bassBandR.process(inR)
 
             // PRIMARY Epicenter-like effect: synthesize an octave below the
             // detected bass. This is the "seismic" part, not a fixed EQ boost.
@@ -159,8 +154,7 @@ class ZeusEpicenter(
         punchL.reset(); punchR.reset()
         h2L.reset(); h2R.reset()
         h3L.reset(); h3R.reset()
-        bassLowL.reset(); bassLowR.reset()
-        bassFloorL.reset(); bassFloorR.reset()
+        bassBandL.reset(); bassBandR.reset()
         subL.reset(); subR.reset()
     }
 
@@ -305,6 +299,20 @@ class ZeusEpicenter(
 
         fun peak(freq: Float, gainDb: Float, q: Float) {
             set(freq, gainDb, q, false)
+        }
+
+        fun bandPass(freqIn: Float, qIn: Float) {
+            val f = freqIn.coerceIn(18f, sr * .45f)
+            val q = qIn.coerceIn(.3f, 4f)
+            val w = 2.0 * PI * f / sr
+            val c = cos(w)
+            val alpha = sin(w) / (2.0 * q)
+            val a0 = 1.0 + alpha
+            b0 = (alpha / a0).toFloat()
+            b1 = 0f
+            b2 = (-alpha / a0).toFloat()
+            a1 = (-2.0 * c / a0).toFloat()
+            a2 = ((1.0 - alpha) / a0).toFloat()
         }
 
         private fun set(freqIn: Float, gainDb: Float, q: Float, shelf: Boolean) {
