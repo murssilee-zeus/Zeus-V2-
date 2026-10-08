@@ -509,14 +509,14 @@ private fun AutoEqSafeCard(vm:EqViewModel){
 }
 
 @Composable private fun EpicenterCard(p:PunchViewModel){
- Card("EPICENTER"){
-  Text("Excitación de grave independiente · sólo ZEUS BASS",color=ZM,fontSize=9.sp)
+ Card("RECONSTRUCCIÓN DE GRAVE"){
+  Text("Reconstrucción de grave independiente · sólo ZEUS BASS",color=ZM,fontSize=9.sp)
   S("EPICENTER",p.epicenterAmount,0f..100f," %"){p.updateEpicenterAmount(it)}
   S("DRIVE",p.epicenterDrive,0f..100f," %"){p.updateEpicenterDrive(it)}
   S("DEPTH / DEEP",p.epicenterDepth,0f..100f," %"){p.updateEpicenterDepth(it)}
   S("HARMONICS",p.epicenterHarmonics,0f..100f," %"){p.updateEpicenterHarmonics(it)}
   S("FREQUENCY",p.epicenterFrequencyHz,18f..80f," Hz"){p.updateEpicenterFrequency(it)}
-  Text(if(p.epicenterAmount <= 0f) "BYPASS REAL · 0% no procesa" else "ACTIVO · subarmónico + textura armónica",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
+  Text(if(p.epicenterAmount <= 0f) "BYPASS REAL · 0% no procesa" else "ACTIVO · reconstrucción subgrave + textura armónica",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
   Text("No actúa en HI-RES ni SPATIAL",color=ZM,fontSize=8.sp)
  }
 }
