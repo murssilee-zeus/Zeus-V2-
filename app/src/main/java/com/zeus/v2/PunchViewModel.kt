@@ -24,6 +24,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         private const val KEY_EPIC_DEPTH = "epicenter_depth"
         private const val KEY_EPIC_HARMONICS = "epicenter_harmonics"
         private const val KEY_EPIC_FREQ = "epicenter_frequency"
+        private const val KEY_EPIC_SWEEP = "epicenter_sweep"
     }
 
     var amount by mutableFloatStateOf(PunchPreset.DEFAULT)
@@ -46,6 +47,8 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     var epicenterHarmonics by mutableFloatStateOf(0f)
     var epicenterFrequencyHz by mutableFloatStateOf(36f)
         private set
+    var epicenterSweepHz by mutableFloatStateOf(72f)
+        private set
 
     fun updatePunchAmount(value: Float) { amount = value.coerceIn(0f, 100f) }
     fun updatePunchCenter(value: Float) { centerHz = value.coerceIn(35f, 65f) }
@@ -58,7 +61,8 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     fun updateEpicenterDrive(value: Float) { epicenterDrive = value.coerceIn(0f, 100f) }
     fun updateEpicenterDepth(value: Float) { epicenterDepth = value.coerceIn(0f, 100f) }
     fun updateEpicenterHarmonics(value: Float) { epicenterHarmonics = value.coerceIn(0f, 100f) }
-    fun updateEpicenterFrequency(value: Float) { epicenterFrequencyHz = value.coerceIn(18f, 80f) }
+    fun updateEpicenterFrequency(value: Float) { epicenterFrequencyHz = value.coerceIn(18f, 65f) }
+    fun updateEpicenterSweep(value: Float) { epicenterSweepHz = value.coerceIn(40f, 140f) }
 
     fun loadSaved() {
         val prefs = getApplication<Application>().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -73,7 +77,8 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         epicenterDrive = prefs.getFloat(KEY_EPIC_DRIVE, 0f).coerceIn(0f, 100f)
         epicenterDepth = prefs.getFloat(KEY_EPIC_DEPTH, 0f).coerceIn(0f, 100f)
         epicenterHarmonics = prefs.getFloat(KEY_EPIC_HARMONICS, 0f).coerceIn(0f, 100f)
-        epicenterFrequencyHz = prefs.getFloat(KEY_EPIC_FREQ, 36f).coerceIn(18f, 80f)
+        epicenterFrequencyHz = prefs.getFloat(KEY_EPIC_FREQ, 36f).coerceIn(18f, 65f)
+        epicenterSweepHz = prefs.getFloat(KEY_EPIC_SWEEP, 72f).coerceIn(40f, 140f)
     }
 
     fun save() {
@@ -91,6 +96,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
             .putFloat(KEY_EPIC_DEPTH, epicenterDepth)
             .putFloat(KEY_EPIC_HARMONICS, epicenterHarmonics)
             .putFloat(KEY_EPIC_FREQ, epicenterFrequencyHz)
+            .putFloat(KEY_EPIC_SWEEP, epicenterSweepHz)
             .apply()
     }
 }
