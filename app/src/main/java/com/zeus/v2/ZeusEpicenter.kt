@@ -69,10 +69,10 @@ class ZeusEpicenter(
         } else {
             // Amount is the master wet control. Drive controls nonlinear
             // density; Depth controls how aggressively the sub stage follows.
-            exciterDrive = 1f + drive * 5f + epicenterAmount * 1.5f
-            exciterMix = (epicenterAmount * (0.10f + drive * .20f) +
-                harmonics * .22f).coerceAtMost(.55f)
-            subMix = (epicenterAmount * (.18f + depth * .62f)).coerceAtMost(.72f)
+            exciterDrive = 1f + drive * 6f + epicenterAmount * 2.5f
+            exciterMix = (epicenterAmount * (0.18f + drive * .30f) +
+                harmonics * .22f).coerceAtMost(.70f)
+            subMix = (epicenterAmount * (.45f + depth * .45f)).coerceAtMost(.90f)
         }
 
         // The target frequency is the center of the transformation, not a
