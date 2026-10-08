@@ -78,7 +78,9 @@ class ZeusEpicenter(
         // The target frequency is the center of the transformation, not a
         // fixed bass EQ. This keeps Epicenter perceptually independent.
         val center = target.coerceIn(25f, 120f)
-        val subTarget = (target * .72f).coerceIn(18f, 50f)
+        // Sweep is the desired reconstructed-sub range. Pitch tracking will
+        // override it when a stable source fundamental is detected.
+        val subTarget = target.coerceIn(18f, 65f)
         lowL.lowShelf(subTarget, (epicenterAmount * depth * 4f).coerceAtMost(4f))
         lowR.lowShelf(subTarget, (epicenterAmount * depth * 4f).coerceAtMost(4f))
         punchL.peak(center, (epicenterAmount * drive * 4f).coerceAtMost(4f), .85f)
@@ -91,8 +93,11 @@ class ZeusEpicenter(
         h3L.peak((center * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
         h3R.peak((center * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
 
-        bassLowL.configure(center.coerceIn(55f, 150f))
-        bassLowR.configure(center.coerceIn(55f, 150f))
+        // Detect the source band around roughly twice the requested sub
+        // frequency, then synthesize at half the tracked source frequency.
+        val detectionCutoff = (subTarget * 2f).coerceIn(55f, 150f)
+        bassLowL.configure(detectionCutoff)
+        bassLowR.configure(detectionCutoff)
         bassFloorL.configure(24f)
         bassFloorR.configure(24f)
 
@@ -171,67 +176,101 @@ class ZeusEpicenter(
      * not become a periodic drone or a clicky reset on every bass cycle.
      */
     private class SubHarmonic(private val sr: Int) {
+        // targetHz is the fallback OUTPUT frequency, not the input frequency.
         private var targetHz = 36f
-        private var trackedHz = 36f
+        private var trackedInputHz = 72f
         private var phase = 0.0
         private var previous = 0f
         private var samplesSinceCross = 0
         private var envelope = 0f
-        private var envelopeA = .01f
-        private var releaseA = .0025f
-        private var mixLimit = 1f
+        private var envelopeAttack = .01f
+        private var envelopeRelease = .0025f
+        private var stableCrossings = 0
+        private var lastMeasuredHz = 0f
+
+        private val minPeriod get() = (sr / 150f).toInt().coerceAtLeast(1)
+        private val maxPeriod get() = (sr / 22f).toInt().coerceAtLeast(minPeriod + 1)
 
         fun configure(target: Float) {
-            targetHz = target.coerceIn(18f, 50f)
-            trackedHz = targetHz
-            mixLimit = .92f
-            envelopeA = (1f - kotlin.math.exp((-2.0 * PI * 18f / sr))).toFloat()
-            releaseA = (1f - kotlin.math.exp((-2.0 * PI * 7f / sr))).toFloat()
+            targetHz = target.coerceIn(18f, 65f)
+            if (trackedInputHz !in 36f..130f) trackedInputHz = targetHz * 2f
+            envelopeAttack =
+                (1f - kotlin.math.exp((-2.0 * PI * 16f / sr))).toFloat()
+            envelopeRelease =
+                (1f - kotlin.math.exp((-2.0 * PI * 6.5f / sr))).toFloat()
         }
 
         fun process(x: Float): Float {
             samplesSinceCross++
 
-            // Estimate the actual bass period. We use the real incoming bass
-            // instead of forcing the selected UI frequency onto every track.
-            if (previous <= 0f && x > 0f && samplesSinceCross > sr / 150) {
-                val measuredHz = (sr.toFloat() / samplesSinceCross.toFloat())
-                    .coerceIn(22f, 110f)
-                trackedHz = trackedHz * .88f + measuredHz * .12f
+            // Positive-going zero crossings estimate the period of the filtered
+            // bass waveform. Only accept plausible bass periods and smooth them
+            // across cycles so a single transient cannot retune the oscillator.
+            if (previous <= 0f && x > 0f) {
+                val period = samplesSinceCross
                 samplesSinceCross = 0
+                if (period in minPeriod..maxPeriod) {
+                    val measuredHz = sr.toFloat() / period.toFloat()
+                    val consistent = lastMeasuredHz <= 0f ||
+                        (measuredHz / lastMeasuredHz).let { it in .62f..1.62f }
+
+                    if (consistent) {
+                        trackedInputHz = if (stableCrossings == 0) {
+                            measuredHz
+                        } else {
+                            trackedInputHz * .82f + measuredHz * .18f
+                        }
+                        stableCrossings = (stableCrossings + 1).coerceAtMost(6)
+                        lastMeasuredHz = measuredHz
+                    } else {
+                        // Treat a sudden period jump as a new note, but require
+                        // subsequent crossings before trusting it fully.
+                        trackedInputHz = measuredHz
+                        stableCrossings = 1
+                        lastMeasuredHz = measuredHz
+                    }
+                } else {
+                    stableCrossings = 0
+                    lastMeasuredHz = 0f
+                }
+            }
+
+            if (samplesSinceCross > maxPeriod) {
+                stableCrossings = 0
+                lastMeasuredHz = 0f
             }
             previous = x
 
-            // When the mix has no clean fundamental, gently fall back toward
-            // the selected reconstruction frequency rather than producing
-            // random low-frequency motion.
-            val confidence = (abs(x) * 8f).coerceIn(0f, 1f)
-            val reconstructionHz = trackedHz * confidence + targetHz * (1f - confidence)
-
+            // Attack/release follower: the generated sub follows bass energy
+            // smoothly instead of reproducing every sample's absolute value.
             val targetEnvelope = abs(x).coerceIn(0f, 1f)
-            val envCoeff = if (targetEnvelope > envelope) envelopeA else releaseA
-            envelope += envCoeff * (targetEnvelope - envelope)
+            val coeff = if (targetEnvelope > envelope) envelopeAttack else envelopeRelease
+            envelope += coeff * (targetEnvelope - envelope)
 
-            // Reconstruct below the detected fundamental. A small target bias
-            // keeps the effect centered around the user's selected frequency.
-            val octaveDown = (reconstructionHz * .5f).coerceIn(18f, 55f)
-            phase += 2.0 * PI * octaveDown / sr
+            // Trust the pitch tracker only after several consistent cycles.
+            // Otherwise Sweep supplies a predictable fallback sub frequency.
+            val trackingConfidence = (stableCrossings / 3f).coerceIn(0f, 1f)
+            val trackedOctaveDown = (trackedInputHz * .5f).coerceIn(18f, 65f)
+            val outputHz =
+                targetHz * (1f - trackingConfidence) +
+                    trackedOctaveDown * trackingConfidence
+
+            phase += 2.0 * PI * outputHz / sr
             while (phase >= 2.0 * PI) phase -= 2.0 * PI
 
-            // Fundamental body + a very small second partial. This makes the
-            // reconstructed bass remain audible on small speakers without
-            // turning the stage into a conventional harmonic exciter.
-            val fundamental = sin(phase)
-            val body = fundamental + sin(phase * 2.0) * .12
-            val shaped = tanh((body * envelope * 4.2f).toDouble()).toFloat()
-            return shaped * mixLimit
+            // Add a restrained second partial for translation to small speakers.
+            // The fundamental remains the dominant component.
+            val body = sin(phase) + sin(phase * 2.0) * .10
+            return tanh((body * envelope * 5.0).toDouble()).toFloat()
         }
 
         fun reset() {
             previous = 0f
             samplesSinceCross = 0
             envelope = 0f
-            trackedHz = targetHz
+            trackedInputHz = targetHz * 2f
+            stableCrossings = 0
+            lastMeasuredHz = 0f
             phase = 0.0
         }
     }
