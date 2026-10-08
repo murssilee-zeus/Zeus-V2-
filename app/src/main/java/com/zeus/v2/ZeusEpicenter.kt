@@ -39,57 +39,69 @@ class ZeusEpicenter(
     private val subL = SubHarmonic(sampleRate)
     private val subR = SubHarmonic(sampleRate)
 
+    private var epicenterAmount = 0f
     private var exciterDrive = 1f
     private var exciterMix = 0f
     private var subMix = 0f
 
+    /**
+     * Epicenter is deliberately independent from Bass Amount, Punch and
+     * Bass Harmonics. Those controls shape Zeus Bass; this stage creates
+     * the additional "pressure / rrrrr / seismic" transformation.
+     */
     fun configure(
-        amountPercent: Float,
-        punchPercent: Float,
+        epicenterPercent: Float,
+        drivePercent: Float,
+        depthPercent: Float,
         harmonicsPercent: Float,
-        bassFrequencyHz: Float,
-        subFrequencyHz: Float
+        frequencyHz: Float
     ) {
-        val amount = amountPercent.coerceIn(0f, 100f) / 100f
-        val punch = punchPercent.coerceIn(0f, 100f)
+        epicenterAmount = epicenterPercent.coerceIn(0f, 100f) / 100f
+        val drive = drivePercent.coerceIn(0f, 100f) / 100f
+        val depth = depthPercent.coerceIn(0f, 100f) / 100f
         val harmonics = harmonicsPercent.coerceIn(0f, 100f) / 100f
-        val bass = bassFrequencyHz.coerceIn(25f, 120f)
-        val sub = subFrequencyHz.coerceIn(18f, 50f)
+        val target = frequencyHz.coerceIn(18f, 80f)
 
-        val subGain = (amount * 10f).coerceAtMost(12f)
-        val punchGain = (PunchControl.midBassGain(punch) * 1.9f).coerceAtMost(10f)
-        val h2Gain = (amount * 2f + harmonics * 4f).coerceAtMost(9f)
-        val h3Gain = (harmonics * 1.8f).coerceAtMost(5f)
+        if (epicenterAmount <= 0f) {
+            exciterDrive = 1f
+            exciterMix = 0f
+            subMix = 0f
+        } else {
+            // Amount is the master wet control. Drive controls nonlinear
+            // density; Depth controls how aggressively the sub stage follows.
+            exciterDrive = 1f + drive * 5f + epicenterAmount * 1.5f
+            exciterMix = (epicenterAmount * (0.10f + drive * .20f) +
+                harmonics * .22f).coerceAtMost(.55f)
+            subMix = (epicenterAmount * (.18f + depth * .62f)).coerceAtMost(.72f)
+        }
 
-        lowL.lowShelf(sub, subGain)
-        lowR.lowShelf(sub, subGain)
-        punchL.peak(bass, punchGain, .85f)
-        punchR.peak(bass, punchGain, .85f)
+        // The target frequency is the center of the transformation, not a
+        // fixed bass EQ. This keeps Epicenter perceptually independent.
+        val center = target.coerceIn(25f, 120f)
+        val subTarget = (target * .72f).coerceIn(18f, 50f)
+        lowL.lowShelf(subTarget, (epicenterAmount * depth * 4f).coerceAtMost(4f))
+        lowR.lowShelf(subTarget, (epicenterAmount * depth * 4f).coerceAtMost(4f))
+        punchL.peak(center, (epicenterAmount * drive * 4f).coerceAtMost(4f), .85f)
+        punchR.peak(center, (epicenterAmount * drive * 4f).coerceAtMost(4f), .85f)
 
-        h2L.peak((bass * 2f).coerceIn(80f, 320f), h2Gain, .90f)
-        h2R.peak((bass * 2f).coerceIn(80f, 320f), h2Gain, .90f)
-        h3L.peak((bass * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
-        h3R.peak((bass * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
+        val h2Gain = (epicenterAmount * drive * 2f + harmonics * 3.5f).coerceAtMost(6f)
+        val h3Gain = (harmonics * 1.8f + epicenterAmount * drive * 1.2f).coerceAtMost(4f)
+        h2L.peak((center * 2f).coerceIn(80f, 320f), h2Gain, .90f)
+        h2R.peak((center * 2f).coerceIn(80f, 320f), h2Gain, .90f)
+        h3L.peak((center * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
+        h3R.peak((center * 3f).coerceIn(240f, 1200f), h3Gain, .95f)
 
-        // Harmonic exciter is now secondary. The seismic character comes
-        // primarily from the synthesized octave-down component below.
-        exciterDrive = 1f + amount * 1.8f + harmonics * 2.8f
-        exciterMix = (amount * .06f + harmonics * .22f).coerceAtMost(.30f)
-
-        // Strong enough to be audible, but still dynamically tied to bass.
-        subMix = (amount * .34f + harmonics * .10f).coerceAtMost(.48f)
-
-        bassLowL.configure(bass.coerceIn(70f, 150f))
-        bassLowR.configure(bass.coerceIn(70f, 150f))
+        bassLowL.configure(center.coerceIn(55f, 150f))
+        bassLowR.configure(center.coerceIn(55f, 150f))
         bassFloorL.configure(24f)
         bassFloorR.configure(24f)
 
-        subL.configure(sub)
-        subR.configure(sub)
+        subL.configure(subTarget)
+        subR.configure(subTarget)
     }
 
     fun processStereo(pcm: ShortArray, size: Int = pcm.size) {
-        if (!enabled) return
+        if (!enabled || epicenterAmount <= 0f) return
 
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
         for (i in 0 until n step 2) {
