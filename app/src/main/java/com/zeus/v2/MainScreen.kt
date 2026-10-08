@@ -823,7 +823,7 @@ private fun CrossoverScreen(viewModel: EqViewModel, modifier: Modifier = Modifie
                     color = colors[0],
                     selected = selectedCompBand == 0,
                     freq = viewModel.crossoverFrequencies[0],
-                    range = 40f..1000f,
+                    range = 20f..1000f,
                     onSelect = { selectedCompBand = 0 },
                     onFreq = { viewModel.setCrossover(0, it) },
                     modifier = Modifier.weight(1f).fillMaxHeight()
