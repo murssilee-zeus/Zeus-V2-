@@ -191,6 +191,7 @@ class MainActivity : ComponentActivity() {
                 punch.updateEpicenterDepth(settings.epicenterDepth)
                 punch.updateEpicenterHarmonics(settings.epicenterHarmonics)
                 punch.updateEpicenterFrequency(settings.epicenterFrequency)
+                punch.updateEpicenterSweep(settings.epicenterSweep)
                 vm.saveSettings()
                 punch.save()
                 audioService?.audioEngine?.let { e ->
@@ -208,8 +209,8 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) { vm.loadSavedIfAny(); punch.loadSaved() }
         LaunchedEffect(Unit) { while (true) { audioService?.audioEngine?.let { e -> vm.spectrum = e.spectrumData.copyOf(); vm.isEngineRunning = e.isEnabled }; delay(50) } }
-        LaunchedEffect(audioService) { audioService?.audioEngine?.let { e -> e.settings = vm.toSettings(punch); e.setSubFrequency(vm.subFrequencyHz); e.setPunch(punch.amount); e.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); e.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz); e.applyAll() } }
-        LaunchedEffect(vm.bands.toList(), vm.subBoost, vm.subFrequencyHz, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics, punch.epicenterAmount, punch.epicenterDrive, punch.epicenterDepth, punch.epicenterHarmonics, punch.epicenterFrequencyHz) { audioService?.audioEngine?.setBands(vm.bands.toList()); audioService?.audioEngine?.setSubBoost(vm.subBoost); audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz); audioService?.audioEngine?.setPunch(punch.amount); audioService?.audioEngine?.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); audioService?.audioEngine?.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz) }
+        LaunchedEffect(audioService) { audioService?.audioEngine?.let { e -> e.settings = vm.toSettings(punch); e.setSubFrequency(vm.subFrequencyHz); e.setPunch(punch.amount); e.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); e.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz,punch.epicenterSweepHz); e.applyAll() } }
+        LaunchedEffect(vm.bands.toList(), vm.subBoost, vm.subFrequencyHz, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics, punch.epicenterAmount, punch.epicenterDrive, punch.epicenterDepth, punch.epicenterHarmonics, punch.epicenterFrequencyHz, punch.epicenterSweepHz) { audioService?.audioEngine?.setBands(vm.bands.toList()); audioService?.audioEngine?.setSubBoost(vm.subBoost); audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz); audioService?.audioEngine?.setPunch(punch.amount); audioService?.audioEngine?.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); audioService?.audioEngine?.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz,punch.epicenterSweepHz) }
         LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }
         LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }
         LaunchedEffect(vm.spatialEnabled, vm.spatialWidth) { audioService?.audioEngine?.setSpatialEnabled(vm.spatialEnabled); audioService?.audioEngine?.setSpatialWidth(vm.spatialWidth) }
