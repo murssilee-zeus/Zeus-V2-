@@ -173,7 +173,7 @@ class MainActivity : ComponentActivity() {
         val punch: PunchViewModel = viewModel()
         val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
             if (uri != null) runCatching {
-                contentResolver.openOutputStream(uri)?.use { it.write(vm.toSettings().toJson().toByteArray(Charsets.UTF_8)) } ?: error("No se pudo abrir el archivo")
+                contentResolver.openOutputStream(uri)?.use { it.write(vm.toSettings(punch).toJson().toByteArray(Charsets.UTF_8)) } ?: error("No se pudo abrir el archivo")
                 Toast.makeText(this@MainActivity, "Configuración exportada", Toast.LENGTH_SHORT).show()
             }.onFailure { Toast.makeText(this@MainActivity, "No se pudo exportar: ${it.message ?: "Error desconocido"}", Toast.LENGTH_LONG).show() }
         }
@@ -186,10 +186,15 @@ class MainActivity : ComponentActivity() {
                 punch.updateBassAmount(settings.bassAmount)
                 punch.updatePunchAmount(settings.bassPunch)
                 punch.updateBassHarmonics(settings.bassHarmonics)
+                punch.updateEpicenterAmount(settings.epicenterAmount)
+                punch.updateEpicenterDrive(settings.epicenterDrive)
+                punch.updateEpicenterDepth(settings.epicenterDepth)
+                punch.updateEpicenterHarmonics(settings.epicenterHarmonics)
+                punch.updateEpicenterFrequency(settings.epicenterFrequency)
                 vm.saveSettings()
                 punch.save()
                 audioService?.audioEngine?.let { e ->
-                    e.settings = vm.toSettings()
+                    e.settings = vm.toSettings(punch)
                     e.setBands(vm.bands.toList())
                     e.setSubBoost(vm.subBoost)
                     e.setPunch(punch.amount)
@@ -203,8 +208,8 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) { vm.loadSavedIfAny(); punch.loadSaved() }
         LaunchedEffect(Unit) { while (true) { audioService?.audioEngine?.let { e -> vm.spectrum = e.spectrumData.copyOf(); vm.isEngineRunning = e.isEnabled }; delay(50) } }
-        LaunchedEffect(audioService) { audioService?.audioEngine?.let { e -> e.settings = vm.toSettings(); e.setSubFrequency(vm.subBoost); e.setPunch(punch.amount); e.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); e.applyAll() } }
-        LaunchedEffect(vm.bands.toList(), vm.subBoost, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics) { audioService?.audioEngine?.setBands(vm.bands.toList()); audioService?.audioEngine?.setSubBoost(vm.subBoost); audioService?.audioEngine?.setPunch(punch.amount); audioService?.audioEngine?.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz) }
+        LaunchedEffect(audioService) { audioService?.audioEngine?.let { e -> e.settings = vm.toSettings(punch); e.setSubFrequency(vm.subFrequencyHz); e.setPunch(punch.amount); e.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); e.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz); e.applyAll() } }
+        LaunchedEffect(vm.bands.toList(), vm.subBoost, vm.subFrequencyHz, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics, punch.epicenterAmount, punch.epicenterDrive, punch.epicenterDepth, punch.epicenterHarmonics, punch.epicenterFrequencyHz) { audioService?.audioEngine?.setBands(vm.bands.toList()); audioService?.audioEngine?.setSubBoost(vm.subBoost); audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz); audioService?.audioEngine?.setPunch(punch.amount); audioService?.audioEngine?.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); audioService?.audioEngine?.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz) }
         LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }
         LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }
         LaunchedEffect(vm.spatialEnabled, vm.spatialWidth) { audioService?.audioEngine?.setSpatialEnabled(vm.spatialEnabled); audioService?.audioEngine?.setSpatialWidth(vm.spatialWidth) }
