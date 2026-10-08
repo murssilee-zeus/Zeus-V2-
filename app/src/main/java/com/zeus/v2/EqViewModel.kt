@@ -194,7 +194,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         selectedBandIndex = 5; compressorMultibandEnabled = true; limiterEnabled = true; limiterThreshold = -1.8f; limiterRatio = 5f; limiterAttack = 3f; limiterRelease = 120f
     }
 
-    fun toSettings(): EqSettings = EqSettings(
+    fun toSettings(punch: PunchViewModel? = null): EqSettings = EqSettings(
         preGain = preamp, subBoost = subBoost, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
         limiterAttack = limiterAttack, limiterRelease = limiterRelease, limiterRatio = limiterRatio, limiterPostGain = limiterPostGain,
         compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
@@ -206,7 +206,12 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compPostGainLow = compMbPostGainLow, compPostGainLoMid = compMbPostGainLoMid, compPostGainHiMid = compMbPostGainHiMid, compPostGainHigh = compMbPostGainHigh,
         compPreGainLow = compMbPreGainLow, compPreGainLoMid = compMbPreGainLoMid, compPreGainHiMid = compMbPreGainHiMid, compPreGainHigh = compMbPreGainHigh,
         pipelineEnabled = pipelineEnabled, lowShelfEnabled = lowShelfEnabled, peakEnabled = peakBandsEnabled, highShelfEnabled = highShelfEnabled,
-        audioSessionEnabled = audioSessionEnabled, selectedAudioSession = selectedAudioSession, spatialEnabled = spatialEnabled, spatialWidth = spatialWidth
+        audioSessionEnabled = audioSessionEnabled, selectedAudioSession = selectedAudioSession, spatialEnabled = spatialEnabled, spatialWidth = spatialWidth,
+        epicenterAmount = punch?.epicenterAmount ?: 0f,
+        epicenterDrive = punch?.epicenterDrive ?: 0f,
+        epicenterDepth = punch?.epicenterDepth ?: 0f,
+        epicenterHarmonics = punch?.epicenterHarmonics ?: 0f,
+        epicenterFrequency = punch?.epicenterFrequencyHz ?: 36f
     )
 
     fun loadFrom(s: EqSettings) {
