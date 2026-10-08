@@ -145,7 +145,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             Card("CROSSOVER 1 — 4"){
                 Text("Toca una frecuencia para editarla.",color=ZM,fontSize=9.sp); Spacer(Modifier.height(5.dp))
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    val ranges=listOf(40f..1000f,100f..5000f,1000f..19500f,8000f..20000f)
+                    val ranges=listOf(20f..1000f,100f..5000f,1000f..19500f,8000f..20000f)
                     ranges.forEachIndexed { idx, range ->
                         val value=vm.crossoverFrequencies.getOrElse(idx){range.start}
                         Column(Modifier.weight(1f)){
@@ -515,7 +515,8 @@ private fun AutoEqSafeCard(vm:EqViewModel){
   S("DRIVE",p.epicenterDrive,0f..100f," %"){p.updateEpicenterDrive(it)}
   S("DEPTH / DEEP",p.epicenterDepth,0f..100f," %"){p.updateEpicenterDepth(it)}
   S("HARMONICS",p.epicenterHarmonics,0f..100f," %"){p.updateEpicenterHarmonics(it)}
-  S("FREQUENCY",p.epicenterFrequencyHz,18f..80f," Hz"){p.updateEpicenterFrequency(it)}
+  S("SWEEP · DETECCIÓN",p.epicenterSweepHz,40f..140f," Hz"){p.updateEpicenterSweep(it)}
+  S("FREQUENCY · SUBGRAVE",p.epicenterFrequencyHz,18f..65f," Hz"){p.updateEpicenterFrequency(it)}
   Text(if(p.epicenterAmount <= 0f) "BYPASS REAL · 0% no procesa" else "ACTIVO · reconstrucción subgrave + textura armónica",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
   Text("No actúa en HI-RES ni SPATIAL",color=ZM,fontSize=8.sp)
  }
