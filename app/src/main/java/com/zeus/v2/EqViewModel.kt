@@ -106,7 +106,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun setCrossover(index: Int, freq: Float) {
         if (index !in 0..3) return
         when (index) {
-            0 -> crossoverFrequencies[0] = freq.coerceIn(40f, crossoverFrequencies[1] - 50f)
+            0 -> crossoverFrequencies[0] = freq.coerceIn(20f, crossoverFrequencies[1] - 50f)
             1 -> crossoverFrequencies[1] = freq.coerceIn(crossoverFrequencies[0] + 50f, crossoverFrequencies[2] - 50f)
             2 -> crossoverFrequencies[2] = freq.coerceIn(crossoverFrequencies[1] + 50f, crossoverFrequencies[3] - 50f)
             3 -> crossoverFrequencies[3] = freq.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
