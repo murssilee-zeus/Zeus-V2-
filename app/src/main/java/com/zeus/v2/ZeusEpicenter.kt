@@ -9,12 +9,12 @@ import kotlin.math.pow
 import kotlin.math.tanh
 
 /**
- * Epicenter-style bass enhancer used by Zeus Bass mode only.
+ * Zeus Bass low-frequency reconstruction stage.
  *
- * The important part is subharmonic synthesis: a controlled octave-below
- * component is generated from the real bass, then blended with the existing
- * Zeus sub/punch stage. This is what creates the physical "rrrr"/seismic
- * sensation instead of merely making the bass louder.
+ * This is intentionally not a simple bass exciter. It reconstructs a
+ * perceptual low-frequency fundamental from bass energy already present in
+ * the PCM signal, then adds controlled subharmonic and harmonic components.
+ * The goal is pressure/depth/"rrrr" sensation without simply turning up EQ.
  */
 class ZeusEpicenter(
     private val sampleRate: Int
@@ -163,56 +163,67 @@ class ZeusEpicenter(
         (x.coerceIn(-1f, 1f) * 32767f).toInt().toShort()
 
     /**
-     * Lightweight octave-down generator.
+     * Perceptual low-frequency reconstruction.
      *
-     * It measures bass zero-crossing periods and drives a synchronized sine
-     * oscillator at half the detected frequency. The envelope follows bass
-     * energy, so there is no constant artificial drone.
+     * Instead of a fixed sub oscillator, this stage follows the bass already
+     * present in the signal, estimates its fundamental, and synthesizes a
+     * controlled component below it. Phase is continuous, so the result does
+     * not become a periodic drone or a clicky reset on every bass cycle.
      */
     private class SubHarmonic(private val sr: Int) {
-        private var targetHz = 42f
-        private var smoothedHz = 42f
+        private var targetHz = 36f
+        private var trackedHz = 36f
         private var phase = 0.0
         private var previous = 0f
         private var samplesSinceCross = 0
         private var envelope = 0f
         private var envelopeA = .01f
+        private var releaseA = .0025f
         private var mixLimit = 1f
 
         fun configure(target: Float) {
             targetHz = target.coerceIn(18f, 50f)
-            mixLimit = .85f
-            envelopeA = (1f - kotlin.math.exp((-2.0 * PI * 14f / sr))).toFloat()
+            trackedHz = targetHz
+            mixLimit = .92f
+            envelopeA = (1f - kotlin.math.exp((-2.0 * PI * 18f / sr))).toFloat()
+            releaseA = (1f - kotlin.math.exp((-2.0 * PI * 7f / sr))).toFloat()
         }
 
         fun process(x: Float): Float {
             samplesSinceCross++
 
-            if (previous <= 0f && x > 0f && samplesSinceCross > sr / 140) {
+            // Estimate the actual bass period. We use the real incoming bass
+            // instead of forcing the selected UI frequency onto every track.
+            if (previous <= 0f && x > 0f && samplesSinceCross > sr / 150) {
                 val measuredHz = (sr.toFloat() / samplesSinceCross.toFloat())
-                    .coerceIn(25f, 120f)
-
-                // Slow tracking prevents unstable pitch jumps on complex mixes.
-                smoothedHz = smoothedHz * .82f + measuredHz * .18f
+                    .coerceIn(22f, 110f)
+                trackedHz = trackedHz * .88f + measuredHz * .12f
                 samplesSinceCross = 0
-
-                // Reset phase at each detected fundamental cycle. The oscillator
-                // runs at half that frequency, therefore completing one cycle
-                // every two bass cycles.
-                phase = 0.0
             }
-
             previous = x
 
-            val targetEnvelope = abs(x)
-            envelope += envelopeA * (targetEnvelope - envelope)
+            // When the mix has no clean fundamental, gently fall back toward
+            // the selected reconstruction frequency rather than producing
+            // random low-frequency motion.
+            val confidence = (abs(x) * 8f).coerceIn(0f, 1f)
+            val reconstructionHz = trackedHz * confidence + targetHz * (1f - confidence)
 
-            val frequency = smoothedHz * .5f
-            phase += (2.0 * PI * frequency / sr)
-            if (phase >= 2.0 * PI) phase -= 2.0 * PI
+            val targetEnvelope = abs(x).coerceIn(0f, 1f)
+            val envCoeff = if (targetEnvelope > envelope) envelopeA else releaseA
+            envelope += envCoeff * (targetEnvelope - envelope)
 
-            // Envelope + soft saturation gives the sub some physical density.
-            val shaped = tanh((sin(phase) * envelope * 3.2f).toDouble()).toFloat()
+            // Reconstruct below the detected fundamental. A small target bias
+            // keeps the effect centered around the user's selected frequency.
+            val octaveDown = (reconstructionHz * .5f).coerceIn(18f, 55f)
+            phase += 2.0 * PI * octaveDown / sr
+            while (phase >= 2.0 * PI) phase -= 2.0 * PI
+
+            // Fundamental body + a very small second partial. This makes the
+            // reconstructed bass remain audible on small speakers without
+            // turning the stage into a conventional harmonic exciter.
+            val fundamental = sin(phase)
+            val body = fundamental + sin(phase * 2.0) * .12
+            val shaped = tanh((body * envelope * 4.2f).toDouble()).toFloat()
             return shaped * mixLimit
         }
 
@@ -220,7 +231,7 @@ class ZeusEpicenter(
             previous = 0f
             samplesSinceCross = 0
             envelope = 0f
-            smoothedHz = targetHz
+            trackedHz = targetHz
             phase = 0.0
         }
     }
