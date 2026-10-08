@@ -199,7 +199,7 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
-   SubSismoCard(vm); PunchCard(punch,vm); SpatialCard(vm); Pipe(vm)
+   SubSismoCard(vm); PunchCard(punch,vm); EpicenterCard(punch); SpatialCard(vm); Pipe(vm)
   }
  }
 }
@@ -319,13 +319,15 @@ private fun HarmanTargetsCard(vm:EqViewModel){
    } }
   }
 
-  Card("MBC  →  PUNCH  →  LIMITER"){
+  Card("MBC  →  PUNCH  →  EPICENTER  →  LIMITER"){
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically){
     Text("SUB/SISMO",color=ZP,fontSize=8.sp,fontWeight=FontWeight.Bold)
     Text("→",color=ZM)
     Text("MBC",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
     Text("→",color=ZM)
     Text("PUNCH",color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold)
+    Text("→",color=ZM)
+    Text("EPICENTER",color=ZPK,fontSize=8.sp,fontWeight=FontWeight.Bold)
     Text("→",color=ZM)
     Text("LIMITER",color=ZG,fontSize=8.sp,fontWeight=FontWeight.Bold)
    }
@@ -502,6 +504,19 @@ private fun AutoEqSafeCard(vm:EqViewModel){
   S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
   S("FREQ",vm.subFrequencyHz,18f..90f," Hz"){vm.subFrequencyHz=it}
   Text("SUB/SISMO → MBC → PUNCH → LIMITER",color=ZM,fontSize=8.sp)
+ }
+}
+
+@Composable private fun EpicenterCard(p:PunchViewModel){
+ Card("EPICENTER"){
+  Text("Excitación de grave independiente · sólo ZEUS BASS",color=ZM,fontSize=9.sp)
+  S("EPICENTER",p.epicenterAmount,0f..100f," %"){p.updateEpicenterAmount(it)}
+  S("DRIVE",p.epicenterDrive,0f..100f," %"){p.updateEpicenterDrive(it)}
+  S("DEPTH / DEEP",p.epicenterDepth,0f..100f," %"){p.updateEpicenterDepth(it)}
+  S("HARMONICS",p.epicenterHarmonics,0f..100f," %"){p.updateEpicenterHarmonics(it)}
+  S("FREQUENCY",p.epicenterFrequencyHz,18f..80f," Hz"){p.updateEpicenterFrequency(it)}
+  Text(if(p.epicenterAmount <= 0f) "BYPASS REAL · 0% no procesa" else "ACTIVO · subarmónico + textura armónica",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
+  Text("No actúa en HI-RES ni SPATIAL",color=ZM,fontSize=8.sp)
  }
 }
 
