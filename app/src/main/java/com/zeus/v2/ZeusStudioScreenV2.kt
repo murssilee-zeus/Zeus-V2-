@@ -138,6 +138,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             // Se reutilizan los componentes ya existentes para no tocar el motor.
             SubSismoCard(vm)
             PunchCard(punch,vm)
+            EpicenterCard(punch)
         }
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("02","DYNAMICS","CROSSOVER + COMPRESSOR","PROCESSING",ZCY)
@@ -312,7 +313,7 @@ private fun HarmanTargetsCard(vm:EqViewModel){
    Column(Modifier.weight(1f)){
     SubSismoCard(vm)
    }
-   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); SpatialCard(vm) }
+   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); EpicenterCard(punch); SpatialCard(vm) }
    Column(Modifier.weight(.9f)){ Card("HEADROOM") {
     S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
     Text("Protección de salida",color=ZM,fontSize=8.sp)
