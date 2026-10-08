@@ -208,6 +208,7 @@ class AudioEngine(private val context: Context) {
             ZeusEpicenter(sampleRate).also {
                 it.enabled =
                     !hiResEnabled &&
+                    !settings.spatialEnabled &&
                     pipelineEnabled
                 applyEpicenter(it)
             }
@@ -261,6 +262,7 @@ class AudioEngine(private val context: Context) {
         zeusEpicenter?.let {
             it.enabled =
                 !hiResEnabled &&
+                !settings.spatialEnabled &&
                 pipelineEnabled
             applyEpicenter(it)
             it.processStereo(buffer, n)
@@ -361,7 +363,7 @@ class AudioEngine(private val context: Context) {
         applyLimiter()
         applyZeusMbc()
         zeusEpicenter?.let {
-            it.enabled = !enabled && pipelineEnabled
+            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
             applyEpicenter(it)
         }
 
@@ -374,6 +376,9 @@ class AudioEngine(private val context: Context) {
     fun setSpatialEnabled(enabled: Boolean) {
         settings.spatialEnabled = enabled
         spatialEngine?.setEnabled(enabled)
+        zeusEpicenter?.let {
+            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
+        }
     }
 
     fun setSpatialWidth(width: Float) {
@@ -416,6 +421,21 @@ class AudioEngine(private val context: Context) {
 
         applyInputGain()
         applyPostEq()
+        zeusEpicenter?.let { applyEpicenter(it) }
+    }
+
+    fun setEpicenterControls(
+        amount: Float,
+        drive: Float,
+        depth: Float,
+        harmonics: Float,
+        frequency: Float
+    ) {
+        settings.epicenterAmount = amount.coerceIn(0f, 100f)
+        settings.epicenterDrive = drive.coerceIn(0f, 100f)
+        settings.epicenterDepth = depth.coerceIn(0f, 100f)
+        settings.epicenterHarmonics = harmonics.coerceIn(0f, 100f)
+        settings.epicenterFrequency = frequency.coerceIn(18f, 80f)
         zeusEpicenter?.let { applyEpicenter(it) }
     }
 
@@ -475,7 +495,7 @@ class AudioEngine(private val context: Context) {
         applyPostEq()
         applyZeusMbc()
         zeusEpicenter?.let {
-            it.enabled = !hiResEnabled && pipelineEnabled
+            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
             applyEpicenter(it)
         }
     }
@@ -1117,11 +1137,11 @@ class AudioEngine(private val context: Context) {
         val epicenter = target ?: return
 
         epicenter.configure(
-            settings.bassAmount,
-            settings.bassPunch,
-            settings.bassHarmonics,
-            bassFrequencyHz,
-            subFrequencyHz
+            settings.epicenterAmount,
+            settings.epicenterDrive,
+            settings.epicenterDepth,
+            settings.epicenterHarmonics,
+            settings.epicenterFrequency
         )
     }
 
