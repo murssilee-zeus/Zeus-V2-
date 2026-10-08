@@ -429,13 +429,15 @@ class AudioEngine(private val context: Context) {
         drive: Float,
         depth: Float,
         harmonics: Float,
-        frequency: Float
+        frequency: Float,
+        sweep: Float
     ) {
         settings.epicenterAmount = amount.coerceIn(0f, 100f)
         settings.epicenterDrive = drive.coerceIn(0f, 100f)
         settings.epicenterDepth = depth.coerceIn(0f, 100f)
         settings.epicenterHarmonics = harmonics.coerceIn(0f, 100f)
-        settings.epicenterFrequency = frequency.coerceIn(18f, 80f)
+        settings.epicenterFrequency = frequency.coerceIn(18f, 65f)
+        settings.epicenterSweep = sweep.coerceIn(40f, 140f)
         zeusEpicenter?.let { applyEpicenter(it) }
     }
 
@@ -1141,7 +1143,8 @@ class AudioEngine(private val context: Context) {
             settings.epicenterDrive,
             settings.epicenterDepth,
             settings.epicenterHarmonics,
-            settings.epicenterFrequency
+            settings.epicenterFrequency,
+            settings.epicenterSweep
         )
     }
 
