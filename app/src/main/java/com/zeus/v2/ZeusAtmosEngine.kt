@@ -129,6 +129,71 @@ class ZeusAtmosEngine(
         }
     }
 
+
+    /** Float32 path preserves fractional precision between DSP stages. */
+    fun processAtmosPCM(pcmBuffer: FloatArray, size: Int = pcmBuffer.size) {
+        val sampleCount = size.coerceIn(0, pcmBuffer.size - (pcmBuffer.size % 2))
+        if (sampleCount < 2) return
+
+        val itdSamples = (sampleRate * itdMs * 0.001f)
+            .coerceIn(1f, maxDelaySamples.toFloat())
+
+        val immersion = atmosImmersion
+        val centerGain = centerFocus.coerceIn(0f, 1.5f)
+
+        for (i in 0 until sampleCount step 2) {
+            val left = pcmBuffer[i]
+            val right = pcmBuffer[i + 1]
+
+            // M/S extraction.
+            val mid = (left + right) * 0.5f
+            val side = (left - right) * 0.5f
+
+            // True LR4 four-way split: 24 dB/octave at 180 / 1800 / 8000 Hz.
+            val bands = lr4.process(side)
+
+            // Keep the low band out of ITD. Low-mid is introduced gently,
+            // while upper bands receive progressively more spatial energy.
+            val protectedLow = bands.low
+            val lowMidSpatial = bands.lowMid * (0.42f + 0.16f * immersion)
+            val highMidSpatial = bands.highMid * (0.95f + 0.30f * immersion)
+            val highSpatial = bands.high * (1.05f + 0.35f * immersion)
+            val spatialInput = lowMidSpatial + highMidSpatial + highSpatial
+
+            // Fractional causal delay using linear interpolation in the ring buffer.
+            sideDelay[delayIndex] = spatialInput
+            val readPos = delayIndex - itdSamples
+            val base = kotlin.math.floor(readPos).toInt()
+            val frac = readPos - base
+            val delayedA = sideDelay[wrap(base, sideDelay.size)]
+            val delayedB = sideDelay[wrap(base - 1, sideDelay.size)]
+            val delayedSide = delayedA * (1f - frac) + delayedB * frac
+            val depthDelaySamples = (sampleRate * (0.0010f + 0.00035f * height3D)).coerceIn(1f, maxDelaySamples.toFloat())
+            val depthRead = delayIndex - depthDelaySamples
+            val depthBase = kotlin.math.floor(depthRead).toInt()
+            val depthFrac = depthRead - depthBase
+            val depthA = sideDelay[wrap(depthBase, sideDelay.size)]
+            val depthB = sideDelay[wrap(depthBase - 1, sideDelay.size)]
+            val depthSide = depthA * (1f - depthFrac) + depthB * depthFrac
+            delayIndex = (delayIndex + 1) % sideDelay.size
+            val airCue = bands.high * (0.10f + 0.12f * height3D) * height3D
+            val sideGain = 1f + immersion * (1.15f + 0.25f * height3D)
+            val delayedMix = immersion * (0.34f + 0.10f * height3D)
+            val depthMix = immersion * (0.12f + 0.10f * height3D)
+            val ild = immersion * (0.045f + 0.035f * height3D)
+            val sideLeft = spatialInput * sideGain * (1f + ild) + delayedSide * delayedMix + depthSide * depthMix + airCue
+            val sideRight = delayedSide * sideGain * (1f + ild) + spatialInput * delayedMix + depthSide * depthMix + airCue
+
+            // Reinsert the protected low band naturally. Mid receives center focus.
+            val outMid = mid * centerGain
+            val outLeft = outMid + protectedLow + sideLeft
+            val outRight = outMid - protectedLow - sideRight
+
+            pcmBuffer[i] = softClip(outLeft).coerceIn(-1f, 1f)
+            pcmBuffer[i + 1] = softClip(outRight).coerceIn(-1f, 1f)
+        }
+    }
+
     fun reset() {
         sideDelay.fill(0f)
         delayIndex = 0
