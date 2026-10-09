@@ -36,6 +36,10 @@ class AudioEngine(private val context: Context) {
     @Volatile
     private var pcmAtmosEnabled = false
 
+    // Records the actual custom PCM route format; capture currently uses stereo PCM16.
+    @Volatile
+    private var pcmRouteSampleRateHz: Int? = null
+
     private var audioSessionId = 0
     private var mbcBandCount = MBC_BANDS
     private var preEqBandCount = TARGET_PRE_EQ_BANDS
@@ -192,6 +196,8 @@ class AudioEngine(private val context: Context) {
 
     fun enablePcmAtmos(sampleRate: Int = 48000) {
 
+        pcmRouteSampleRateHz = sampleRate
+
         atmosEngine =
             ZeusAtmosEngine(sampleRate).also {
                 it.atmosImmersion =
@@ -229,6 +235,7 @@ class AudioEngine(private val context: Context) {
     fun disablePcmAtmos() {
 
         pcmAtmosEnabled = false
+        pcmRouteSampleRateHz = null
 
         atmosEngine?.reset()
         zeusMbc?.reset()
@@ -365,10 +372,22 @@ class AudioEngine(private val context: Context) {
 
         applyAll()
 
+        val routeDescription = if (pcmAtmosEnabled) {
+            "capture/output PCM16 stereo at ${pcmRouteSampleRateHz ?: "unknown"} Hz"
+        } else {
+            "Android Audio Framework session effect"
+        }
         Log.i(
             TAG,
-            "Hi-Res mode ${if (enabled) "ON" else "OFF"}; PCM path=" +
-                if (enabled) "transparent pass-through" else "mode DSP"
+            "Hi-Res mode ${if (enabled) "ON" else "OFF"}; " +
+                "DSP bypass=${enabled}; route=$routeDescription; " +
+                if (enabled && pcmAtmosEnabled) {
+                    "PCM samples pass unchanged, but this route is not true >48 kHz/24-bit Hi-Res"
+                } else if (enabled) {
+                    "session DSP bypassed; source format/resolution not exposed by this effect"
+                } else {
+                    "mode DSP restored"
+                }
         )
     }
 
