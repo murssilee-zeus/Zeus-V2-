@@ -252,7 +252,7 @@ private fun HarmanTargetsCard(vm:EqViewModel){
     Text("SPATIAL ENGINE",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)
     Text(if(vm.spatialEnabled) "Stereo virtualizer activo" else "Procesamiento espacial apagado",color=ZM,fontSize=8.sp)
    }
-   Switch(checked=vm.spatialEnabled,onCheckedChange={vm.spatialEnabled=it})
+   Switch(checked=vm.spatialEnabled,onCheckedChange={enabled->vm.spatialEnabled=enabled;if(enabled)vm.hiResEnabled=false})
   }
   S("WIDTH",vm.spatialWidth,0f..100f," %"){vm.spatialWidth=it}
   Text("Centro estable · expansión estéreo controlada",color=ZM,fontSize=8.sp)
