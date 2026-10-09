@@ -149,6 +149,55 @@ class ZeusEpicenter(
         }
     }
 
+
+    /** 32-bit float processing path; no intermediate 16-bit quantization. */
+    fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
+        if (!enabled || epicenterAmount <= 0f) return
+
+        val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        for (i in 0 until n step 2) {
+            val inL = pcm[i]
+            val inR = pcm[i + 1]
+
+            var outL = lowL.process(inL)
+            var outR = lowR.process(inR)
+
+            outL = punchL.process(outL)
+            outR = punchR.process(outR)
+
+            // Isolate useful bass energy for both synthesis stages.
+            val bassL = bassBandL.process(inL)
+            val bassR = bassBandR.process(inR)
+
+            // PRIMARY Epicenter-like effect: synthesize an octave below the
+            // detected bass. This is the "seismic" part, not a fixed EQ boost.
+            outL += subL.process(bassL) * subMix
+            outR += subR.process(bassR) * subMix
+
+            // Secondary nonlinear harmonics add texture to the new sub without
+            // replacing the original Zeus bass character.
+            val shapedL = tanh((bassL * exciterDrive).toDouble()).toFloat()
+            val shapedR = tanh((bassR * exciterDrive).toDouble()).toFloat()
+
+            val h2Lx = shapedL * shapedL
+            val h2Rx = shapedR * shapedR
+
+            val excitedL =
+                h2L.process(h2Lx) * exciterMix +
+                h3L.process(shapedL * shapedL * shapedL) * (exciterMix * .65f)
+
+            val excitedR =
+                h2R.process(h2Rx) * exciterMix +
+                h3R.process(shapedR * shapedR * shapedR) * (exciterMix * .65f)
+
+            outL += excitedL
+            outR += excitedR
+
+            pcm[i] = outL.coerceIn(-1f, 1f)
+            pcm[i + 1] = outR.coerceIn(-1f, 1f)
+        }
+    }
+
     fun reset() {
         lowL.reset(); lowR.reset()
         punchL.reset(); punchR.reset()
