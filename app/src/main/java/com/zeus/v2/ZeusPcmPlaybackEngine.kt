@@ -133,7 +133,13 @@ class ZeusPcmPlaybackEngine(
                 it.start()
             }
 
-            Log.i(TAG, "PCM Atmos route ON sr=$sampleRate")
+            Log.i(
+                TAG,
+                "PCM route ON input=AudioPlaybackCapture " +
+                    "output=AudioTrack format=PCM_16_BIT channels=stereo " +
+                    "sampleRate=$sampleRate Hz; this is a 16-bit capture/replay bridge, " +
+                    "not a bit-perfect or >48 kHz Hi-Res path"
+            )
             true
         } catch (t: Throwable) {
             Log.e(TAG, "PCM route start failed", t)
