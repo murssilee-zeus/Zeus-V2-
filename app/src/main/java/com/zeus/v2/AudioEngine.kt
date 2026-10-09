@@ -252,33 +252,28 @@ class AudioEngine(private val context: Context) {
             return 0
         }
 
-        // Native Zeus multiband compressor.
-        zeusMbc?.processStereo(
-            buffer,
-            n
-        )
+        // Route the PCM bus by mode: one processing identity at a time.
+        // HI-RES: leave captured PCM samples untouched (within the current
+        // PCM16/48 kHz capture route). No compressor, bass reconstruction,
+        // spatial widening, or soft clipping is applied here.
+        if (!hiResEnabled && !settings.spatialEnabled) {
+            // ZEUS BASS: dynamics + Epicenter, with spatial DSP bypassed.
+            zeusMbc?.processStereo(buffer, n)
 
-        // Native 2x Extreme Epicenter for the PCM route.
-        zeusEpicenter?.let {
-            it.enabled =
-                !hiResEnabled &&
-                !settings.spatialEnabled &&
-                pipelineEnabled
-            applyEpicenter(it)
-            it.processStereo(buffer, n)
-        }
-
-        // Existing Zeus Atmos engine.
-        atmosEngine?.let {
-
-            it.atmosImmersion =
-                settings.spatialWidth
-                    .coerceIn(0f, 100f) / 100f
-
-            it.processAtmosPCM(
-                buffer,
-                n
-            )
+            zeusEpicenter?.let {
+                it.enabled = pipelineEnabled
+                applyEpicenter(it)
+                it.processStereo(buffer, n)
+            }
+        } else if (!hiResEnabled && settings.spatialEnabled) {
+            // ZEUS SPATIAL: spatial processor only; no bass reconstruction
+            // or multiband compression from the PCM bus.
+            atmosEngine?.let {
+                it.atmosImmersion =
+                    settings.spatialWidth
+                        .coerceIn(0f, 100f) / 100f
+                it.processAtmosPCM(buffer, n)
+            }
         }
 
         return pcmBuffer?.write(
@@ -354,31 +349,31 @@ class AudioEngine(private val context: Context) {
     }
 
     fun setHiResEnabled(enabled: Boolean) {
-
         hiResEnabled = enabled
 
-        applyInputGain()
-        applyMbc()
-        applyPostEq()
-        applyLimiter()
-        applyZeusMbc()
-        zeusEpicenter?.let {
-            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
-            applyEpicenter(it)
+        if (enabled) {
+            // Modes are mutually exclusive: Hi-Res must not inherit Spatial.
+            settings.spatialEnabled = false
+            spatialEngine?.setEnabled(false)
         }
+
+        applyAll()
 
         Log.i(
             TAG,
-            "Hi-Res mode ${if (enabled) "ON" else "OFF"}"
+            "Hi-Res mode ${if (enabled) "ON" else "OFF"}; PCM path=" +
+                if (enabled) "transparent pass-through" else "mode DSP"
         )
     }
 
     fun setSpatialEnabled(enabled: Boolean) {
+        if (enabled) {
+            // Selecting Spatial exits Hi-Res so the UI cannot stack modes in DSP.
+            hiResEnabled = false
+        }
         settings.spatialEnabled = enabled
         spatialEngine?.setEnabled(enabled)
-        zeusEpicenter?.let {
-            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
-        }
+        applyAll()
     }
 
     fun setSpatialWidth(width: Float) {
@@ -636,6 +631,11 @@ class AudioEngine(private val context: Context) {
         spatialEngine?.setEnabled(
             settings.spatialEnabled
         )
+
+        // The Android DynamicsProcessing effect itself must be bypassed in
+        // Hi-Res; otherwise EQ/limiter stages can still alter the PCM output.
+        dynamicsProcessing?.enabled = !hiResEnabled
+        isEnabled = !hiResEnabled
     }
 
     // ---------------------------------------------------------
@@ -759,7 +759,8 @@ class AudioEngine(private val context: Context) {
             val active =
                 s.compEnabled &&
                     pipelineEnabled &&
-                    !hiResEnabled
+                    !hiResEnabled &&
+                    !settings.spatialEnabled
 
             val c1 =
                 s.cross1.coerceIn(
@@ -895,45 +896,15 @@ class AudioEngine(private val context: Context) {
 
         try {
 
-            // MODO HI-RES: Sonido ultra plano, limpio y de alta fidelidad
-            if (hiResEnabled) {
-
-                dp.setPostEqBandAllChannelsTo(
-                    0,
-                    DynamicsProcessing.EqBand(
-                        false,
-                        1000f,
-                        0f
+            // HI-RES must not add tonal coloration. Explicitly bypass all
+            // four post-EQ bands instead of adding presence/air boosts.
+            if (hiResEnabled || settings.spatialEnabled) {
+                for (i in 0..3) {
+                    dp.setPostEqBandAllChannelsTo(
+                        i,
+                        DynamicsProcessing.EqBand(false, 1000f, 0f)
                     )
-                )
-
-                dp.setPostEqBandAllChannelsTo(
-                    1,
-                    DynamicsProcessing.EqBand(
-                        false,
-                        1000f,
-                        0f
-                    )
-                )
-
-                dp.setPostEqBandAllChannelsTo(
-                    2,
-                    DynamicsProcessing.EqBand(
-                        true,
-                        2800f,
-                        0.65f
-                    )
-                )
-
-                dp.setPostEqBandAllChannelsTo(
-                    3,
-                    DynamicsProcessing.EqBand(
-                        true,
-                        11500f,
-                        0.75f
-                    )
-                )
-
+                }
                 return
             }
 
