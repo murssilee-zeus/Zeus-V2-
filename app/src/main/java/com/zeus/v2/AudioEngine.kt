@@ -216,6 +216,9 @@ class AudioEngine(private val context: Context) {
         pcmBuffer = ZeusPcmBuffer()
 
         pcmAtmosEnabled = true
+        // When PCM spatial DSP is available, avoid stacking Android Virtualizer
+        // on top of it. The session Virtualizer remains the fallback without PCM.
+        spatialEngine?.setEnabled(false)
 
         Log.i(
             TAG,
@@ -231,6 +234,9 @@ class AudioEngine(private val context: Context) {
         zeusMbc?.reset()
         zeusEpicenter?.reset()
         pcmBuffer?.clear()
+
+        // Restore the platform spatializer as fallback after the PCM route ends.
+        spatialEngine?.setEnabled(settings.spatialEnabled)
     }
 
     fun processPcmStereo(
@@ -372,7 +378,8 @@ class AudioEngine(private val context: Context) {
             hiResEnabled = false
         }
         settings.spatialEnabled = enabled
-        spatialEngine?.setEnabled(enabled)
+        // Avoid double spatial processing while the PCM spatial engine is active.
+        spatialEngine?.setEnabled(enabled && !pcmAtmosEnabled)
         applyAll()
     }
 
