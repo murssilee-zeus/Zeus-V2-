@@ -344,7 +344,7 @@ class AudioEngine(private val context: Context) {
 
     fun setEnabled(enabled: Boolean) {
         try {
-            dynamicsProcessing?.enabled = enabled
+            dynamicsProcessing?.enabled = enabled && !hiResEnabled
             isEnabled = enabled
         } catch (e: Exception) {
             Log.e(
