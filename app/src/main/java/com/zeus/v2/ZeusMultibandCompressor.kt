@@ -110,6 +110,36 @@ class ZeusMultibandCompressor(
         }
     }
 
+
+    /** Float32 path avoids quantizing each compressor stage back to PCM16. */
+    fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
+        if (!enabled) return
+        val n = size.coerceIn(0, pcm.size - (pcm.size % 2))
+        if (n < 2) return
+
+        for (i in 0 until n step 2) {
+            val left = pcm[i]
+            val right = pcm[i + 1]
+            val lb = splitL.process(left)
+            val rb = splitR.process(right)
+
+            val g0 = bandGain(0, lb.low, rb.low)
+            val g1 = bandGain(1, lb.lowMid, rb.lowMid)
+            val g2 = bandGain(2, lb.highMid, rb.highMid)
+            val g3 = bandGain(3, lb.high, rb.high)
+
+            val outL =
+                lb.low * g0 + lb.lowMid * g1 +
+                lb.highMid * g2 + lb.high * g3
+            val outR =
+                rb.low * g0 + rb.lowMid * g1 +
+                rb.highMid * g2 + rb.high * g3
+
+            pcm[i] = outL.coerceIn(-1f, 1f)
+            pcm[i + 1] = outR.coerceIn(-1f, 1f)
+        }
+    }
+
     fun reset() {
         splitL.reset()
         splitR.reset()
