@@ -636,7 +636,7 @@ class AudioEngine(private val context: Context) {
         )
 
         spatialEngine?.setEnabled(
-            settings.spatialEnabled
+            settings.spatialEnabled && !pcmAtmosEnabled
         )
 
         // The Android DynamicsProcessing effect itself must be bypassed in
