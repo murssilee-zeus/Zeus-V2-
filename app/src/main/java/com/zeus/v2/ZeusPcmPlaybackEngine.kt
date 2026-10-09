@@ -13,9 +13,9 @@ import android.util.Log
 /**
  * Real PCM input/output bridge for Android 10+.
  *
- * Input: AudioPlaybackCapture -> interleaved stereo PCM16.
- * DSP: ZeusAtmosEngine through AudioEngine's PCM bus.
- * Output: app-owned AudioTrack.
+ * Input: Android AudioPlaybackCapture -> interleaved stereo PCM16.
+ * DSP: float32 interleaved stereo throughout Zeus DSP and ring buffer.
+ * Output: app-owned float32 AudioTrack (device/route may convert downstream).
  *
  * Important: Android does not expose a public API for replacing another app's
  * mixer output in-place. This route captures eligible playback and replays the
@@ -102,7 +102,7 @@ class ZeusPcmPlaybackEngine(
                 .setAudioAttributes(attributes)
                 .setAudioFormat(
                     AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
                         .setSampleRate(sampleRate)
                         .setChannelMask(outputMask)
                         .build()
@@ -166,7 +166,8 @@ class ZeusPcmPlaybackEngine(
 
     private fun loop(record: AudioRecord, output: AudioTrack) {
         val input = ShortArray(FRAMES_PER_BUFFER * 2)
-        val processed = ShortArray(FRAMES_PER_BUFFER * 2)
+        val floatInput = FloatArray(FRAMES_PER_BUFFER * 2)
+        val processed = FloatArray(FRAMES_PER_BUFFER * 2)
 
         while (running) {
             val read = try {
@@ -181,11 +182,11 @@ class ZeusPcmPlaybackEngine(
             if (even < 2) continue
 
             capturedSamples += even.toLong()
+            for (i in 0 until even) floatInput[i] = input[i] / 32768f
 
-            // The engine writes the processed frames into the PCM ring buffer.
-            audioEngine.processPcmStereo(input, even)
+            // One input conversion to float32, then all DSP stages and buffering remain float.
+            audioEngine.processPcmStereo(floatInput, even)
             var remaining = even
-            var offset = 0
             while (remaining > 0 && running) {
                 val got = audioEngine.readProcessedPcm(processed, remaining)
                 if (got <= 0) {
@@ -195,14 +196,13 @@ class ZeusPcmPlaybackEngine(
                 val written = try {
                     output.write(processed, 0, got, AudioTrack.WRITE_BLOCKING)
                 } catch (t: Throwable) {
-                    Log.e(TAG, "PCM write failed", t)
+                    Log.e(TAG, "Float PCM write failed", t)
                     0
                 }
                 if (written <= 0) {
                     running = false
                     break
                 }
-                offset += written
                 remaining -= written
                 playedSamples += written.toLong()
             }
