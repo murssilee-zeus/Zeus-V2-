@@ -32,6 +32,7 @@ class AudioEngine(private val context: Context) {
     private var zeusMbc: ZeusMultibandCompressor? = null
     private var zeusEpicenter: ZeusEpicenter? = null
     private var pcmBuffer: ZeusPcmBuffer? = null
+    private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
 
     @Volatile
     private var pcmAtmosEnabled = false
@@ -220,6 +221,7 @@ class AudioEngine(private val context: Context) {
             }
 
         pcmBuffer = ZeusPcmBuffer()
+        pcmFloatBuffer = ZeusFloatPcmBuffer()
 
         pcmAtmosEnabled = true
         // When PCM spatial DSP is available, avoid stacking Android Virtualizer
@@ -241,6 +243,7 @@ class AudioEngine(private val context: Context) {
         zeusMbc?.reset()
         zeusEpicenter?.reset()
         pcmBuffer?.clear()
+        pcmFloatBuffer?.clear()
 
         // Restore the platform spatializer as fallback after the PCM route ends.
         spatialEngine?.setEnabled(settings.spatialEnabled)
@@ -306,6 +309,35 @@ class AudioEngine(private val context: Context) {
             size
         ) ?: 0
 
+    /**
+     * Float32 internal DSP bus. Input arrives from Android capture as PCM16,
+     * so source precision is already limited, but DSP stages avoid repeated
+     * 16-bit quantization and the output can be handed to AudioTrack as float.
+     */
+    fun processPcmStereo(buffer: FloatArray, size: Int = buffer.size): Int {
+        if (!pcmAtmosEnabled) return 0
+        val n = size.coerceIn(0, buffer.size - (buffer.size % 2))
+        if (n < 2) return 0
+
+        if (!hiResEnabled && !settings.spatialEnabled) {
+            zeusMbc?.processStereo(buffer, n)
+            zeusEpicenter?.let {
+                it.enabled = pipelineEnabled
+                applyEpicenter(it)
+                it.processStereo(buffer, n)
+            }
+        } else if (!hiResEnabled && settings.spatialEnabled) {
+            atmosEngine?.let {
+                it.atmosImmersion = settings.spatialWidth.coerceIn(0f, 100f) / 100f
+                it.processAtmosPCM(buffer, n)
+            }
+        }
+        return pcmFloatBuffer?.write(buffer, 0, n) ?: 0
+    }
+
+    fun readProcessedPcm(output: FloatArray, size: Int = output.size): Int =
+        pcmFloatBuffer?.read(output, 0, size) ?: 0
+
     fun release() {
 
         pcmAtmosEnabled = false
@@ -314,11 +346,13 @@ class AudioEngine(private val context: Context) {
         zeusMbc?.reset()
         zeusEpicenter?.reset()
         pcmBuffer?.clear()
+        pcmFloatBuffer?.clear()
 
         atmosEngine = null
         zeusMbc = null
         zeusEpicenter = null
         pcmBuffer = null
+        pcmFloatBuffer = null
 
         try {
             visualizer?.enabled = false
