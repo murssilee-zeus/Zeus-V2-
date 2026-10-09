@@ -48,9 +48,9 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
     Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)
-    Switch(checked=vm.hiResEnabled,onCheckedChange={vm.hiResEnabled=it},modifier=Modifier.height(30.dp))
+    Switch(checked=vm.hiResEnabled,onCheckedChange={enabled->vm.hiResEnabled=enabled;if(enabled)vm.spatialEnabled=false},modifier=Modifier.height(30.dp))
     Text("SPATIAL",color=if(vm.spatialEnabled) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=5.dp))
-    Switch(checked=vm.spatialEnabled,onCheckedChange={vm.spatialEnabled=it},modifier=Modifier.height(30.dp))
+    Switch(checked=vm.spatialEnabled,onCheckedChange={enabled->vm.spatialEnabled=enabled;if(enabled)vm.hiResEnabled=false},modifier=Modifier.height(30.dp))
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
