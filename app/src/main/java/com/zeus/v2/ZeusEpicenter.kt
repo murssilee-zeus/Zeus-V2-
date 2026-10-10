@@ -73,6 +73,8 @@ class ZeusEpicenter(
             exciterDrive = 1f
             exciterMix = 0f
             subMix = 0f
+            resonatorMix = 0f
+            dynamicBassAmount = 0f
         } else {
             // Amount is the master wet control. Drive controls nonlinear
             // density; Depth controls how aggressively the sub stage follows.
