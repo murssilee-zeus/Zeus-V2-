@@ -136,7 +136,7 @@ class ZeusEpicenter(
             // WEcho-inspired dynamic low-end: quieter bass passages receive a
             // little more synthesized-sub level, while loud passages are kept
             // in check. The envelope is smoothed to avoid pumping/chattering.
-            val envCoeff = if (sampleRate > 0) 0.0025f else 0.0025f
+            val envCoeff = 0.0015f
             bassEnvelopeL += envCoeff * (kotlin.math.abs(bassL) - bassEnvelopeL)
             bassEnvelopeR += envCoeff * (kotlin.math.abs(bassR) - bassEnvelopeR)
             val dynamicL = 1f + dynamicBassAmount * (1f - bassEnvelopeL * 12f).coerceIn(0f, 1f)
@@ -199,7 +199,7 @@ class ZeusEpicenter(
             // WEcho-inspired dynamic low-end: quieter bass passages receive a
             // little more synthesized-sub level, while loud passages are kept
             // in check. The envelope is smoothed to avoid pumping/chattering.
-            val envCoeff = if (sampleRate > 0) 0.0025f else 0.0025f
+            val envCoeff = 0.0015f
             bassEnvelopeL += envCoeff * (kotlin.math.abs(bassL) - bassEnvelopeL)
             bassEnvelopeR += envCoeff * (kotlin.math.abs(bassR) - bassEnvelopeR)
             val dynamicL = 1f + dynamicBassAmount * (1f - bassEnvelopeL * 12f).coerceIn(0f, 1f)
@@ -212,8 +212,8 @@ class ZeusEpicenter(
 
             // PRIMARY Epicenter-like effect: synthesize an octave below the
             // detected bass. This is the "seismic" part, not a fixed EQ boost.
-            outL += subL.process(bassL) * subMix
-            outR += subR.process(bassR) * subMix
+            outL += subL.process(bassL) * subMix * dynamicL
+            outR += subR.process(bassR) * subMix * dynamicR
 
             // Secondary nonlinear harmonics add texture to the new sub without
             // replacing the original Zeus bass character.
