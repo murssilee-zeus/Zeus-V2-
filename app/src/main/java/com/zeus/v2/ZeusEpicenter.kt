@@ -33,6 +33,13 @@ class ZeusEpicenter(
 
     private val bassBandL = Biquad(sampleRate)
     private val bassBandR = Biquad(sampleRate)
+    // Parallel resonator inspired by the WEcho approach, independently implemented.
+    private val resonatorL = Biquad(sampleRate)
+    private val resonatorR = Biquad(sampleRate)
+    private var resonatorMix = 0f
+    private var dynamicBassAmount = 0f
+    private var bassEnvelopeL = 0f
+    private var bassEnvelopeR = 0f
 
     private val subL = SubHarmonic(sampleRate)
     private val subR = SubHarmonic(sampleRate)
@@ -73,6 +80,10 @@ class ZeusEpicenter(
             exciterMix = (epicenterAmount * (0.18f + drive * .30f) +
                 harmonics * .22f).coerceAtMost(.70f)
             subMix = (epicenterAmount * (.45f + depth * .45f)).coerceAtMost(.90f)
+            // A restrained parallel resonant band adds body without turning the
+            // entire low end into a static EQ shelf. Depth sets resonance/Q.
+            resonatorMix = (epicenterAmount * (.10f + depth * .22f)).coerceAtMost(.32f)
+            dynamicBassAmount = (epicenterAmount * depth * .30f).coerceAtMost(.30f)
         }
 
         // The target frequency is the center of the transformation, not a
@@ -97,6 +108,8 @@ class ZeusEpicenter(
         // the desired sub output/fallback; they are independent controls.
         bassBandL.bandPass(sweep, 0.85f)
         bassBandR.bandPass(sweep, 0.85f)
+        resonatorL.bandPass(sweep, 1.0f + depth * 1.5f)
+        resonatorR.bandPass(sweep, 1.0f + depth * 1.5f)
 
         subL.configure(subTarget)
         subR.configure(subTarget)
@@ -120,10 +133,24 @@ class ZeusEpicenter(
             val bassL = bassBandL.process(inL)
             val bassR = bassBandR.process(inR)
 
+            // WEcho-inspired dynamic low-end: quieter bass passages receive a
+            // little more synthesized-sub level, while loud passages are kept
+            // in check. The envelope is smoothed to avoid pumping/chattering.
+            val envCoeff = if (sampleRate > 0) 0.0025f else 0.0025f
+            bassEnvelopeL += envCoeff * (kotlin.math.abs(bassL) - bassEnvelopeL)
+            bassEnvelopeR += envCoeff * (kotlin.math.abs(bassR) - bassEnvelopeR)
+            val dynamicL = 1f + dynamicBassAmount * (1f - bassEnvelopeL * 12f).coerceIn(0f, 1f)
+            val dynamicR = 1f + dynamicBassAmount * (1f - bassEnvelopeR * 12f).coerceIn(0f, 1f)
+
+            // Resonator adds a controlled parallel band at the selected sweep
+            // frequency, inspired by WEcho's Bass Resonator, not copied from it.
+            outL += resonatorL.process(inL) * resonatorMix
+            outR += resonatorR.process(inR) * resonatorMix
+
             // PRIMARY Epicenter-like effect: synthesize an octave below the
             // detected bass. This is the "seismic" part, not a fixed EQ boost.
-            outL += subL.process(bassL) * subMix
-            outR += subR.process(bassR) * subMix
+            outL += subL.process(bassL) * subMix * dynamicL
+            outR += subR.process(bassR) * subMix * dynamicR
 
             // Secondary nonlinear harmonics add texture to the new sub without
             // replacing the original Zeus bass character.
@@ -169,6 +196,20 @@ class ZeusEpicenter(
             val bassL = bassBandL.process(inL)
             val bassR = bassBandR.process(inR)
 
+            // WEcho-inspired dynamic low-end: quieter bass passages receive a
+            // little more synthesized-sub level, while loud passages are kept
+            // in check. The envelope is smoothed to avoid pumping/chattering.
+            val envCoeff = if (sampleRate > 0) 0.0025f else 0.0025f
+            bassEnvelopeL += envCoeff * (kotlin.math.abs(bassL) - bassEnvelopeL)
+            bassEnvelopeR += envCoeff * (kotlin.math.abs(bassR) - bassEnvelopeR)
+            val dynamicL = 1f + dynamicBassAmount * (1f - bassEnvelopeL * 12f).coerceIn(0f, 1f)
+            val dynamicR = 1f + dynamicBassAmount * (1f - bassEnvelopeR * 12f).coerceIn(0f, 1f)
+
+            // Resonator adds a controlled parallel band at the selected sweep
+            // frequency, inspired by WEcho's Bass Resonator, not copied from it.
+            outL += resonatorL.process(inL) * resonatorMix
+            outR += resonatorR.process(inR) * resonatorMix
+
             // PRIMARY Epicenter-like effect: synthesize an octave below the
             // detected bass. This is the "seismic" part, not a fixed EQ boost.
             outL += subL.process(bassL) * subMix
@@ -204,6 +245,8 @@ class ZeusEpicenter(
         h2L.reset(); h2R.reset()
         h3L.reset(); h3R.reset()
         bassBandL.reset(); bassBandR.reset()
+        resonatorL.reset(); resonatorR.reset()
+        bassEnvelopeL = 0f; bassEnvelopeR = 0f
         subL.reset(); subR.reset()
     }
 
