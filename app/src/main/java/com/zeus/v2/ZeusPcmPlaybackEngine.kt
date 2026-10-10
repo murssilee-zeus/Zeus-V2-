@@ -13,9 +13,11 @@ import android.util.Log
 /**
  * Real PCM input/output bridge for Android 10+.
  *
- * Input: Android AudioPlaybackCapture -> interleaved stereo PCM16.
+ * Input: Android AudioPlaybackCapture requests interleaved stereo PCM_FLOAT.
  * DSP: float32 interleaved stereo throughout Zeus DSP and ring buffer.
  * Output: app-owned float32 AudioTrack (device/route may convert downstream).
+ * This avoids an explicit PCM16 capture quantization step when Android supports
+ * float playback capture, but does not guarantee bit-perfect/lossless playback.
  *
  * Important: Android does not expose a public API for replacing another app's
  * mixer output in-place. This route captures eligible playback and replays the
@@ -57,8 +59,9 @@ class ZeusPcmPlaybackEngine(
 
         val channelMask = AudioFormat.CHANNEL_IN_STEREO
         val outputMask = AudioFormat.CHANNEL_OUT_STEREO
+        val captureEncoding = AudioFormat.ENCODING_PCM_FLOAT
         val format = AudioFormat.Builder()
-            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .setEncoding(captureEncoding)
             .setSampleRate(sampleRate)
             .setChannelMask(channelMask)
             .build()
@@ -73,7 +76,7 @@ class ZeusPcmPlaybackEngine(
         val minRecord = AudioRecord.getMinBufferSize(
             sampleRate,
             channelMask,
-            AudioFormat.ENCODING_PCM_16BIT
+            captureEncoding
         )
         val minTrack = AudioTrack.getMinBufferSize(
             sampleRate,
@@ -135,10 +138,10 @@ class ZeusPcmPlaybackEngine(
 
             Log.i(
                 TAG,
-                "PCM route ON input=AudioPlaybackCapture " +
-                    "output=AudioTrack format=PCM_16_BIT channels=stereo " +
-                    "sampleRate=$sampleRate Hz; this is a 16-bit capture/replay bridge, " +
-                    "not a bit-perfect or >48 kHz Hi-Res path"
+                "PCM route ON input=AudioPlaybackCapture output=AudioTrack " +
+                    "format=PCM_FLOAT channels=stereo sampleRate=$sampleRate Hz; " +
+                    "float capture/replay path, not guaranteed bit-perfect/lossless " +
+                    "and not a >48 kHz Hi-Res path"
             )
             true
         } catch (t: Throwable) {
@@ -165,8 +168,7 @@ class ZeusPcmPlaybackEngine(
     }
 
     private fun loop(record: AudioRecord, output: AudioTrack) {
-        val input = ShortArray(FRAMES_PER_BUFFER * 2)
-        val floatInput = FloatArray(FRAMES_PER_BUFFER * 2)
+        val input = FloatArray(FRAMES_PER_BUFFER * 2)
         val processed = FloatArray(FRAMES_PER_BUFFER * 2)
 
         while (running) {
@@ -182,10 +184,9 @@ class ZeusPcmPlaybackEngine(
             if (even < 2) continue
 
             capturedSamples += even.toLong()
-            for (i in 0 until even) floatInput[i] = input[i] / 32768f
 
-            // One input conversion to float32, then all DSP stages and buffering remain float.
-            audioEngine.processPcmStereo(floatInput, even)
+            // Capture and processing stay in float32 without an intermediate PCM16 conversion.
+            audioEngine.processPcmStereo(input, even)
             var remaining = even
             while (remaining > 0 && running) {
                 val got = audioEngine.readProcessedPcm(processed, remaining)
