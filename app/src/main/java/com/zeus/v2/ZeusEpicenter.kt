@@ -207,6 +207,10 @@ class ZeusEpicenter(
             val excitedL = h2L.process(h2Lx) * exciterMix + h3L.process(shapedL * shapedL * shapedL) * (exciterMix * 0.5f)
             val excitedR = h2R.process(h2Rx) * exciterMix + h3R.process(shapedR * shapedR * shapedR) * (exciterMix * 0.5f)
 
+            // Mantener la ruta Float32 equivalente a ShortArray: sumar los armónicos excitados.
+            outL += excitedL
+            outR += excitedR
+
             // Para la salida float, aplicamos soft-clipping para proteger amplificadores/audífonos
             pcm[i] = tanh(outL.toDouble()).toFloat()
             pcm[i + 1] = tanh(outR.toDouble()).toFloat()
