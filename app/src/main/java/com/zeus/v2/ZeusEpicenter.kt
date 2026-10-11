@@ -217,6 +217,26 @@ class ZeusEpicenter(
         }
     }
 
+    /** Limpia estados internos al detener o reiniciar la ruta PCM. */
+    fun reset() {
+        lowL.reset()
+        lowR.reset()
+        punchL.reset()
+        punchR.reset()
+        h2L.reset()
+        h2R.reset()
+        h3L.reset()
+        h3R.reset()
+        bassBandL.reset()
+        bassBandR.reset()
+        resonatorL.reset()
+        resonatorR.reset()
+        subL.reset()
+        subR.reset()
+        bassEnvelopeL = 0f
+        bassEnvelopeR = 0f
+    }
+
     private fun toShort(sample: Float): Short {
         val s = sample * 32768f
         return when {
