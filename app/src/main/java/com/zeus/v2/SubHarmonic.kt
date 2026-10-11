@@ -19,13 +19,17 @@ class SubHarmonic(private val sampleRate: Int) {
     }
 
     fun process(bassSample: Float): Float {
-        // Oscilador de fase continua. La fase avanza por muestra para producir
-        // una onda real a la frecuencia objetivo, en vez de alternar solo 0/pi.
+        // Oscilador de fase continua: genera una senoide real a la frecuencia objetivo.
         val safeRate = sampleRate.coerceAtLeast(1)
         phase += 2.0 * PI * subTargetFreq.toDouble() / safeRate.toDouble()
         if (phase >= 2.0 * PI) phase -= 2.0 * PI
 
         val rawSub = sin(phase) * abs(bassSample)
         return lpFilter.process(rawSub.toFloat())
+    }
+
+    fun reset() {
+        phase = 0.0
+        lpFilter.reset()
     }
 }
