@@ -61,7 +61,7 @@ class ZeusEpicenter(
         val harmonics = harmonicsPercent.coerceIn(0f, 100f) / 100f
         
         // Mapeo sísmico clásico: Forzamos el rango objetivo a la zona más física (24Hz a 55Hz)
-        val target = frequencyHz.coerceIn(24f, 55f)
+        val target = frequencyHz.coerceIn(18f, 55f)
         val sweep = sweepHz.coerceIn(50f, 120f)
 
         if (epicenterAmount <= 0f) {
@@ -84,7 +84,7 @@ class ZeusEpicenter(
         }
 
         val center = target.coerceIn(25f, 80f)
-        val subTarget = target.coerceIn(20f, 50f)
+        val subTarget = target.coerceIn(18f, 50f)
         
         // CAMBIO 2: Mayor empuje de ecualización en bajas frecuencias (+6dB máx)
         lowL.lowShelf(subTarget, (epicenterAmount * depth * 6f).coerceAtMost(6f))
