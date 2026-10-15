@@ -146,8 +146,8 @@ class ZeusEpicenter(
 
             // Detector alimentado con la señal de entrada sin el estrecho bassBand.
             // El factor extra aumenta el subgrave; el soft-clip final controla los picos.
-            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 2.5f
-            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 2.5f
+            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 4.0f
+            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 4.0f
             outL += subGeneratedL
             outR += subGeneratedR
 
