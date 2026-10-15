@@ -1,51 +1,53 @@
 package com.zeus.v2
 
-import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.exp
-import kotlin.math.sin
 
 /**
- * Generador senoidal de subgrave para Zeus Bass.
+ * Sintetizador de sub-octava por conmutación de estado (flip-flop).
  *
- * La frecuencia de salida es estable y configurable; la amplitud sigue la
- * envolvente del bajo de entrada con suavizado para reducir bombeo y aspereza.
- * No afirma detectar automáticamente la mitad exacta de cada nota de entrada.
+ * Alterna la polaridad en cada cruce ascendente de la señal de entrada.
+ * La salida se suaviza con una envolvente y un filtro pasa-bajas.
+ *
+ * Nota: con audio musical complejo, los cruces por cero no garantizan una
+ * división exacta entre dos de la nota fundamental; para ello se requiere
+ * detección/seguimiento de tono.
  */
 class SubHarmonic(private val sampleRate: Int) {
     private val safeSampleRate = sampleRate.coerceAtLeast(8000)
-    private var phase = 0.0
-    private var subTargetFreq = 24f
+    private var lastSample = 0f
+    private var flipFlopState = 1f
     private var envelope = 0f
 
-    private val lpFilter = Biquad(safeSampleRate)
-
-    // Coeficientes calculados una sola vez, no dentro del bucle de audio.
-    private val attackCoeff =
-        (1.0 - exp(-1.0 / (safeSampleRate * 0.008))).toFloat()
-    private val releaseCoeff =
-        (1.0 - exp(-1.0 / (safeSampleRate * 0.120))).toFloat()
+    private val lowPassPurifier = Biquad(safeSampleRate)
 
     fun configure(targetFrequencyHz: Float) {
-        subTargetFreq = targetFrequencyHz.coerceIn(18f, 55f)
-        lpFilter.lowPass(subTargetFreq.coerceIn(18f, 60f), 0.9f)
+        val cutoff = targetFrequencyHz.coerceIn(18f, 48f)
+            .coerceAtMost(safeSampleRate * 0.45f)
+        lowPassPurifier.lowPass(cutoff, 1.0f)
     }
 
-    fun process(bassSample: Float): Float {
-        val inputLevel = abs(bassSample).coerceAtMost(1f)
-        val coeff = if (inputLevel > envelope) attackCoeff else releaseCoeff
-        envelope += coeff * (inputLevel - envelope)
+    fun process(inputSample: Float): Float {
+        val input = inputSample.coerceIn(-1f, 1f)
 
-        phase += 2.0 * PI * subTargetFreq.toDouble() / safeSampleRate
-        if (phase >= 2.0 * PI) phase -= 2.0 * PI
+        // Ataque rápido y liberación más suave para conservar el impacto
+        // sin hacer que el nivel siga cada muestra de la forma de onda.
+        val envCoeff = if (abs(input) > envelope) 0.008f else 0.0012f
+        envelope += envCoeff * (abs(input) - envelope)
 
-        val rawSub = sin(phase) * envelope
-        return lpFilter.process(rawSub.toFloat())
+        // Un cambio de estado por cruce ascendente con pequeña histéresis.
+        if (input > 0.001f && lastSample <= 0.001f) {
+            flipFlopState = -flipFlopState
+        }
+        lastSample = input
+
+        val rawSub = flipFlopState * envelope
+        return lowPassPurifier.process(rawSub)
     }
 
     fun reset() {
-        phase = 0.0
+        lastSample = 0f
+        flipFlopState = 1f
         envelope = 0f
-        lpFilter.reset()
+        lowPassPurifier.reset()
     }
 }
