@@ -144,9 +144,12 @@ class ZeusEpicenter(
             outL += resonatorL.process(inL) * resonatorMix
             outR += resonatorR.process(inR) * resonatorMix
 
-            // Inyección masiva de la sub-armónica del modulo SubHarmonic
-            outL += subL.process(bassL) * subMix * dynamicL
-            outR += subR.process(bassR) * subMix * dynamicR
+            // Detector alimentado con la señal de entrada sin el estrecho bassBand.
+            // El factor extra aumenta el subgrave; el soft-clip final controla los picos.
+            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 2.5f
+            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 2.5f
+            outL += subGeneratedL
+            outR += subGeneratedR
 
             // Distorsión armónica controlada para presencia analógica
             val shapedL = tanh((bassL * exciterDrive).toDouble()).toFloat()
@@ -195,8 +198,11 @@ class ZeusEpicenter(
             outL += resonatorL.process(inL) * resonatorMix
             outR += resonatorR.process(inR) * resonatorMix
 
-            outL += subL.process(bassL) * subMix * dynamicL
-            outR += subR.process(bassR) * subMix * dynamicR
+            // Alimentar el flip-flop con la señal limpia de entrada, no solo bassBand.
+            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 2.5f
+            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 2.5f
+            outL += subGeneratedL
+            outR += subGeneratedR
 
             val shapedL = tanh((bassL * exciterDrive).toDouble()).toFloat()
             val shapedR = tanh((bassR * exciterDrive).toDouble()).toFloat()
