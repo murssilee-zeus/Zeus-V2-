@@ -199,8 +199,8 @@ class ZeusEpicenter(
             outR += resonatorR.process(inR) * resonatorMix
 
             // Alimentar el flip-flop con la señal limpia de entrada, no solo bassBand.
-            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 2.5f
-            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 2.5f
+            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 4.5f
+            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 4.5f
             outL += subGeneratedL
             outR += subGeneratedR
 
