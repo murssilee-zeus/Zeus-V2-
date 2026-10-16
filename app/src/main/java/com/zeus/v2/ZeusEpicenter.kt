@@ -128,10 +128,7 @@ class ZeusEpicenter(
             outL = punchL.process(outL)
             outR = punchR.process(outR)
 
-            val bassL = bassBandL.process(inL)
-            val bassR = bassBandR.process(inR)
-
-            // 1. Bajo filtrado para el análisis del flip-flop.
+            // Bajo filtrado para el análisis del flip-flop.
             val bassL = bassBandL.process(inL)
             val bassR = bassBandR.process(inR)
 
@@ -178,9 +175,6 @@ class ZeusEpicenter(
 
             outL = punchL.process(outL)
             outR = punchR.process(outR)
-
-            val bassL = bassBandL.process(inL)
-            val bassR = bassBandR.process(inR)
 
             // Bajo filtrado para el análisis del flip-flop.
             val bassL = bassBandL.process(inL)
