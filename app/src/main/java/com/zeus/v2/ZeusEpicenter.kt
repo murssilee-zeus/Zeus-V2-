@@ -131,41 +131,35 @@ class ZeusEpicenter(
             val bassL = bassBandL.process(inL)
             val bassR = bassBandR.process(inR)
 
-            // CAMBIO 5: Optimización del detector de envolvente dinámico. 
-            // Invertimos la lógica para que cuando el bajo original golpee MUY DURO,
-            // el sub-bajo sintetizado se comprima un poco, evitando saturación digital fea (clipping).
-            val envCoeff = 0.0025f
-            bassEnvelopeL += envCoeff * (abs(bassL) - bassEnvelopeL)
-            bassEnvelopeR += envCoeff * (abs(bassR) - bassEnvelopeR)
-            
-            val dynamicL = 1f + dynamicBassAmount * (1f - (bassEnvelopeL * 8f).coerceIn(0f, 1f))
-            val dynamicR = 1f + dynamicBassAmount * (1f - (bassEnvelopeR * 8f).coerceIn(0f, 1f))
+            // 1. Bajo filtrado para el análisis del flip-flop.
+            val bassL = bassBandL.process(inL)
+            val bassR = bassBandR.process(inR)
 
+            // 2. Cuerpo del resonador en paralelo.
             outL += resonatorL.process(inL) * resonatorMix
             outR += resonatorR.process(inR) * resonatorMix
 
-            // Detector alimentado con la señal de entrada sin el estrecho bassBand.
-            // El factor extra aumenta el subgrave; el soft-clip final controla los picos.
-            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 4.0f
-            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 4.0f
-            outL += subGeneratedL
-            outR += subGeneratedR
+            // 3. Generación sísmica directa: sin atenuación por bassEnvelope.
+            val subGeneratedL = subL.process(bassL) * subMix * 3.5f
+            val subGeneratedR = subR.process(bassR) * subMix * 3.5f
 
-            // Distorsión armónica controlada para presencia analógica
+            // 4. Soft-clipping independiente del subgrave antes de sumarlo.
+            outL += tanh(subGeneratedL.toDouble()).toFloat()
+            outR += tanh(subGeneratedR.toDouble()).toFloat()
+
+            // 5. Excitador de armónicos secundarios para textura en medios-bajos.
             val shapedL = tanh((bassL * exciterDrive).toDouble()).toFloat()
             val shapedR = tanh((bassR * exciterDrive).toDouble()).toFloat()
 
-            val h2Lx = shapedL * shapedL
-            val h2Rx = shapedR * shapedR
-
-            val excitedL = h2L.process(h2Lx) * exciterMix + h3L.process(shapedL * shapedL * shapedL) * (exciterMix * 0.5f)
-            val excitedR = h2R.process(h2Rx) * exciterMix + h3R.process(shapedR * shapedR * shapedR) * (exciterMix * 0.5f)
+            val excitedL = h2L.process(shapedL * shapedL) * exciterMix +
+                h3L.process(shapedL * shapedL * shapedL) * (exciterMix * 0.5f)
+            val excitedR = h2R.process(shapedR * shapedR) * exciterMix +
+                h3R.process(shapedR * shapedR * shapedR) * (exciterMix * 0.5f)
 
             outL += excitedL
             outR += excitedR
 
-            // CAMBIO 6: Soft-clipping (Saturación suave) final antes de retornar a Short.
-            // Si el bajo rompe el límite de 1.0f, el valor se comprime suavemente en lugar de hacer 'crackle' digital.
+            // 6. Limitación suave de la mezcla completa antes de la salida Short.
             pcm[i] = toShort(tanh(outL.toDouble()).toFloat())
             pcm[i + 1] = toShort(tanh(outR.toDouble()).toFloat())
         }
@@ -188,36 +182,35 @@ class ZeusEpicenter(
             val bassL = bassBandL.process(inL)
             val bassR = bassBandR.process(inR)
 
-            val envCoeff = 0.0025f
-            bassEnvelopeL += envCoeff * (abs(bassL) - bassEnvelopeL)
-            bassEnvelopeR += envCoeff * (abs(bassR) - bassEnvelopeR)
-            
-            val dynamicL = 1f + dynamicBassAmount * (1f - (bassEnvelopeL * 8f).coerceIn(0f, 1f))
-            val dynamicR = 1f + dynamicBassAmount * (1f - (bassEnvelopeR * 8f).coerceIn(0f, 1f))
+            // Bajo filtrado para el análisis del flip-flop.
+            val bassL = bassBandL.process(inL)
+            val bassR = bassBandR.process(inR)
 
+            // Cuerpo del resonador en paralelo.
             outL += resonatorL.process(inL) * resonatorMix
             outR += resonatorR.process(inR) * resonatorMix
 
-            // Alimentar el flip-flop con la señal limpia de entrada, no solo bassBand.
-            val subGeneratedL = subL.process(inL) * subMix * dynamicL * 4.5f
-            val subGeneratedR = subR.process(inR) * subMix * dynamicR * 4.5f
-            outL += subGeneratedL
-            outR += subGeneratedR
+            // Generación sísmica directa, sin atenuación por bassEnvelope.
+            val subGeneratedL = subL.process(bassL) * subMix * 3.5f
+            val subGeneratedR = subR.process(bassR) * subMix * 3.5f
 
+            // Soft-clipping independiente del subgrave antes de sumarlo.
+            outL += tanh(subGeneratedL.toDouble()).toFloat()
+            outR += tanh(subGeneratedR.toDouble()).toFloat()
+
+            // Excitador de armónicos secundarios.
             val shapedL = tanh((bassL * exciterDrive).toDouble()).toFloat()
             val shapedR = tanh((bassR * exciterDrive).toDouble()).toFloat()
 
-            val h2Lx = shapedL * shapedL
-            val h2Rx = shapedR * shapedR
+            val excitedL = h2L.process(shapedL * shapedL) * exciterMix +
+                h3L.process(shapedL * shapedL * shapedL) * (exciterMix * 0.5f)
+            val excitedR = h2R.process(shapedR * shapedR) * exciterMix +
+                h3R.process(shapedR * shapedR * shapedR) * (exciterMix * 0.5f)
 
-            val excitedL = h2L.process(h2Lx) * exciterMix + h3L.process(shapedL * shapedL * shapedL) * (exciterMix * 0.5f)
-            val excitedR = h2R.process(h2Rx) * exciterMix + h3R.process(shapedR * shapedR * shapedR) * (exciterMix * 0.5f)
-
-            // Mantener la ruta Float32 equivalente a ShortArray: sumar los armónicos excitados.
             outL += excitedL
             outR += excitedR
 
-            // Para la salida float, aplicamos soft-clipping para proteger amplificadores/audífonos
+            // Limitación suave de la mezcla completa antes de la salida Float32.
             pcm[i] = tanh(outL.toDouble()).toFloat()
             pcm[i + 1] = tanh(outR.toDouble()).toFloat()
         }
