@@ -278,6 +278,7 @@ class AudioEngine(private val context: Context) {
 
             zeusEpicenter?.let {
                 it.enabled = pipelineEnabled
+                it.headphoneMode = settings.headphoneMode
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
@@ -323,6 +324,7 @@ class AudioEngine(private val context: Context) {
             zeusMbc?.processStereo(buffer, n)
             zeusEpicenter?.let {
                 it.enabled = pipelineEnabled
+                it.headphoneMode = settings.headphoneMode
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
