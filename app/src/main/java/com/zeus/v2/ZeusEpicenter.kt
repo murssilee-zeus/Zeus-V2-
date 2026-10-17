@@ -18,6 +18,8 @@ class ZeusEpicenter(
     private val sampleRate: Int
 ) {
     var enabled = true
+    /** Uses one centered mono sub-octave voice for headphone output. */
+    var headphoneMode = false
 
     private val lowL = Biquad(sampleRate)
     private val lowR = Biquad(sampleRate)
@@ -41,6 +43,7 @@ class ZeusEpicenter(
 
     private val subL = SubHarmonic(sampleRate)
     private val subR = SubHarmonic(sampleRate)
+    private val headphoneSub = HeadphoneSubHarmonic(sampleRate)
 
     private var epicenterAmount = 0f
     private var exciterDrive = 1f
@@ -112,6 +115,7 @@ class ZeusEpicenter(
 
         subL.configure(subTarget)
         subR.configure(subTarget)
+        headphoneSub.configure(subTarget.coerceIn(32f, 55f))
     }
 
     fun processStereo(pcm: ShortArray, size: Int = pcm.size) {
@@ -137,8 +141,18 @@ class ZeusEpicenter(
             outR += resonatorR.process(inR) * resonatorMix
 
             // 3. Generación sísmica directa: sin atenuación por bassEnvelope.
-            val subGeneratedL = subL.process(bassL) * subMix * 3.5f
-            val subGeneratedR = subR.process(bassR) * subMix * 3.5f
+            val subGeneratedL: Float
+            val subGeneratedR: Float
+            if (headphoneMode) {
+                // Analyze mono bass and inject the same sub-octave into both channels.
+                val monoBass = (bassL + bassR) * 0.5f
+                val generated = headphoneSub.process(monoBass) * subMix * 1.4f
+                subGeneratedL = generated
+                subGeneratedR = generated
+            } else {
+                subGeneratedL = subL.process(bassL) * subMix * 3.5f
+                subGeneratedR = subR.process(bassR) * subMix * 3.5f
+            }
 
             // 4. Soft-clipping independiente del subgrave antes de sumarlo.
             outL += tanh(subGeneratedL.toDouble()).toFloat()
@@ -185,8 +199,18 @@ class ZeusEpicenter(
             outR += resonatorR.process(inR) * resonatorMix
 
             // Generación sísmica directa, sin atenuación por bassEnvelope.
-            val subGeneratedL = subL.process(bassL) * subMix * 3.5f
-            val subGeneratedR = subR.process(bassR) * subMix * 3.5f
+            val subGeneratedL: Float
+            val subGeneratedR: Float
+            if (headphoneMode) {
+                // Analyze mono bass and inject the same sub-octave into both channels.
+                val monoBass = (bassL + bassR) * 0.5f
+                val generated = headphoneSub.process(monoBass) * subMix * 1.4f
+                subGeneratedL = generated
+                subGeneratedR = generated
+            } else {
+                subGeneratedL = subL.process(bassL) * subMix * 3.5f
+                subGeneratedR = subR.process(bassR) * subMix * 3.5f
+            }
 
             // Soft-clipping independiente del subgrave antes de sumarlo.
             outL += tanh(subGeneratedL.toDouble()).toFloat()
@@ -226,6 +250,7 @@ class ZeusEpicenter(
         resonatorR.reset()
         subL.reset()
         subR.reset()
+        headphoneSub.reset()
         bassEnvelopeL = 0f
         bassEnvelopeR = 0f
     }
