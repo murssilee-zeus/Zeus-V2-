@@ -54,6 +54,25 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
+  Row(
+   Modifier.fillMaxWidth().padding(top=3.dp,bottom=4.dp)
+    .background(ZSUR,RoundedCornerShape(7.dp))
+    .border(1.dp,if(vm.headphoneMode) ZP else ZCY,RoundedCornerShape(7.dp))
+    .padding(horizontal=10.dp,vertical=3.dp),
+   verticalAlignment=Alignment.CenterVertically
+  ){
+   Text("🔊",fontSize=15.sp)
+   Text("ALTAVOCES",color=if(!vm.headphoneMode) ZCY else ZM,fontSize=9.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=4.dp))
+   Spacer(Modifier.weight(1f))
+   Text("SALIDA",color=ZM,fontSize=8.sp,fontWeight=FontWeight.Bold)
+   Switch(
+    checked=vm.headphoneMode,
+    onCheckedChange={vm.headphoneMode=it},
+    modifier=Modifier.padding(horizontal=6.dp).height(30.dp)
+   )
+   Text("🎧",fontSize=15.sp)
+   Text("AUDÍFONOS",color=if(vm.headphoneMode) ZP else ZM,fontSize=9.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=4.dp))
+  }
   if(cfg.screenWidthDp <= cfg.screenHeightDp){
    Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
     listOf("EQ / PUNCH","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
