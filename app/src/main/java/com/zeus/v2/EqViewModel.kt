@@ -53,6 +53,8 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     var audioSessionEnabled by mutableStateOf(false)
     /** Hi-Res acoustic mode. */
     var hiResEnabled by mutableStateOf(false)
+    /** Output tuning selector: false = speakers, true = headphones. */
+    var headphoneMode by mutableStateOf(false)
     var spatialEnabled by mutableStateOf(false)
     var spatialWidth by mutableFloatStateOf(35f)
     var lowShelfEnabled by mutableStateOf(true)
@@ -206,7 +208,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compPostGainLow = compMbPostGainLow, compPostGainLoMid = compMbPostGainLoMid, compPostGainHiMid = compMbPostGainHiMid, compPostGainHigh = compMbPostGainHigh,
         compPreGainLow = compMbPreGainLow, compPreGainLoMid = compMbPreGainLoMid, compPreGainHiMid = compMbPreGainHiMid, compPreGainHigh = compMbPreGainHigh,
         pipelineEnabled = pipelineEnabled, lowShelfEnabled = lowShelfEnabled, peakEnabled = peakBandsEnabled, highShelfEnabled = highShelfEnabled,
-        audioSessionEnabled = audioSessionEnabled, selectedAudioSession = selectedAudioSession, spatialEnabled = spatialEnabled, spatialWidth = spatialWidth,
+        audioSessionEnabled = audioSessionEnabled, selectedAudioSession = selectedAudioSession, spatialEnabled = spatialEnabled, spatialWidth = spatialWidth, headphoneMode = headphoneMode,
         epicenterAmount = punch?.epicenterAmount ?: 0f,
         epicenterDrive = punch?.epicenterDrive ?: 0f,
         epicenterDepth = punch?.epicenterDepth ?: 0f,
@@ -221,7 +223,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         crossoverFrequencies[1] = s.cross2
         crossoverFrequencies[2] = s.cross3
         crossoverFrequencies[3] = s.cross4.coerceIn(crossoverFrequencies[2] + 50f, 20000f)
-        compMbThLow = s.compThLow; compMbThLoMid = s.compThLoMid; compMbThHiMid = s.compThHiMid; compMbThHigh = s.compThHigh; compMbRatioLow = s.compRatioLow; compMbRatioLoMid = s.compRatioLoMid; compMbRatioHiMid = s.compRatioHiMid; compMbRatioHigh = s.compRatioHigh; compMbKneeLow = s.compKneeLow; compMbKneeLoMid = s.compKneeLoMid; compMbKneeHiMid = s.compKneeHiMid; compMbKneeHigh = s.compKneeHigh; compMbAttackLow = s.compAttackLow; compMbAttackLoMid = s.compAttackLoMid; compMbAttackHiMid = s.compAttackHiMid; compMbAttackHigh = s.compAttackHigh; compMbReleaseLow = s.compReleaseLow; compMbReleaseLoMid = s.compReleaseLoMid; compMbReleaseHiMid = s.compReleaseHiMid; compMbReleaseHigh = s.compReleaseHigh; compMbPostGainLow = s.compPostGainLow; compMbPostGainLoMid = s.compPostGainLoMid; compMbPostGainHiMid = s.compPostGainHiMid; compMbPostGainHigh = s.compPostGainHigh; compMbPreGainLow = s.compPreGainLow; compMbPreGainLoMid = s.compPreGainLoMid; compMbPreGainHiMid = s.compPreGainHiMid; compMbPreGainHigh = s.compPreGainHigh; pipelineEnabled = s.pipelineEnabled; lowShelfEnabled = s.lowShelfEnabled; peakBandsEnabled = s.peakEnabled; highShelfEnabled = s.highShelfEnabled; audioSessionEnabled = s.audioSessionEnabled; selectedAudioSession = s.selectedAudioSession; spatialEnabled = s.spatialEnabled; spatialWidth = s.spatialWidth
+        compMbThLow = s.compThLow; compMbThLoMid = s.compThLoMid; compMbThHiMid = s.compThHiMid; compMbThHigh = s.compThHigh; compMbRatioLow = s.compRatioLow; compMbRatioLoMid = s.compRatioLoMid; compMbRatioHiMid = s.compRatioHiMid; compMbRatioHigh = s.compRatioHigh; compMbKneeLow = s.compKneeLow; compMbKneeLoMid = s.compKneeLoMid; compMbKneeHiMid = s.compKneeHiMid; compMbKneeHigh = s.compKneeHigh; compMbAttackLow = s.compAttackLow; compMbAttackLoMid = s.compAttackLoMid; compMbAttackHiMid = s.compAttackHiMid; compMbAttackHigh = s.compAttackHigh; compMbReleaseLow = s.compReleaseLow; compMbReleaseLoMid = s.compReleaseLoMid; compMbReleaseHiMid = s.compReleaseHiMid; compMbReleaseHigh = s.compReleaseHigh; compMbPostGainLow = s.compPostGainLow; compMbPostGainLoMid = s.compPostGainLoMid; compMbPostGainHiMid = s.compPostGainHiMid; compMbPostGainHigh = s.compPostGainHigh; compMbPreGainLow = s.compPreGainLow; compMbPreGainLoMid = s.compPreGainLoMid; compMbPreGainHiMid = s.compPreGainHiMid; compMbPreGainHigh = s.compPreGainHigh; pipelineEnabled = s.pipelineEnabled; lowShelfEnabled = s.lowShelfEnabled; peakBandsEnabled = s.peakEnabled; highShelfEnabled = s.highShelfEnabled; audioSessionEnabled = s.audioSessionEnabled; selectedAudioSession = s.selectedAudioSession; spatialEnabled = s.spatialEnabled; spatialWidth = s.spatialWidth; headphoneMode = s.headphoneMode
     }
 
     fun saveNamedPreset(name: String) { val clean = name.trim(); if (clean.isNotEmpty()) { val settings=toSettings(); EqPrefs.saveNamed(getApplication(), clean, settings); ConfigFileRepository.saveNamed(getApplication(), clean, settings) } }
