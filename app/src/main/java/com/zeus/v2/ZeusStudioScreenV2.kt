@@ -509,8 +509,17 @@ private fun AutoEqSafeCard(vm:EqViewModel){
 }
 
 @Composable private fun EpicenterCard(p:PunchViewModel){
- Card("RECONSTRUCCIÓN DE GRAVE"){
-  Text("Reconstrucción de grave independiente · sólo ZEUS BASS",color=ZM,fontSize=9.sp)
+ Card("EPICENTER · ZEUS BASS"){
+  Text("Grave independiente · sólo ZEUS BASS",color=ZM,fontSize=9.sp)
+  Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(6.dp), modifier=Modifier.fillMaxWidth()){
+   Column(Modifier.weight(1f)){
+    Text("SALIDA DE AUDIO",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold)
+    Text(if(p.epicenterHeadphoneMode) "AUDÍFONOS · grave mono centrado" else "ALTAVOCES · grave estéreo",color=ZM,fontSize=8.sp)
+   }
+   Text("ALTAVOCES",color=if(!p.epicenterHeadphoneMode) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.Bold)
+   Switch(checked=p.epicenterHeadphoneMode,onCheckedChange=p::updateEpicenterHeadphoneMode)
+   Text("AUDÍFONOS",color=if(p.epicenterHeadphoneMode) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.Bold)
+  }
   S("EPICENTER",p.epicenterAmount,0f..100f," %"){p.updateEpicenterAmount(it)}
   S("DRIVE",p.epicenterDrive,0f..100f," %"){p.updateEpicenterDrive(it)}
   S("DEPTH / DEEP",p.epicenterDepth,0f..100f," %"){p.updateEpicenterDepth(it)}
