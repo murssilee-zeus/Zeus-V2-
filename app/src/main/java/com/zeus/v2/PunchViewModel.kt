@@ -25,6 +25,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         private const val KEY_EPIC_HARMONICS = "epicenter_harmonics"
         private const val KEY_EPIC_FREQ = "epicenter_frequency"
         private const val KEY_EPIC_SWEEP = "epicenter_sweep"
+        private const val KEY_EPIC_HEADPHONE_MODE = "epicenter_headphone_mode"
     }
 
     var amount by mutableFloatStateOf(PunchPreset.DEFAULT)
@@ -49,6 +50,8 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var epicenterSweepHz by mutableFloatStateOf(72f)
         private set
+    var epicenterHeadphoneMode by mutableStateOf(false)
+        private set
 
     fun updatePunchAmount(value: Float) { amount = value.coerceIn(0f, 100f) }
     fun updatePunchCenter(value: Float) { centerHz = value.coerceIn(35f, 65f) }
@@ -63,6 +66,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     fun updateEpicenterHarmonics(value: Float) { epicenterHarmonics = value.coerceIn(0f, 100f) }
     fun updateEpicenterFrequency(value: Float) { epicenterFrequencyHz = value.coerceIn(18f, 65f) }
     fun updateEpicenterSweep(value: Float) { epicenterSweepHz = value.coerceIn(40f, 140f) }
+    fun updateEpicenterHeadphoneMode(value: Boolean) { epicenterHeadphoneMode = value }
 
     fun loadSaved() {
         val prefs = getApplication<Application>().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -79,6 +83,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         epicenterHarmonics = prefs.getFloat(KEY_EPIC_HARMONICS, 0f).coerceIn(0f, 100f)
         epicenterFrequencyHz = prefs.getFloat(KEY_EPIC_FREQ, 36f).coerceIn(18f, 65f)
         epicenterSweepHz = prefs.getFloat(KEY_EPIC_SWEEP, 72f).coerceIn(40f, 140f)
+        epicenterHeadphoneMode = prefs.getBoolean(KEY_EPIC_HEADPHONE_MODE, false)
     }
 
     fun save() {
@@ -97,6 +102,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
             .putFloat(KEY_EPIC_HARMONICS, epicenterHarmonics)
             .putFloat(KEY_EPIC_FREQ, epicenterFrequencyHz)
             .putFloat(KEY_EPIC_SWEEP, epicenterSweepHz)
+            .putBoolean(KEY_EPIC_HEADPHONE_MODE, epicenterHeadphoneMode)
             .apply()
     }
 }
