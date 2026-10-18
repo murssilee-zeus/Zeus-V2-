@@ -19,6 +19,17 @@ class ZeusEpicenter(
 ) {
     var enabled = true
 
+    /** En audífonos, centra el subgrave sin reducir su nivel. */
+    @Volatile
+    var headphoneMode: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                subL.reset()
+                subR.reset()
+            }
+        }
+
     private val lowL = Biquad(sampleRate)
     private val lowR = Biquad(sampleRate)
     private val punchL = Biquad(sampleRate)
@@ -84,7 +95,7 @@ class ZeusEpicenter(
         }
 
         val center = target.coerceIn(25f, 80f)
-        val subTarget = target.coerceIn(18f, 50f)
+        val subTarget = if (headphoneMode) target.coerceIn(18f, 55f) else target.coerceIn(18f, 50f)
         
         // CAMBIO 2: Mayor empuje de ecualización en bajas frecuencias (+6dB máx)
         lowL.lowShelf(subTarget, (epicenterAmount * depth * 6f).coerceAtMost(6f))
@@ -137,8 +148,9 @@ class ZeusEpicenter(
             outR += resonatorR.process(inR) * resonatorMix
 
             // 3. Generación sísmica directa: sin atenuación por bassEnvelope.
-            val subGeneratedL = subL.process(bassL) * subMix * 3.5f
-            val subGeneratedR = subR.process(bassR) * subMix * 3.5f
+            val subInput = if (headphoneMode) (bassL + bassR) * 0.5f else 0f
+            val subGeneratedL = subL.process(if (headphoneMode) subInput else bassL) * subMix * 3.5f
+            val subGeneratedR = subR.process(if (headphoneMode) subInput else bassR) * subMix * 3.5f
 
             // 4. Soft-clipping independiente del subgrave antes de sumarlo.
             outL += tanh(subGeneratedL.toDouble()).toFloat()
@@ -185,8 +197,9 @@ class ZeusEpicenter(
             outR += resonatorR.process(inR) * resonatorMix
 
             // Generación sísmica directa, sin atenuación por bassEnvelope.
-            val subGeneratedL = subL.process(bassL) * subMix * 3.5f
-            val subGeneratedR = subR.process(bassR) * subMix * 3.5f
+            val subInput = if (headphoneMode) (bassL + bassR) * 0.5f else 0f
+            val subGeneratedL = subL.process(if (headphoneMode) subInput else bassL) * subMix * 3.5f
+            val subGeneratedR = subR.process(if (headphoneMode) subInput else bassR) * subMix * 3.5f
 
             // Soft-clipping independiente del subgrave antes de sumarlo.
             outL += tanh(subGeneratedL.toDouble()).toFloat()
