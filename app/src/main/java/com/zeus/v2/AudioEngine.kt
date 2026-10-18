@@ -31,6 +31,7 @@ class AudioEngine(private val context: Context) {
     private var atmosEngine: ZeusAtmosEngine? = null
     private var zeusMbc: ZeusMultibandCompressor? = null
     private var zeusEpicenter: ZeusEpicenter? = null
+    @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
 
@@ -477,6 +478,14 @@ class AudioEngine(private val context: Context) {
         applyInputGain()
         applyPostEq()
         zeusEpicenter?.let { applyEpicenter(it) }
+    }
+
+    fun setEpicenterHeadphoneMode(enabled: Boolean) {
+        epicenterHeadphoneMode = enabled
+        zeusEpicenter?.let {
+            it.headphoneMode = enabled
+            applyEpicenter(it)
+        }
     }
 
     fun setEpicenterControls(
@@ -1168,6 +1177,7 @@ class AudioEngine(private val context: Context) {
     ) {
         val epicenter = target ?: return
 
+        epicenter.headphoneMode = epicenterHeadphoneMode
         epicenter.configure(
             settings.epicenterAmount,
             settings.epicenterDrive,
