@@ -139,6 +139,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             SubSismoCard(vm)
             PunchCard(punch,vm)
             EpicenterCard(punch)
+            SplMeterCard(punch)
         }
         Column(Modifier.width(pageWidth).fillMaxHeight().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
             ConsolePageHeader("02","DYNAMICS","CROSSOVER + COMPRESSOR","PROCESSING",ZCY)
@@ -200,7 +201,8 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
    Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
-   SubSismoCard(vm); PunchCard(punch,vm); EpicenterCard(punch); SpatialCard(vm); Pipe(vm)
+   SubSismoCard(vm); PunchCard(punch,vm); EpicenterCard(punch)
+            SplMeterCard(punch); SpatialCard(vm); Pipe(vm)
   }
  }
 }
@@ -313,7 +315,8 @@ private fun HarmanTargetsCard(vm:EqViewModel){
    Column(Modifier.weight(1f)){
     SubSismoCard(vm)
    }
-   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); EpicenterCard(punch); SpatialCard(vm) }
+   Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); EpicenterCard(punch)
+            SplMeterCard(punch); SpatialCard(vm) }
    Column(Modifier.weight(.9f)){ Card("HEADROOM") {
     S("HEADROOM",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
     Text("Protección de salida",color=ZM,fontSize=8.sp)
@@ -505,6 +508,27 @@ private fun AutoEqSafeCard(vm:EqViewModel){
   S("POWER",vm.subBoost,0f..12f," dB"){vm.subBoost=it}
   S("FREQ",vm.subFrequencyHz,18f..90f," Hz"){vm.subFrequencyHz=it}
   Text("SUB/SISMO → MBC → PUNCH → LIMITER",color=ZM,fontSize=8.sp)
+ }
+}
+
+@Composable private fun SplMeterCard(p: PunchViewModel) {
+ Card("ZEUS LEVEL METER · dBFS") {
+  Text("MEDICIÓN DIGITAL DEL PCM PROCESADO · NO ES dB SPL ACÚSTICO",color=ZM,fontSize=7.sp)
+  MeterBar("MASTER RMS",p.meterMasterRmsDbfs,ZCY)
+  MeterBar("PEAK",p.meterPeakDbfs,ZPK)
+  MeterBar("SUB / SISMI · 18–90 Hz",p.meterSubRmsDbfs,ZP)
+  MeterBar("EPICENTER · SUB SINTETIZADO",p.meterEpicenterRmsDbfs,ZOR)
+ }
+}
+
+@Composable private fun MeterBar(label: String, value: Float, accent: Color) {
+ val level = ((value + 60f) / 60f).coerceIn(0f,1f)
+ Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+  Text(label,color=ZM,fontSize=7.sp,fontWeight=FontWeight.Bold,modifier=Modifier.width(132.dp))
+  Box(Modifier.weight(1f).height(8.dp).background(ZGRID,RoundedCornerShape(4.dp)).clip(RoundedCornerShape(4.dp))) {
+   Box(Modifier.fillMaxHeight().fillMaxWidth(level).background(accent,RoundedCornerShape(4.dp)))
+  }
+  Text(if(value <= -119f) "−∞" else String.format(java.util.Locale.US,"%.1f",value),color=ZT,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.width(38.dp),textAlign=TextAlign.End)
  }
 }
 
