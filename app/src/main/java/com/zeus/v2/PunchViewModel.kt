@@ -53,6 +53,22 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     var epicenterHeadphoneMode by mutableStateOf(false)
         private set
 
+    var meterMasterRmsDbfs by mutableFloatStateOf(-120f)
+        private set
+    var meterPeakDbfs by mutableFloatStateOf(-120f)
+        private set
+    var meterSubRmsDbfs by mutableFloatStateOf(-120f)
+        private set
+    var meterEpicenterRmsDbfs by mutableFloatStateOf(-120f)
+        private set
+
+    fun updateMeters(masterRmsDbfs: Float, peakDbfs: Float, subRmsDbfs: Float, epicenterRmsDbfs: Float) {
+        meterMasterRmsDbfs = masterRmsDbfs.coerceIn(-120f, 0f)
+        meterPeakDbfs = peakDbfs.coerceIn(-120f, 0f)
+        meterSubRmsDbfs = subRmsDbfs.coerceIn(-120f, 0f)
+        meterEpicenterRmsDbfs = epicenterRmsDbfs.coerceIn(-120f, 0f)
+    }
+
     fun updatePunchAmount(value: Float) { amount = value.coerceIn(0f, 100f) }
     fun updatePunchCenter(value: Float) { centerHz = value.coerceIn(35f, 65f) }
     fun updatePunchQ(value: Float) { q = value.coerceIn(0.5f, 3.0f) }
