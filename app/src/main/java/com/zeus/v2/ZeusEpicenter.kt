@@ -7,6 +7,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.pow
 import kotlin.math.tanh
+import kotlin.math.log10
 
 /**
  * Zeus Bass low-frequency reconstruction stage - SEISMIC EDITION.
@@ -18,6 +19,10 @@ class ZeusEpicenter(
     private val sampleRate: Int
 ) {
     var enabled = true
+
+    /** RMS del subgrave sintetizado en el último bloque PCM, en dBFS. */
+    @Volatile var lastSubRmsDbfs: Float = -120f
+        private set
 
     /** En audífonos, centra el subgrave sin reducir su nivel. */
     @Volatile
@@ -126,9 +131,11 @@ class ZeusEpicenter(
     }
 
     fun processStereo(pcm: ShortArray, size: Int = pcm.size) {
-        if (!enabled || epicenterAmount <= 0f) return
+        if (!enabled || epicenterAmount <= 0f) { lastSubRmsDbfs = -120f; return }
 
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        var subEnergy = 0.0
+        var subSamples = 0
         for (i in 0 until n step 2) {
             val inL = pcm[i] / 32768f
             val inR = pcm[i + 1] / 32768f
@@ -151,6 +158,8 @@ class ZeusEpicenter(
             val subInput = if (headphoneMode) (bassL + bassR) * 0.5f else 0f
             val subGeneratedL = subL.process(if (headphoneMode) subInput else bassL) * subMix * 3.5f
             val subGeneratedR = subR.process(if (headphoneMode) subInput else bassR) * subMix * 3.5f
+            subEnergy += subGeneratedL.toDouble() * subGeneratedL + subGeneratedR.toDouble() * subGeneratedR
+            subSamples += 2
 
             // 4. Soft-clipping independiente del subgrave antes de sumarlo.
             outL += tanh(subGeneratedL.toDouble()).toFloat()
@@ -172,12 +181,15 @@ class ZeusEpicenter(
             pcm[i] = toShort(tanh(outL.toDouble()).toFloat())
             pcm[i + 1] = toShort(tanh(outR.toDouble()).toFloat())
         }
+        lastSubRmsDbfs = if (subSamples > 0 && subEnergy > 0.0) (20.0 * log10(sqrt(subEnergy / subSamples))).toFloat().coerceIn(-120f, 0f) else -120f
     }
 
     fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
-        if (!enabled || epicenterAmount <= 0f) return
+        if (!enabled || epicenterAmount <= 0f) { lastSubRmsDbfs = -120f; return }
 
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        var subEnergy = 0.0
+        var subSamples = 0
         for (i in 0 until n step 2) {
             val inL = pcm[i]
             val inR = pcm[i + 1]
@@ -200,6 +212,8 @@ class ZeusEpicenter(
             val subInput = if (headphoneMode) (bassL + bassR) * 0.5f else 0f
             val subGeneratedL = subL.process(if (headphoneMode) subInput else bassL) * subMix * 3.5f
             val subGeneratedR = subR.process(if (headphoneMode) subInput else bassR) * subMix * 3.5f
+            subEnergy += subGeneratedL.toDouble() * subGeneratedL + subGeneratedR.toDouble() * subGeneratedR
+            subSamples += 2
 
             // Soft-clipping independiente del subgrave antes de sumarlo.
             outL += tanh(subGeneratedL.toDouble()).toFloat()
@@ -221,6 +235,7 @@ class ZeusEpicenter(
             pcm[i] = tanh(outL.toDouble()).toFloat()
             pcm[i + 1] = tanh(outR.toDouble()).toFloat()
         }
+        lastSubRmsDbfs = if (subSamples > 0 && subEnergy > 0.0) (20.0 * log10(sqrt(subEnergy / subSamples))).toFloat().coerceIn(-120f, 0f) else -120f
     }
 
     /** Limpia estados internos al detener o reiniciar la ruta PCM. */
@@ -239,6 +254,7 @@ class ZeusEpicenter(
         resonatorR.reset()
         subL.reset()
         subR.reset()
+        lastSubRmsDbfs = -120f
         bassEnvelopeL = 0f
         bassEnvelopeR = 0f
     }
