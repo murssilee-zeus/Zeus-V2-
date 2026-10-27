@@ -383,7 +383,7 @@ class AudioEngine(private val context: Context) {
         splMasterRmsDbfs = toDbfs(if (samples > 0) sqrt(energy / samples).toFloat() else 0f)
         splPeakDbfs = toDbfs(peak)
         splSubRmsDbfs = toDbfs(if (subSamples > 0) sqrt(subEnergy / subSamples).toFloat() else 0f)
-        splEpicenterRmsDbfs = zeusEpicenter?.lastSubRmsDbfs ?: -120f
+        splEpicenterRmsDbfs = if (!hiResEnabled && !settings.spatialEnabled && pipelineEnabled) zeusEpicenter?.lastSubRmsDbfs ?: -120f else -120f
     }
 
     private fun publishPcmMeters(buffer: FloatArray, size: Int) {
@@ -410,7 +410,7 @@ class AudioEngine(private val context: Context) {
         splMasterRmsDbfs = toDbfs(if (samples > 0) sqrt(energy / samples).toFloat() else 0f)
         splPeakDbfs = toDbfs(peak)
         splSubRmsDbfs = toDbfs(if (subSamples > 0) sqrt(subEnergy / subSamples).toFloat() else 0f)
-        splEpicenterRmsDbfs = zeusEpicenter?.lastSubRmsDbfs ?: -120f
+        splEpicenterRmsDbfs = if (!hiResEnabled && !settings.spatialEnabled && pipelineEnabled) zeusEpicenter?.lastSubRmsDbfs ?: -120f else -120f
     }
 
     private fun toDbfs(amplitude: Float): Float =
