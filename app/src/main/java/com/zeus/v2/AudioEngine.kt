@@ -60,6 +60,18 @@ class AudioEngine(private val context: Context) {
     var spectrumData: FloatArray = FloatArray(128) { 0f }
         private set
 
+    // Live digital meters sampled from the actual processed PCM output. Values are dBFS, not acoustic dB SPL.
+    @Volatile var splMasterRmsDbfs: Float = -120f
+        private set
+    @Volatile var splPeakDbfs: Float = -120f
+        private set
+    @Volatile var splSubRmsDbfs: Float = -120f
+        private set
+    @Volatile var splEpicenterRmsDbfs: Float = -120f
+        private set
+    private var meterSubL: Biquad? = null
+    private var meterSubR: Biquad? = null
+
     @Volatile
     var isEnabled = false
         private set
@@ -199,6 +211,12 @@ class AudioEngine(private val context: Context) {
     fun enablePcmAtmos(sampleRate: Int = 48000) {
 
         pcmRouteSampleRateHz = sampleRate
+        meterSubL = Biquad(sampleRate).also { it.bandPass(48f, 0.55f) }
+        meterSubR = Biquad(sampleRate).also { it.bandPass(48f, 0.55f) }
+        splMasterRmsDbfs = -120f
+        splPeakDbfs = -120f
+        splSubRmsDbfs = -120f
+        splEpicenterRmsDbfs = -120f
 
         atmosEngine =
             ZeusAtmosEngine(sampleRate).also {
@@ -293,6 +311,7 @@ class AudioEngine(private val context: Context) {
             }
         }
 
+        publishPcmMeters(buffer, n)
         return pcmBuffer?.write(
             buffer,
             0,
@@ -333,11 +352,70 @@ class AudioEngine(private val context: Context) {
                 it.processAtmosPCM(buffer, n)
             }
         }
+        publishPcmMeters(buffer, n)
         return pcmFloatBuffer?.write(buffer, 0, n) ?: 0
     }
 
     fun readProcessedPcm(output: FloatArray, size: Int = output.size): Int =
         pcmFloatBuffer?.read(output, 0, size) ?: 0
+
+    private fun publishPcmMeters(buffer: ShortArray, size: Int) {
+        var energy = 0.0
+        var subEnergy = 0.0
+        var peak = 0f
+        var samples = 0
+        var subSamples = 0
+        val lowL = meterSubL
+        val lowR = meterSubR
+        for (i in 0 until size step 2) {
+            val left = buffer[i] / 32768f
+            val right = buffer[i + 1] / 32768f
+            energy += left.toDouble() * left + right.toDouble() * right
+            peak = maxOf(peak, abs(left), abs(right))
+            samples += 2
+            if (lowL != null && lowR != null) {
+                val subL = lowL.process(left)
+                val subR = lowR.process(right)
+                subEnergy += subL.toDouble() * subL + subR.toDouble() * subR
+                subSamples += 2
+            }
+        }
+        splMasterRmsDbfs = toDbfs(if (samples > 0) sqrt(energy / samples).toFloat() else 0f)
+        splPeakDbfs = toDbfs(peak)
+        splSubRmsDbfs = toDbfs(if (subSamples > 0) sqrt(subEnergy / subSamples).toFloat() else 0f)
+        splEpicenterRmsDbfs = zeusEpicenter?.lastSubRmsDbfs ?: -120f
+    }
+
+    private fun publishPcmMeters(buffer: FloatArray, size: Int) {
+        var energy = 0.0
+        var subEnergy = 0.0
+        var peak = 0f
+        var samples = 0
+        var subSamples = 0
+        val lowL = meterSubL
+        val lowR = meterSubR
+        for (i in 0 until size step 2) {
+            val left = buffer[i].coerceIn(-1f, 1f)
+            val right = buffer[i + 1].coerceIn(-1f, 1f)
+            energy += left.toDouble() * left + right.toDouble() * right
+            peak = maxOf(peak, abs(left), abs(right))
+            samples += 2
+            if (lowL != null && lowR != null) {
+                val subL = lowL.process(left)
+                val subR = lowR.process(right)
+                subEnergy += subL.toDouble() * subL + subR.toDouble() * subR
+                subSamples += 2
+            }
+        }
+        splMasterRmsDbfs = toDbfs(if (samples > 0) sqrt(energy / samples).toFloat() else 0f)
+        splPeakDbfs = toDbfs(peak)
+        splSubRmsDbfs = toDbfs(if (subSamples > 0) sqrt(subEnergy / subSamples).toFloat() else 0f)
+        splEpicenterRmsDbfs = zeusEpicenter?.lastSubRmsDbfs ?: -120f
+    }
+
+    private fun toDbfs(amplitude: Float): Float =
+        if (amplitude <= 1e-6f || !amplitude.isFinite()) -120f
+        else (20.0 * log10(amplitude.toDouble())).toFloat().coerceIn(-120f, 0f)
 
     fun release() {
 
