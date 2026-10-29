@@ -1348,7 +1348,48 @@ class AudioEngine(private val context: Context) {
                         visualizer: Visualizer?,
                         waveform: ByteArray?,
                         samplingRate: Int
-                    ) = Unit
+                    ) {
+                        // Fallback meters for the Android-effects route, where the
+                        // custom PCM bus is not running. Visualizer waveform is unsigned 8-bit PCM.
+                        if (pcmAtmosEnabled || waveform == null || waveform.isEmpty()) return
+
+                        val sr = (samplingRate / 1000).coerceIn(8000, 192000)
+                        if (meterSubL == null || pcmRouteSampleRateHz != sr) {
+                            meterSubL = Biquad(sr).also { it.bandPass(48f, 0.55f) }
+                            meterSubR = Biquad(sr).also { it.bandPass(48f, 0.55f) }
+                        }
+
+                        var energy = 0.0
+                        var subEnergy = 0.0
+                        var peak = 0f
+                        var count = 0
+                        val lowL = meterSubL
+                        val lowR = meterSubR
+
+                        for (sample in waveform) {
+                            val x = ((sample.toInt() and 0xFF) - 128) / 128f
+                            energy += x.toDouble() * x
+                            peak = maxOf(peak, abs(x))
+                            val low = lowL?.process(x) ?: 0f
+                            // Mono waveform capture: one filtered stream is enough.
+                            subEnergy += low.toDouble() * low
+                            count++
+                        }
+
+                        val master = toDbfs(if (count > 0) sqrt(energy / count).toFloat() else 0f)
+                        val sub = toDbfs(if (count > 0) sqrt(subEnergy / count).toFloat() else 0f)
+                        splMasterRmsDbfs = master
+                        splPeakDbfs = toDbfs(peak)
+                        splSubRmsDbfs = sub
+
+                        // In the Android-effects fallback, Epicenter is an EQ-based
+                        // low-frequency contour, not the custom sub-synth stage.
+                        // Show its measured low-band activity only when Bass is active.
+                        splEpicenterRmsDbfs =
+                            if (!hiResEnabled && !settings.spatialEnabled && pipelineEnabled &&
+                                (settings.bassAmount > 0f || settings.subBoost > 0f)) sub
+                            else -120f
+                    }
 
                     override fun onFftDataCapture(
                         visualizer: Visualizer?,
@@ -1481,7 +1522,7 @@ class AudioEngine(private val context: Context) {
                     }
                 },
                 Visualizer.getMaxCaptureRate(),
-                false,
+                true,
                 true
             )
 
