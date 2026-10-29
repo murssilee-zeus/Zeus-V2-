@@ -1354,7 +1354,7 @@ class AudioEngine(private val context: Context) {
                         if (pcmAtmosEnabled || waveform == null || waveform.isEmpty()) return
 
                         val sr = (samplingRate / 1000).coerceIn(8000, 192000)
-                        if (meterSubL == null || pcmRouteSampleRateHz != sr) {
+                        if (meterSubL == null || meterSubR == null) {
                             meterSubL = Biquad(sr).also { it.bandPass(48f, 0.55f) }
                             meterSubR = Biquad(sr).also { it.bandPass(48f, 0.55f) }
                         }
