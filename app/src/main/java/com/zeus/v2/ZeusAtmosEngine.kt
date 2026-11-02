@@ -70,11 +70,10 @@ class ZeusAtmosEngine(
     fun processAtmosPCM(pcmBuffer: ShortArray, size: Int = pcmBuffer.size) {
         val count = size.coerceIn(0, pcmBuffer.size - pcmBuffer.size % 2)
         if (count < 2) return
-        for (i in 0 until count) pcmBuffer[i] = pcmBuffer[i]
-        processFrames(count) { i, l, r ->
+        processFrames(count, { i, l, r ->
             pcmBuffer[i] = (softClip(l) * 32767f).toInt().toShort()
             pcmBuffer[i + 1] = (softClip(r) * 32767f).toInt().toShort()
-        } { i -> Pair(pcmBuffer[i] / 32768f, pcmBuffer[i + 1] / 32768f) }
+        }, { i -> Pair(pcmBuffer[i] / 32768f, pcmBuffer[i + 1] / 32768f) })
     }
 
     /** Float32 path avoids quantization between DSP stages. */
@@ -87,7 +86,7 @@ class ZeusAtmosEngine(
         }, { i -> Pair(pcmBuffer[i], pcmBuffer[i + 1]) })
     }
 
-    private inline fun processFrames(
+    private fun processFrames(
         count: Int,
         write: (Int, Float, Float) -> Unit,
         read: (Int) -> Pair<Float, Float>
