@@ -12,8 +12,8 @@ import kotlin.math.tanh
  *
  * The low band remains protected from ITD/spatial widening. Spatial energy
  * is progressively introduced through low-mid, high-mid and high bands.
- * This keeps the previous Zeus sonic character while making the crossover
- * behavior substantially more controlled than the former one-pole split.
+ * Center content stays at unity by default; restrained interaural delay,
+ * level and depth cues aim for externalization without turning the sides into echo.
  */
 class ZeusAtmosEngine(
     private val sampleRate: Int = 44100
@@ -111,13 +111,16 @@ class ZeusAtmosEngine(
             val depthB = sideDelay[wrap(depthBase - 1, sideDelay.size)]
             val depthSide = depthA * (1f - depthFrac) + depthB * depthFrac
             delayIndex = (delayIndex + 1) % sideDelay.size
-            val airCue = bands.high * (0.10f + 0.12f * height3D) * height3D
-            val sideGain = 1f + immersion * (1.15f + 0.25f * height3D)
-            val delayedMix = immersion * (0.34f + 0.10f * height3D)
-            val depthMix = immersion * (0.12f + 0.10f * height3D)
-            val ild = immersion * (0.045f + 0.035f * height3D)
+            // DTS-inspired cues: keep the phantom center untouched and use
+            // restrained interaural differences instead of simply blasting the side channel.
+            // The previous >2x side gain could make peaks flatten and the image sound phasey.
+            val airCue = bands.high * (0.045f + 0.055f * height3D) * height3D
+            val sideGain = 1f + immersion * (0.42f + 0.12f * height3D)
+            val delayedMix = immersion * (0.16f + 0.06f * height3D)
+            val depthMix = immersion * (0.055f + 0.045f * height3D)
+            val ild = immersion * (0.022f + 0.018f * height3D)
             val sideLeft = spatialInput * sideGain * (1f + ild) + delayedSide * delayedMix + depthSide * depthMix + airCue
-            val sideRight = delayedSide * sideGain * (1f + ild) + spatialInput * delayedMix + depthSide * depthMix + airCue
+            val sideRight = delayedSide * sideGain * (1f - ild) + spatialInput * delayedMix + depthSide * depthMix + airCue
 
             // Reinsert the protected low band naturally. Mid receives center focus.
             val outMid = mid * centerGain
@@ -176,13 +179,16 @@ class ZeusAtmosEngine(
             val depthB = sideDelay[wrap(depthBase - 1, sideDelay.size)]
             val depthSide = depthA * (1f - depthFrac) + depthB * depthFrac
             delayIndex = (delayIndex + 1) % sideDelay.size
-            val airCue = bands.high * (0.10f + 0.12f * height3D) * height3D
-            val sideGain = 1f + immersion * (1.15f + 0.25f * height3D)
-            val delayedMix = immersion * (0.34f + 0.10f * height3D)
-            val depthMix = immersion * (0.12f + 0.10f * height3D)
-            val ild = immersion * (0.045f + 0.035f * height3D)
+            // DTS-inspired cues: keep the phantom center untouched and use
+            // restrained interaural differences instead of simply blasting the side channel.
+            // The previous >2x side gain could make peaks flatten and the image sound phasey.
+            val airCue = bands.high * (0.045f + 0.055f * height3D) * height3D
+            val sideGain = 1f + immersion * (0.42f + 0.12f * height3D)
+            val delayedMix = immersion * (0.16f + 0.06f * height3D)
+            val depthMix = immersion * (0.055f + 0.045f * height3D)
+            val ild = immersion * (0.022f + 0.018f * height3D)
             val sideLeft = spatialInput * sideGain * (1f + ild) + delayedSide * delayedMix + depthSide * depthMix + airCue
-            val sideRight = delayedSide * sideGain * (1f + ild) + spatialInput * delayedMix + depthSide * depthMix + airCue
+            val sideRight = delayedSide * sideGain * (1f - ild) + spatialInput * delayedMix + depthSide * depthMix + airCue
 
             // Reinsert the protected low band naturally. Mid receives center focus.
             val outMid = mid * centerGain
