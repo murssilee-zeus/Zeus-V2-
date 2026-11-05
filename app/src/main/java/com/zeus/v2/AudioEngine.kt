@@ -31,6 +31,8 @@ class AudioEngine(private val context: Context) {
     private var atmosEngine: ZeusAtmosEngine? = null
     private var zeusMbc: ZeusMultibandCompressor? = null
     private var zeusEpicenter: ZeusEpicenter? = null
+    private var zeusHiResImpact: ZeusHiResImpact? = null
+    private var zeusSubSismi: ZeusSubSismi? = null
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
@@ -238,6 +240,10 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
             }
 
+        zeusHiResImpact = ZeusHiResImpact(sampleRate)
+        zeusSubSismi = ZeusSubSismi(sampleRate)
+        applyHiResBassStages()
+
         pcmBuffer = ZeusPcmBuffer()
         pcmFloatBuffer = ZeusFloatPcmBuffer()
 
@@ -260,6 +266,8 @@ class AudioEngine(private val context: Context) {
         atmosEngine?.reset()
         zeusMbc?.reset()
         zeusEpicenter?.reset()
+        zeusHiResImpact?.reset()
+        zeusSubSismi?.reset()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
@@ -294,6 +302,11 @@ class AudioEngine(private val context: Context) {
             // EXPERIMENT: run the custom Zeus bass bus in Normal and Hi-Res.
             // Android DynamicsProcessing remains bypassed in Hi-Res.
             if (pipelineEnabled) zeusMbc?.processStereo(buffer, n)
+            if (hiResEnabled && pipelineEnabled) {
+                applyHiResBassStages()
+                zeusHiResImpact?.processStereo(buffer, n)
+                zeusSubSismi?.processStereo(buffer, n)
+            }
             zeusEpicenter?.let {
                 it.enabled = pipelineEnabled
                 applyEpicenter(it)
@@ -430,6 +443,8 @@ class AudioEngine(private val context: Context) {
         atmosEngine = null
         zeusMbc = null
         zeusEpicenter = null
+        zeusHiResImpact = null
+        zeusSubSismi = null
         pcmBuffer = null
         pcmFloatBuffer = null
 
@@ -484,6 +499,7 @@ class AudioEngine(private val context: Context) {
         }
 
         applyAll()
+        applyHiResBassStages()
 
         val routeDescription = if (pcmAtmosEnabled) {
             "capture/output PCM16 stereo at ${pcmRouteSampleRateHz ?: "unknown"} Hz"
@@ -555,6 +571,7 @@ class AudioEngine(private val context: Context) {
 
         applyInputGain()
         applyPostEq()
+        applyHiResBassStages()
         zeusEpicenter?.let { applyEpicenter(it) }
     }
 
@@ -603,6 +620,7 @@ class AudioEngine(private val context: Context) {
 
         applyInputGain()
         applyPostEq()
+        applyHiResBassStages()
         zeusEpicenter?.let { applyEpicenter(it) }
 
         Log.i(
@@ -1248,6 +1266,11 @@ class AudioEngine(private val context: Context) {
                 settings.compPostGainHigh
             )
         )
+    }
+
+    private fun applyHiResBassStages() {
+        zeusHiResImpact?.configure(settings.bassPunch)
+        zeusSubSismi?.configure(settings.bassAmount, bassFrequencyHz, settings.bassMono)
     }
 
     private fun applyEpicenter(
