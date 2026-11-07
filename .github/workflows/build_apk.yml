@@ -1,6 +1,6 @@
 name: Build Zeus-V2 APK
 
-# Cross 4 UI verification build.
+# Build normal APKs; publish a downloadable prerelease for Bass Evolution only.
 on:
   push:
     branches: [ main, master, fix/punch-v2, fix/cross4-controls-v2, feature/zeus-bass-evolution ]
@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,8 +66,21 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Zeus-V2-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish Bass Evolution prerelease
+        if: github.ref == 'refs/heads/feature/zeus-bass-evolution' && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: zeus-bass-evolution-build-${{ github.run_number }}-${{ github.run_attempt }}
+          name: Zeus Bass Evolution build ${{ github.run_number }}
+          prerelease: true
+          generate_release_notes: true
+          files: app/build/outputs/apk/debug/*.apk
+          fail_on_unmatched_files: true
