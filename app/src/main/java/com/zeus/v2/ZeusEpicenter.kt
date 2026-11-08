@@ -89,7 +89,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
         val subRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.24 + depth * 0.30)))).toFloat()
         val voiceCoeff = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.045))).toFloat()
         val holdLength = (sr * (0.045 + depth * 0.11)).toInt()
-        val gain = (0.24f + amount * 0.72f + drive * 0.30f) *
+        val gain = (0.62f + amount * 1.18f + drive * 0.62f) *
             (if (headphoneMode) 0.52f else 1f)
 
         for (i in 0 until n step 2) {
@@ -106,11 +106,11 @@ class ZeusEpicenter(private val sampleRate: Int) {
             env110 += (if (b3 > env110) attack else release) * (b3 - env110)
 
             val detector = (env55 * 0.52f + env80 * 0.34f + env110 * 0.14f)
-            if (detector > 0.0022f) holdSamples = holdLength
+            if (detector > 0.00035f) holdSamples = holdLength
             else if (holdSamples > 0) holdSamples--
 
             val hold = if (holdSamples > 0) 1f else 0.68f
-            val detectorDrive = (detector * (7.0f + drive * 9.0f)).coerceIn(0f, 1f)
+            val detectorDrive = (detector * (22.0f + drive * 30.0f)).coerceIn(0f, 1f)
             val targetEnvelope = detectorDrive * hold
             subEnvelope += (if (targetEnvelope > subEnvelope) attack else subRelease) *
                 (targetEnvelope - subEnvelope)
@@ -118,7 +118,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
             // Keep the synthesized sub centered and suppress excitation caused
             // mostly by wide stereo content rather than bass energy.
             voiceEnvelope += voiceCoeff * (side - voiceEnvelope)
-            val stereoGuard = (1f - (voiceEnvelope / (detector + 0.015f)).coerceIn(0f, 0.7f) * 0.28f)
+            val stereoGuard = (1f - (voiceEnvelope / (detector + 0.025f)).coerceIn(0f, 0.55f) * 0.16f)
             phase += (2.0 * PI * targetHz / sr)
             if (phase >= 2.0 * PI) phase -= 2.0 * PI
             oscillator = sin(phase).toFloat()
@@ -158,7 +158,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
         val subRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.24 + depth * 0.30)))).toFloat()
         val voiceCoeff = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.045))).toFloat()
         val holdLength = (sr * (0.045 + depth * 0.11)).toInt()
-        val gain = (0.24f + amount * 0.72f + drive * 0.30f) *
+        val gain = (0.62f + amount * 1.18f + drive * 0.62f) *
             (if (headphoneMode) 0.52f else 1f)
 
         for (i in 0 until n step 2) {
@@ -175,17 +175,17 @@ class ZeusEpicenter(private val sampleRate: Int) {
             env110 += (if (b3 > env110) attack else release) * (b3 - env110)
 
             val detector = env55 * 0.52f + env80 * 0.34f + env110 * 0.14f
-            if (detector > 0.0022f) holdSamples = holdLength
+            if (detector > 0.00035f) holdSamples = holdLength
             else if (holdSamples > 0) holdSamples--
 
             val hold = if (holdSamples > 0) 1f else 0.68f
-            val detectorDrive = (detector * (7.0f + drive * 9.0f)).coerceIn(0f, 1f)
+            val detectorDrive = (detector * (22.0f + drive * 30.0f)).coerceIn(0f, 1f)
             val targetEnvelope = detectorDrive * hold
             subEnvelope += (if (targetEnvelope > subEnvelope) attack else subRelease) *
                 (targetEnvelope - subEnvelope)
 
             voiceEnvelope += voiceCoeff * (side - voiceEnvelope)
-            val stereoGuard = 1f - (voiceEnvelope / (detector + 0.015f)).coerceIn(0f, 0.7f) * 0.28f
+            val stereoGuard = 1f - (voiceEnvelope / (detector + 0.025f)).coerceIn(0f, 0.55f) * 0.16f
             phase += 2.0 * PI * targetHz / sr
             if (phase >= 2.0 * PI) phase -= 2.0 * PI
             oscillator = sin(phase).toFloat()
