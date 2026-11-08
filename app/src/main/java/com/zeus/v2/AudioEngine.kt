@@ -31,6 +31,7 @@ class AudioEngine(private val context: Context) {
     private var atmosEngine: ZeusAtmosEngine? = null
     private var zeusMbc: ZeusMultibandCompressor? = null
     private var zeusEpicenter: ZeusEpicenter? = null
+    private var zeusDynamicEpicenter: ZeusDynamicEpicenter? = null
     private var zeusBassEvolution: ZeusBassEvolution? = null
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
@@ -242,6 +243,8 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
             }
 
+        zeusDynamicEpicenter = ZeusDynamicEpicenter(sampleRate).also { applyDynamicEpicenter(it) }
+
         pcmBuffer = ZeusPcmBuffer()
         pcmFloatBuffer = ZeusFloatPcmBuffer()
 
@@ -264,6 +267,7 @@ class AudioEngine(private val context: Context) {
         atmosEngine?.reset()
         zeusMbc?.reset()
         zeusEpicenter?.reset()
+        zeusDynamicEpicenter?.reset()
         zeusBassEvolution?.reset()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
@@ -305,6 +309,7 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
+            zeusDynamicEpicenter?.let { it.configure(settings.epicenterAmount, pipelineEnabled, epicenterHeadphoneMode); it.processStereo(buffer, n) }
         } else if (!hiResEnabled && settings.spatialEnabled) {
             // ZEUS SPATIAL: spatial processor only; no bass reconstruction
             // or multiband compression from the PCM bus.
@@ -352,6 +357,7 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
+            zeusDynamicEpicenter?.let { it.configure(settings.epicenterAmount, pipelineEnabled, epicenterHeadphoneMode); it.processStereo(buffer, n) }
         } else if (!hiResEnabled && settings.spatialEnabled) {
             atmosEngine?.let {
                 it.atmosImmersion = settings.spatialWidth.coerceIn(0f, 100f) / 100f
@@ -436,6 +442,8 @@ class AudioEngine(private val context: Context) {
         atmosEngine = null
         zeusMbc = null
         zeusEpicenter = null
+        zeusDynamicEpicenter?.reset()
+        zeusDynamicEpicenter = null
         zeusBassEvolution = null
         pcmBuffer = null
         pcmFloatBuffer = null
@@ -1264,6 +1272,14 @@ class AudioEngine(private val context: Context) {
             rumblePercent = settings.bassAmount,
             punchPercent = settings.bassPunch,
             enabled = pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
+        )
+    }
+
+    private fun applyDynamicEpicenter(target: ZeusDynamicEpicenter? = zeusDynamicEpicenter) {
+        target?.configure(
+            epicenterPercent = settings.epicenterAmount,
+            active = pipelineEnabled && !hiResEnabled && !settings.spatialEnabled,
+            headphones = epicenterHeadphoneMode
         )
     }
 
