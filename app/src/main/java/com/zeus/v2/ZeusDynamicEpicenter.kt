@@ -35,6 +35,7 @@ class ZeusDynamicEpicenter(sampleRate: Int) {
     private var subHp = 0f
     private var rmsEnergy = 0.0
     private var rmsCount = 0
+    private var pcmFloatScratch = FloatArray(16384)
 
     @Volatile var lastSubRmsDbfs: Float = -120f
         private set
@@ -119,6 +120,7 @@ class ZeusDynamicEpicenter(sampleRate: Int) {
     fun processStereo(pcm: ShortArray, size: Int = pcm.size) {
         if (!enabled) return
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        if (pcmFloatScratch.size < n) pcmFloatScratch = FloatArray(n)
         for (i in 0 until n) pcmFloatScratch[i] = pcm[i] / 32768f
         processStereo(pcmFloatScratch, n)
         for (i in 0 until n) {
@@ -143,8 +145,4 @@ class ZeusDynamicEpicenter(sampleRate: Int) {
         lastSubRmsDbfs = -120f
     }
 
-    companion object {
-        // Large enough for normal Android PCM callbacks; resized only outside DSP loops.
-        private var pcmFloatScratch = FloatArray(16384)
-    }
 }
