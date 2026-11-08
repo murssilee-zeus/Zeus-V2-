@@ -309,7 +309,6 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
-            zeusDynamicEpicenter?.let { it.configure(settings.epicenterAmount, pipelineEnabled, epicenterHeadphoneMode); it.processStereo(buffer, n) }
         } else if (!hiResEnabled && settings.spatialEnabled) {
             // ZEUS SPATIAL: spatial processor only; no bass reconstruction
             // or multiband compression from the PCM bus.
@@ -357,7 +356,6 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
-            zeusDynamicEpicenter?.let { it.configure(settings.epicenterAmount, pipelineEnabled, epicenterHeadphoneMode); it.processStereo(buffer, n) }
         } else if (!hiResEnabled && settings.spatialEnabled) {
             atmosEngine?.let {
                 it.atmosImmersion = settings.spatialWidth.coerceIn(0f, 100f) / 100f
