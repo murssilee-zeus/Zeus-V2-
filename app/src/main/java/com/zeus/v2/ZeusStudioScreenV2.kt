@@ -49,6 +49,8 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
     Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)
     Switch(checked=vm.hiResEnabled,onCheckedChange={enabled->vm.hiResEnabled=enabled;if(enabled)vm.spatialEnabled=false},modifier=Modifier.height(30.dp))
+    Text("EPIC",color=if(vm.hiResEpicenterEnabled) ZPK else ZM,fontSize=7.sp,fontWeight=FontWeight.ExtraBold)
+    Switch(checked=vm.hiResEpicenterEnabled,onCheckedChange={vm.hiResEpicenterEnabled=it},modifier=Modifier.height(30.dp))
     Text("SPATIAL",color=if(vm.spatialEnabled) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=5.dp))
     Switch(checked=vm.spatialEnabled,onCheckedChange={enabled->vm.spatialEnabled=enabled;if(enabled)vm.hiResEnabled=false},modifier=Modifier.height(30.dp))
    }
@@ -551,7 +553,7 @@ private fun AutoEqSafeCard(vm:EqViewModel){
   S("SWEEP · DETECCIÓN",p.epicenterSweepHz,40f..140f," Hz"){p.updateEpicenterSweep(it)}
   S("FREQUENCY · SUBGRAVE",p.epicenterFrequencyHz,18f..65f," Hz"){p.updateEpicenterFrequency(it)}
   Text(if(p.epicenterAmount <= 0f) "OFF · 0 = motor detenido" else "ACTIVO · potencia independiente 0–12",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
-  Text("No actúa en HI-RES ni SPATIAL",color=ZM,fontSize=8.sp)
+  Text("En HI-RES usa el interruptor EPIC; SPATIAL siempre lo excluye.",color=ZM,fontSize=8.sp)
  }
 }
 
