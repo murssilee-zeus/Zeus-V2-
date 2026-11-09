@@ -33,6 +33,8 @@ class AudioEngine(private val context: Context) {
     private var zeusEpicenter: ZeusEpicenter? = null
     private var zeusDynamicEpicenter: ZeusDynamicEpicenter? = null
     private var zeusBassEvolution: ZeusBassEvolution? = null
+    private var zeusHiResImpact: ZeusHiResImpact? = null
+    private var zeusSubSismi: ZeusSubSismi? = null
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
@@ -233,6 +235,9 @@ class AudioEngine(private val context: Context) {
             }
 
         zeusBassEvolution = ZeusBassEvolution(sampleRate).also { applyBassEvolution(it) }
+        zeusHiResImpact = ZeusHiResImpact(sampleRate)
+        zeusSubSismi = ZeusSubSismi(sampleRate)
+        applyHiResBassStages()
 
         zeusEpicenter =
             ZeusEpicenter(sampleRate).also {
@@ -269,6 +274,8 @@ class AudioEngine(private val context: Context) {
         zeusEpicenter?.reset()
         zeusDynamicEpicenter?.reset()
         zeusBassEvolution?.reset()
+        zeusHiResImpact?.reset()
+        zeusSubSismi?.reset()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
@@ -303,6 +310,10 @@ class AudioEngine(private val context: Context) {
             // ZEUS BASS: Rumble/Punch contour, dynamics and independent Epicenter.
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
             zeusMbc?.processStereo(buffer, n)
+            if (pipelineEnabled) {
+                zeusHiResImpact?.processStereo(buffer, n)
+                zeusSubSismi?.processStereo(buffer, n)
+            }
 
             zeusEpicenter?.let {
                 it.enabled = pipelineEnabled
@@ -351,6 +362,10 @@ class AudioEngine(private val context: Context) {
         if (!hiResEnabled && !settings.spatialEnabled) {
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
             zeusMbc?.processStereo(buffer, n)
+            if (pipelineEnabled) {
+                zeusHiResImpact?.processStereo(buffer, n)
+                zeusSubSismi?.processStereo(buffer, n)
+            }
             zeusEpicenter?.let {
                 it.enabled = pipelineEnabled
                 applyEpicenter(it)
@@ -434,6 +449,8 @@ class AudioEngine(private val context: Context) {
         atmosEngine?.reset()
         zeusMbc?.reset()
         zeusEpicenter?.reset()
+        zeusHiResImpact?.reset()
+        zeusSubSismi?.reset()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
@@ -443,6 +460,8 @@ class AudioEngine(private val context: Context) {
         zeusDynamicEpicenter?.reset()
         zeusDynamicEpicenter = null
         zeusBassEvolution = null
+        zeusHiResImpact = null
+        zeusSubSismi = null
         pcmBuffer = null
         pcmFloatBuffer = null
 
@@ -496,6 +515,7 @@ class AudioEngine(private val context: Context) {
             spatialEngine?.setEnabled(false)
         }
 
+        applyHiResBassStages()
         applyAll()
 
         val routeDescription = if (pcmAtmosEnabled) {
@@ -523,6 +543,7 @@ class AudioEngine(private val context: Context) {
             hiResEnabled = false
         }
         settings.spatialEnabled = enabled
+        applyHiResBassStages()
         // Avoid double spatial processing while the PCM spatial engine is active.
         spatialEngine?.setEnabled(enabled && !pcmAtmosEnabled)
         applyAll()
@@ -568,6 +589,7 @@ class AudioEngine(private val context: Context) {
 
         applyInputGain()
         applyPostEq()
+        applyHiResBassStages()
         zeusEpicenter?.let { applyEpicenter(it) }
     }
 
@@ -617,6 +639,7 @@ class AudioEngine(private val context: Context) {
         applyInputGain()
         applyPostEq()
         applyBassEvolution()
+        applyHiResBassStages()
         zeusEpicenter?.let { applyEpicenter(it) }
 
         Log.i(
@@ -653,6 +676,7 @@ class AudioEngine(private val context: Context) {
         applyPostEq()
         applyZeusMbc()
         applyBassEvolution()
+        applyHiResBassStages()
         zeusEpicenter?.let {
             it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
             applyEpicenter(it)
@@ -1270,6 +1294,16 @@ class AudioEngine(private val context: Context) {
             rumblePercent = settings.bassAmount,
             punchPercent = settings.bassPunch,
             enabled = pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
+        )
+    }
+
+    private fun applyHiResBassStages() {
+        val active = pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
+        zeusHiResImpact?.configure(if (active) settings.bassPunch else 0f)
+        zeusSubSismi?.configure(
+            amountPercent = if (active) settings.bassAmount else 0f,
+            frequencyHz = bassFrequencyHz,
+            mono = settings.bassMono
         )
     }
 
