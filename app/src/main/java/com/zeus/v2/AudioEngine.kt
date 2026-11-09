@@ -587,7 +587,7 @@ class AudioEngine(private val context: Context) {
         frequency: Float,
         sweep: Float
     ) {
-        settings.epicenterAmount = amount.coerceIn(0f, 100f)
+        settings.epicenterAmount = amount.coerceIn(0f, 12f)
         settings.epicenterDrive = drive.coerceIn(0f, 100f)
         settings.epicenterDepth = depth.coerceIn(0f, 100f)
         settings.epicenterHarmonics = harmonics.coerceIn(0f, 100f)
