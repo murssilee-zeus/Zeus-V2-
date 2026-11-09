@@ -302,9 +302,9 @@ class AudioEngine(private val context: Context) {
         }
 
         // Route the PCM bus by mode: one processing identity at a time.
-        // HI-RES: leave captured PCM samples untouched (within the current
-        // PCM16/48 kHz capture route). No compressor, bass reconstruction,
-        // spatial widening, or soft clipping is applied here.
+        // HI-RES HYBRID: captured PCM remains untouched except for the
+        // independent Epicenter low-frequency excitation. No MBC, bass
+        // evolution, impact, sub/sismo, spatial widening or general clipping.
         if (!hiResEnabled && !settings.spatialEnabled) {
             // ZEUS BASS: Rumble/Punch contour, dynamics and independent Epicenter.
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
@@ -547,7 +547,7 @@ class AudioEngine(private val context: Context) {
             "Hi-Res mode ${if (enabled) "ON" else "OFF"}; " +
                 "DSP bypass=${enabled}; route=$routeDescription; " +
                 if (enabled && pcmAtmosEnabled) {
-                    "PCM samples pass unchanged, but this route is not true >48 kHz/24-bit Hi-Res"
+                    "Epicenter low-frequency excitation enabled; PCM route is still limited to the capture format, not true >48 kHz/24-bit"
                 } else if (enabled) {
                     "session DSP bypassed; source format/resolution not exposed by this effect"
                 } else {
