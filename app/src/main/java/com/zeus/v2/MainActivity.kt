@@ -201,6 +201,7 @@ class MainActivity : ComponentActivity() {
                     e.setPunch(punch.amount)
                     e.setBassControls(punch.bassAmount, punch.bassMono, punch.bassHarmonics, punch.bassFrequencyHz)
                     e.setHiResEnabled(vm.hiResEnabled)
+                    e.setHiResEpicenterEnabled(vm.hiResEpicenterEnabled)
                     e.applyAll()
                 }
                 Toast.makeText(this@MainActivity, "Configuración importada y aplicada", Toast.LENGTH_SHORT).show()
@@ -213,6 +214,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(vm.bands.toList(), vm.subBoost, vm.subFrequencyHz, punch.amount, punch.bassAmount, punch.bassFrequencyHz, punch.bassMono, punch.bassHarmonics, punch.epicenterAmount, punch.epicenterDrive, punch.epicenterDepth, punch.epicenterHarmonics, punch.epicenterFrequencyHz, punch.epicenterSweepHz, punch.epicenterHeadphoneMode) { audioService?.audioEngine?.setBands(vm.bands.toList()); audioService?.audioEngine?.setSubBoost(vm.subBoost); audioService?.audioEngine?.setSubFrequency(vm.subFrequencyHz); audioService?.audioEngine?.setPunch(punch.amount); audioService?.audioEngine?.setBassControls(punch.bassAmount,punch.bassMono,punch.bassHarmonics,punch.bassFrequencyHz); audioService?.audioEngine?.setEpicenterControls(punch.epicenterAmount,punch.epicenterDrive,punch.epicenterDepth,punch.epicenterHarmonics,punch.epicenterFrequencyHz,punch.epicenterSweepHz); audioService?.audioEngine?.setEpicenterHeadphoneMode(punch.epicenterHeadphoneMode) }
         LaunchedEffect(vm.preamp, vm.headroomTrim) { audioService?.audioEngine?.setPreGain(vm.preamp + vm.headroomTrim) }
         LaunchedEffect(vm.hiResEnabled) { audioService?.audioEngine?.setHiResEnabled(vm.hiResEnabled) }
+        LaunchedEffect(vm.hiResEpicenterEnabled) { audioService?.audioEngine?.setHiResEpicenterEnabled(vm.hiResEpicenterEnabled) }
         LaunchedEffect(vm.spatialEnabled, vm.spatialWidth) { audioService?.audioEngine?.setSpatialEnabled(vm.spatialEnabled); audioService?.audioEngine?.setSpatialWidth(vm.spatialWidth) }
         LaunchedEffect(vm.pipelineEnabled,vm.lowShelfEnabled,vm.peakBandsEnabled,vm.highShelfEnabled) { audioService?.audioEngine?.setPipelineTags(vm.pipelineEnabled,vm.lowShelfEnabled,vm.peakBandsEnabled,vm.highShelfEnabled) }
         LaunchedEffect(vm.limiterEnabled,vm.limiterThreshold,vm.limiterAttack,vm.limiterRelease,vm.limiterRatio,vm.limiterPostGain) { audioService?.audioEngine?.setLimiter(vm.limiterEnabled,vm.limiterThreshold,vm.limiterAttack,vm.limiterRelease,vm.limiterRatio,vm.limiterPostGain) }
