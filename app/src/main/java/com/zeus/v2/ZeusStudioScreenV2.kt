@@ -544,13 +544,13 @@ private fun AutoEqSafeCard(vm:EqViewModel){
    Switch(checked=p.epicenterHeadphoneMode,onCheckedChange=p::updateEpicenterHeadphoneMode)
    Text("AUDÍFONOS",color=if(p.epicenterHeadphoneMode) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.Bold)
   }
-  S("EPICENTER",p.epicenterAmount,0f..100f," %"){p.updateEpicenterAmount(it)}
+  S("POWER",p.epicenterAmount,0f..12f,""){p.updateEpicenterAmount(it)}
   S("DRIVE",p.epicenterDrive,0f..100f," %"){p.updateEpicenterDrive(it)}
   S("DEPTH / DEEP",p.epicenterDepth,0f..100f," %"){p.updateEpicenterDepth(it)}
   S("HARMONICS",p.epicenterHarmonics,0f..100f," %"){p.updateEpicenterHarmonics(it)}
   S("SWEEP · DETECCIÓN",p.epicenterSweepHz,40f..140f," Hz"){p.updateEpicenterSweep(it)}
   S("FREQUENCY · SUBGRAVE",p.epicenterFrequencyHz,18f..65f," Hz"){p.updateEpicenterFrequency(it)}
-  Text(if(p.epicenterAmount <= 0f) "BYPASS REAL · 0% no procesa" else "ACTIVO · reconstrucción subgrave + textura armónica",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
+  Text(if(p.epicenterAmount <= 0f) "OFF · 0 = motor detenido" else "ACTIVO · potencia independiente 0–12",color=if(p.epicenterAmount <= 0f) ZM else ZPK,fontSize=8.sp)
   Text("No actúa en HI-RES ni SPATIAL",color=ZM,fontSize=8.sp)
  }
 }
