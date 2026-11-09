@@ -241,10 +241,9 @@ class AudioEngine(private val context: Context) {
 
         zeusEpicenter =
             ZeusEpicenter(sampleRate).also {
-                it.enabled =
-                    !hiResEnabled &&
-                    !settings.spatialEnabled &&
-                    pipelineEnabled
+                // Hybrid Hi-Res + Epicenter: only the independent low-frequency
+                // exciter is allowed to touch the Hi-Res PCM route.
+                it.enabled = !settings.spatialEnabled && pipelineEnabled
                 applyEpicenter(it)
             }
 
@@ -320,6 +319,14 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
+        } else if (hiResEnabled && !settings.spatialEnabled) {
+            // HI-RES + EPICENTER HYBRID: preserve the PCM signal path and add
+            // only the independent low-frequency Epicenter stage.
+            zeusEpicenter?.let {
+                it.enabled = pipelineEnabled
+                applyEpicenter(it)
+                it.processStereo(buffer, n)
+            }
         } else if (!hiResEnabled && settings.spatialEnabled) {
             // ZEUS SPATIAL: spatial processor only; no bass reconstruction
             // or multiband compression from the PCM bus.
@@ -371,6 +378,14 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
+        } else if (hiResEnabled && !settings.spatialEnabled) {
+            // HI-RES + EPICENTER HYBRID: no MBC, bass evolution, impact or
+            // sub/sismo processing. Epicenter is the only added DSP stage.
+            zeusEpicenter?.let {
+                it.enabled = pipelineEnabled
+                applyEpicenter(it)
+                it.processStereo(buffer, n)
+            }
         } else if (!hiResEnabled && settings.spatialEnabled) {
             atmosEngine?.let {
                 it.atmosImmersion = settings.spatialWidth.coerceIn(0f, 100f) / 100f
@@ -408,7 +423,7 @@ class AudioEngine(private val context: Context) {
         splMasterRmsDbfs = toDbfs(if (samples > 0) sqrt(energy / samples).toFloat() else 0f)
         splPeakDbfs = toDbfs(peak)
         splSubRmsDbfs = toDbfs(if (subSamples > 0) sqrt(subEnergy / subSamples).toFloat() else 0f)
-        splEpicenterRmsDbfs = if (!hiResEnabled && !settings.spatialEnabled && pipelineEnabled) zeusEpicenter?.lastSubRmsDbfs ?: -120f else -120f
+        splEpicenterRmsDbfs = if (!settings.spatialEnabled && pipelineEnabled) zeusEpicenter?.lastSubRmsDbfs ?: -120f else -120f
     }
 
     private fun publishPcmMeters(buffer: FloatArray, size: Int) {
@@ -435,7 +450,7 @@ class AudioEngine(private val context: Context) {
         splMasterRmsDbfs = toDbfs(if (samples > 0) sqrt(energy / samples).toFloat() else 0f)
         splPeakDbfs = toDbfs(peak)
         splSubRmsDbfs = toDbfs(if (subSamples > 0) sqrt(subEnergy / subSamples).toFloat() else 0f)
-        splEpicenterRmsDbfs = if (!hiResEnabled && !settings.spatialEnabled && pipelineEnabled) zeusEpicenter?.lastSubRmsDbfs ?: -120f else -120f
+        splEpicenterRmsDbfs = if (!settings.spatialEnabled && pipelineEnabled) zeusEpicenter?.lastSubRmsDbfs ?: -120f else -120f
     }
 
     private fun toDbfs(amplitude: Float): Float =
@@ -516,6 +531,10 @@ class AudioEngine(private val context: Context) {
         }
 
         applyHiResBassStages()
+        zeusEpicenter?.let {
+            it.enabled = !settings.spatialEnabled && pipelineEnabled
+            applyEpicenter(it)
+        }
         applyAll()
 
         val routeDescription = if (pcmAtmosEnabled) {
@@ -544,6 +563,10 @@ class AudioEngine(private val context: Context) {
         }
         settings.spatialEnabled = enabled
         applyHiResBassStages()
+        zeusEpicenter?.let {
+            it.enabled = !enabled && pipelineEnabled
+            applyEpicenter(it)
+        }
         // Avoid double spatial processing while the PCM spatial engine is active.
         spatialEngine?.setEnabled(enabled && !pcmAtmosEnabled)
         applyAll()
@@ -678,7 +701,7 @@ class AudioEngine(private val context: Context) {
         applyBassEvolution()
         applyHiResBassStages()
         zeusEpicenter?.let {
-            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
+            it.enabled = !settings.spatialEnabled && pipelineEnabled
             applyEpicenter(it)
         }
     }
@@ -806,7 +829,7 @@ class AudioEngine(private val context: Context) {
         applyZeusMbc()
 
         zeusEpicenter?.let {
-            it.enabled = !hiResEnabled && !settings.spatialEnabled && pipelineEnabled
+            it.enabled = !settings.spatialEnabled && pipelineEnabled
             applyEpicenter(it)
         }
 
