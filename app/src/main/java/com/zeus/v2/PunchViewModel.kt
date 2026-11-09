@@ -20,6 +20,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         private const val KEY_BASS_MONO = "bass_mono"
         private const val KEY_BASS_HARMONICS = "bass_harmonics"
         private const val KEY_EPIC_AMOUNT = "epicenter_amount"
+        private const val KEY_EPIC_POWER_SCALE = "epicenter_power_scale_v1"
         private const val KEY_EPIC_DRIVE = "epicenter_drive"
         private const val KEY_EPIC_DEPTH = "epicenter_depth"
         private const val KEY_EPIC_HARMONICS = "epicenter_harmonics"
@@ -76,7 +77,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
     fun updateBassFrequency(value: Float) { bassFrequencyHz = value.coerceIn(25f, 120f) }
     fun updateBassMono(value: Boolean) { bassMono = value }
     fun updateBassHarmonics(value: Float) { bassHarmonics = value.coerceIn(0f, 100f) }
-    fun updateEpicenterAmount(value: Float) { epicenterAmount = value.coerceIn(0f, 100f) }
+    fun updateEpicenterAmount(value: Float) { epicenterAmount = value.coerceIn(0f, 12f) }
     fun updateEpicenterDrive(value: Float) { epicenterDrive = value.coerceIn(0f, 100f) }
     fun updateEpicenterDepth(value: Float) { epicenterDepth = value.coerceIn(0f, 100f) }
     fun updateEpicenterHarmonics(value: Float) { epicenterHarmonics = value.coerceIn(0f, 100f) }
@@ -93,7 +94,8 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
         bassFrequencyHz = prefs.getFloat(KEY_BASS_FREQUENCY, 45f).coerceIn(25f, 120f)
         bassMono = prefs.getBoolean(KEY_BASS_MONO, true)
         bassHarmonics = prefs.getFloat(KEY_BASS_HARMONICS, 0f).coerceIn(0f, 100f)
-        epicenterAmount = prefs.getFloat(KEY_EPIC_AMOUNT, 0f).coerceIn(0f, 100f)
+        val oldEpicenterPower = prefs.getFloat(KEY_EPIC_AMOUNT, 0f)
+        epicenterAmount = if (prefs.getBoolean(KEY_EPIC_POWER_SCALE, false)) oldEpicenterPower.coerceIn(0f, 12f) else (oldEpicenterPower.coerceIn(0f, 100f) * 0.12f).coerceIn(0f, 12f)
         epicenterDrive = prefs.getFloat(KEY_EPIC_DRIVE, 0f).coerceIn(0f, 100f)
         epicenterDepth = prefs.getFloat(KEY_EPIC_DEPTH, 0f).coerceIn(0f, 100f)
         epicenterHarmonics = prefs.getFloat(KEY_EPIC_HARMONICS, 0f).coerceIn(0f, 100f)
@@ -113,6 +115,7 @@ class PunchViewModel(application: Application) : AndroidViewModel(application) {
             .putBoolean(KEY_BASS_MONO, bassMono)
             .putFloat(KEY_BASS_HARMONICS, bassHarmonics)
             .putFloat(KEY_EPIC_AMOUNT, epicenterAmount)
+            .putBoolean(KEY_EPIC_POWER_SCALE, true)
             .putFloat(KEY_EPIC_DRIVE, epicenterDrive)
             .putFloat(KEY_EPIC_DEPTH, epicenterDepth)
             .putFloat(KEY_EPIC_HARMONICS, epicenterHarmonics)
