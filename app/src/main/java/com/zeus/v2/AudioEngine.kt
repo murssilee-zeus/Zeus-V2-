@@ -1288,7 +1288,7 @@ class AudioEngine(private val context: Context) {
 
         epicenter.headphoneMode = epicenterHeadphoneMode
         epicenter.configure(
-            settings.epicenterAmount,
+            (settings.epicenterAmount.coerceIn(0f, 12f) * (100f / 12f)),
             settings.epicenterDrive,
             settings.epicenterDepth,
             settings.epicenterHarmonics,
