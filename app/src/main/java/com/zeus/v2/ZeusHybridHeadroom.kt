@@ -20,12 +20,14 @@ class ZeusHybridHeadroom(
         -1f / (sampleRate.coerceAtLeast(8000) * (releaseMs.coerceIn(20f, 250f) / 1000f))
     )
     private var gain = 1f
+    private var peakEnvelope = 0f
 
     fun processStereo(buffer: FloatArray, size: Int = buffer.size) {
         val n = size.coerceIn(0, buffer.size - buffer.size % 2)
         for (i in 0 until n step 2) {
             val peak = max(abs(buffer[i]), abs(buffer[i + 1]))
-            val target = if (peak > ceiling) ceiling / peak else 1f
+            peakEnvelope = max(peak, peakEnvelope * releaseCoeff)
+            val target = if (peakEnvelope > ceiling) ceiling / peakEnvelope else 1f
             gain = if (target < gain) target else 1f - (1f - gain) * releaseCoeff
             buffer[i] = (buffer[i] * gain).coerceIn(-1f, 1f)
             buffer[i + 1] = (buffer[i + 1] * gain).coerceIn(-1f, 1f)
@@ -38,7 +40,8 @@ class ZeusHybridHeadroom(
             val left = buffer[i] / 32768f
             val right = buffer[i + 1] / 32768f
             val peak = max(abs(left), abs(right))
-            val target = if (peak > ceiling) ceiling / peak else 1f
+            peakEnvelope = max(peak, peakEnvelope * releaseCoeff)
+            val target = if (peakEnvelope > ceiling) ceiling / peakEnvelope else 1f
             gain = if (target < gain) target else 1f - (1f - gain) * releaseCoeff
             buffer[i] = (left * gain * 32768f).toInt().coerceIn(-32768, 32767).toShort()
             buffer[i + 1] = (right * gain * 32768f).toInt().coerceIn(-32768, 32767).toShort()
@@ -47,5 +50,6 @@ class ZeusHybridHeadroom(
 
     fun reset() {
         gain = 1f
+        peakEnvelope = 0f
     }
 }
