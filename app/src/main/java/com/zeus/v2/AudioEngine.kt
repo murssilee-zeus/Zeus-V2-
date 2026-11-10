@@ -38,6 +38,7 @@ class AudioEngine(private val context: Context) {
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
+    private var hiResHeadroom: ZeusHybridHeadroom? = null
 
     @Volatile
     private var pcmAtmosEnabled = false
@@ -251,6 +252,7 @@ class AudioEngine(private val context: Context) {
 
         pcmBuffer = ZeusPcmBuffer()
         pcmFloatBuffer = ZeusFloatPcmBuffer()
+        hiResHeadroom = ZeusHybridHeadroom(sampleRate)
 
         pcmAtmosEnabled = true
         // When PCM spatial DSP is available, avoid stacking Android Virtualizer
@@ -277,6 +279,7 @@ class AudioEngine(private val context: Context) {
         zeusSubSismi?.reset()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
+        hiResHeadroom?.reset()
 
         // Restore the platform spatializer as fallback after the PCM route ends.
         spatialEngine?.setEnabled(settings.spatialEnabled)
@@ -327,6 +330,7 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
+            hiResHeadroom?.processStereo(buffer, n)
         } else if (!hiResEnabled && settings.spatialEnabled) {
             // ZEUS SPATIAL: spatial processor only; no bass reconstruction
             // or multiband compression from the PCM bus.
@@ -386,6 +390,7 @@ class AudioEngine(private val context: Context) {
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
+            hiResHeadroom?.processStereo(buffer, n)
         } else if (!hiResEnabled && settings.spatialEnabled) {
             atmosEngine?.let {
                 it.atmosImmersion = settings.spatialWidth.coerceIn(0f, 100f) / 100f
@@ -468,6 +473,7 @@ class AudioEngine(private val context: Context) {
         zeusSubSismi?.reset()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
+        hiResHeadroom?.reset()
 
         atmosEngine = null
         zeusMbc = null
