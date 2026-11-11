@@ -11,11 +11,11 @@ class BassEngine(sampleRate: Float = 48000f) {
     var enabled: Boolean = true
     var bassMono: Boolean = true
     var bassAmount: Float = 0f
-        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f)
+        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f) }
     var harmonicAmount: Float = 0f
-        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f)
+        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f) }
     var punchAmount: Float = 0f
-        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f)
+        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f) }
 
     private var lowL = 0f
     private var lowR = 0f
