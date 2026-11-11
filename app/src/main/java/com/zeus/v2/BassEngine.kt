@@ -6,16 +6,16 @@ import kotlin.math.tanh
 
 /** PCM bass processor for the direct-buffer audio path. */
 class BassEngine(sampleRate: Float = 48000f) {
-    private var currentSampleRate = sampleRate.coerceIn(8000f, 192000f)
+    private var currentSampleRate = (if (sampleRate.isFinite()) sampleRate else 48000f).coerceIn(8000f, 192000f)
 
     var enabled: Boolean = true
     var bassMono: Boolean = true
     var bassAmount: Float = 0f
-        set(value) { field = value.coerceIn(0f, 100f) }
+        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f)
     var harmonicAmount: Float = 0f
-        set(value) { field = value.coerceIn(0f, 100f) }
+        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f)
     var punchAmount: Float = 0f
-        set(value) { field = value.coerceIn(0f, 100f) }
+        set(value) { field = (if (value.isFinite()) value else 0f).coerceIn(0f, 100f)
 
     private var lowL = 0f
     private var lowR = 0f
@@ -39,13 +39,15 @@ class BassEngine(sampleRate: Float = 48000f) {
         frames: Int = (buffer.size - offset) / 2
     ) {
         if (!enabled || buffer.isEmpty()) return
-        val newSr = sampleRate.toFloat().coerceIn(8000f, 192000f)
+        val newSr = (if (sampleRate > 0) sampleRate.toFloat() else currentSampleRate).coerceIn(8000f, 192000f)
         if (newSr != currentSampleRate) {
             currentSampleRate = newSr
             reset()
         }
-        val end = min(buffer.size, offset + frames * 2)
-        if (offset >= end) return
+        val safeOffset = offset.coerceIn(0, buffer.size)
+        val safeFrames = frames.coerceAtLeast(0).coerceAtMost((buffer.size - safeOffset) / 2)
+        val end = safeOffset + safeFrames * 2
+        if (safeFrames == 0) return
 
         val lowA = onePoleCoeff(82f)
         val envFastA = onePoleCoeff(95f)
@@ -55,10 +57,12 @@ class BassEngine(sampleRate: Float = 48000f) {
         val harmonics = harmonicAmount / 100f
         val punch = punchAmount / 100f
 
-        var i = offset
+        var i = safeOffset
         while (i + 1 < end) {
-            val l = buffer[i]
-            val r = buffer[i + 1]
+            val rawL = buffer[i]
+            val rawR = buffer[i + 1]
+            val l = if (rawL.isFinite()) rawL else 0f
+            val r = if (rawR.isFinite()) rawR else 0f
             lowL += lowA * (l - lowL)
             lowR += lowA * (r - lowR)
             val monoBass = (lowL + lowR) * 0.5f
