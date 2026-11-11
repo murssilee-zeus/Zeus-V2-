@@ -63,7 +63,8 @@ class Biquad(private val sampleRate: Int) {
     fun peak(frequencyHz: Float, gainDb: Float, q: Float) {
         val cs = cos(omega(frequencyHz))
         val alpha = sin(omega(frequencyHz)) / (2.0 * quality(q))
-        val a = 10.0.pow(gainDb.coerceIn(-24f, 24f) / 40.0)
+        val safeGainDb = (if (gainDb.isFinite()) gainDb else 0f).coerceIn(-24f, 24f)
+        val a = 10.0.pow(safeGainDb / 40.0)
         publish(
             1.0 + alpha * a, -2.0 * cs, 1.0 - alpha * a,
             1.0 + alpha / a, -2.0 * cs, 1.0 - alpha / a
@@ -74,7 +75,8 @@ class Biquad(private val sampleRate: Int) {
         val w = omega(frequencyHz)
         val cs = cos(w)
         val sn = sin(w)
-        val a = 10.0.pow(gainDb.coerceIn(-24f, 24f) / 40.0)
+        val safeGainDb = (if (gainDb.isFinite()) gainDb else 0f).coerceIn(-24f, 24f)
+        val a = 10.0.pow(safeGainDb / 40.0)
         val slope = 1.0
         val alpha = (sn / 2.0) * sqrt(((a + 1.0 / a) * (1.0 / slope - 1.0) + 2.0).coerceAtLeast(0.0))
         val two = 2.0 * sqrt(a) * alpha
@@ -114,21 +116,24 @@ class Biquad(private val sampleRate: Int) {
     }
 
     private fun omega(frequencyHz: Float): Double {
-        val sr = sampleRate.coerceAtLeast(8000).toDouble()
-        val f = frequencyHz.coerceIn(1f, (sr * 0.45).toFloat()).toDouble()
+        val sr = sampleRate.coerceIn(8000, 192000).toDouble()
+        val requested = if (frequencyHz.isFinite()) frequencyHz else 1000f
+        val f = requested.coerceIn(1f, (sr * 0.45).toFloat()).toDouble()
         return 2.0 * PI * f / sr
     }
 
-    private fun quality(q: Float): Double = q.coerceIn(0.1f, 20f).toDouble()
+    private fun quality(q: Float): Double = (if (q.isFinite()) q else 0.707f).coerceIn(0.1f, 20f).toDouble()
 
     private fun publish(
         b0: Double, b1: Double, b2: Double,
         a0: Double, a1: Double, a2: Double
     ) {
-        c = if (!a0.isFinite() || abs(a0) < 1e-12) {
-            identity
-        } else {
+        val normalized = if (a0.isFinite() && abs(a0) >= 1e-12) {
             Coeffs(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0)
-        }
+        } else identity
+        c = if (normalized.b0.isFinite() && normalized.b1.isFinite() &&
+            normalized.b2.isFinite() && normalized.a1.isFinite() && normalized.a2.isFinite()) {
+            normalized
+        } else identity
     }
 }
