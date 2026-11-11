@@ -13,21 +13,28 @@ import kotlin.math.PI
  * crossover. The splitter is used only by the PCM DSP path.
  */
 class ZeusLr4BandSplitter(
-    private val sampleRate: Int,
+    sampleRate: Int,
     crossover1Hz: Float = 180f,
     crossover2Hz: Float = 1800f,
     crossover3Hz: Float = 8000f
 ) {
-    private val f1 = crossover1Hz.coerceIn(40f, sampleRate * 0.20f)
-    private val f2 = crossover2Hz.coerceIn(f1 + 20f, sampleRate * 0.35f)
-    private val f3 = crossover3Hz.coerceIn(f2 + 20f, sampleRate * 0.45f)
+    private val safeSampleRate = sampleRate.coerceIn(8000, 192000)
+    private val maxHz = safeSampleRate * 0.45f
+    private val f1Max = minOf(1000f, maxHz / 3f).coerceAtLeast(20f)
+    private val f1 = (if (crossover1Hz.isFinite()) crossover1Hz else 180f)
+        .coerceIn(20f, f1Max)
+    private val f2Max = minOf(8000f, maxHz * 0.75f).coerceAtLeast(f1 + 20f)
+    private val f2 = (if (crossover2Hz.isFinite()) crossover2Hz else 1800f)
+        .coerceIn(f1 + 20f, f2Max)
+    private val f3 = (if (crossover3Hz.isFinite()) crossover3Hz else 8000f)
+        .coerceIn(f2 + 20f, maxHz)
 
-    private val low = Lr4Filter(sampleRate, f1, false)
-    private val lowMidHp = Lr4Filter(sampleRate, f1, true)
-    private val lowMidLp = Lr4Filter(sampleRate, f2, false)
-    private val highMidHp = Lr4Filter(sampleRate, f2, true)
-    private val highMidLp = Lr4Filter(sampleRate, f3, false)
-    private val high = Lr4Filter(sampleRate, f3, true)
+    private val low = Lr4Filter(safeSampleRate, f1, false)
+    private val lowMidHp = Lr4Filter(safeSampleRate, f1, true)
+    private val lowMidLp = Lr4Filter(safeSampleRate, f2, false)
+    private val highMidHp = Lr4Filter(safeSampleRate, f2, true)
+    private val highMidLp = Lr4Filter(safeSampleRate, f3, false)
+    private val high = Lr4Filter(safeSampleRate, f3, true)
 
     data class Bands(
         val low: Float,
