@@ -106,19 +106,30 @@ private data class DashPreset(val name:String,val desc:String,val art:String)
 
 @Composable
 private fun ZeusPresetDashboard(vm:EqViewModel,p:PunchViewModel){
- Column(Modifier.fillMaxSize().padding(4.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-  Row(Modifier.weight(1.08f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-   DashGroup("◇","HiRes Presets","Máxima fidelidad y detalle",ZCY,listOf(
-    DashPreset("HiFi Studio","Sonido puro","🎙"),DashPreset("Audiófilo","Máxima resolución","🔊"),DashPreset("Clásico","Balance natural","🎻"),DashPreset("Jazz","Suave y relajado","🎷"),DashPreset("Rock HiRes","Potencia clara","🎸"),DashPreset("Vocal","Voces cristalinas","🎤")),Modifier.weight(1f)){applyDashPreset(vm,p,0,it)}
-   DashGroup("∿","Híbrido Presets","Equilibrio perfecto",ZP,listOf(
-    DashPreset("Balanced","Equilibrio ideal","⚖"),DashPreset("Dynamic","Más impacto","🥁"),DashPreset("Warm","Sonido cálido","🎹"),DashPreset("Punchy","Más pegada","🔊"),DashPreset("Clear","Claridad superior","〰"),DashPreset("Versatile","Todo terreno","🎧")),Modifier.weight(1f)){applyDashPreset(vm,p,1,it)}
-   DashGroup("♬","Spatial Presets","Sonido envolvente y amplio",ZG,listOf(
-    DashPreset("Wide","Gran escenario","🎆"),DashPreset("3D Surround","Imagen 3D","🌀"),DashPreset("Cinematic","Cine en casa","🎬"),DashPreset("Immersive","Total inmersión","🎼"),DashPreset("Ambient","Espacio natural","🌲"),DashPreset("Live Room","Acústica real","🎙")),Modifier.weight(1f)){applyDashPreset(vm,p,2,it)}
+ val cfg=LocalConfiguration.current
+ val hi=listOf(DashPreset("HiFi Studio","Sonido puro","🎙"),DashPreset("Audiófilo","Máxima resolución","🔊"),DashPreset("Clásico","Balance natural","🎻"),DashPreset("Jazz","Suave y relajado","🎷"),DashPreset("Rock HiRes","Potencia clara","🎸"),DashPreset("Vocal","Voces cristalinas","🎤"))
+ val hy=listOf(DashPreset("Balanced","Equilibrio ideal","⚖"),DashPreset("Dynamic","Más impacto","🥁"),DashPreset("Warm","Sonido cálido","🎹"),DashPreset("Punchy","Más pegada","🔊"),DashPreset("Clear","Claridad superior","〰"),DashPreset("Versatile","Todo terreno","🎧"))
+ val sp=listOf(DashPreset("Wide","Gran escenario","🎆"),DashPreset("3D Surround","Imagen 3D","🌀"),DashPreset("Cinematic","Cine en casa","🎬"),DashPreset("Immersive","Total inmersión","🎼"),DashPreset("Ambient","Espacio natural","🌲"),DashPreset("Live Room","Acústica real","🎙"))
+ val bass=listOf(DashPreset("Deep Bass","Subgrave total","🔊"),DashPreset("Punch","Golpe potente","✊"),DashPreset("Rumble","Vibración real","〰"),DashPreset("Bass Boost","Más graves","📊"),DashPreset("Boom","Impacto extremo","🚘"),DashPreset("Subsonic","Ultra profundo","🌊"))
+ if(cfg.screenWidthDp>cfg.screenHeightDp){
+  Column(Modifier.fillMaxSize().padding(4.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+   Row(Modifier.weight(1.08f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    DashGroup("◇","HiRes Presets","Máxima fidelidad y detalle",ZCY,hi,Modifier.weight(1f)){applyDashPreset(vm,p,0,it)}
+    DashGroup("∿","Híbrido Presets","Equilibrio perfecto",ZP,hy,Modifier.weight(1f)){applyDashPreset(vm,p,1,it)}
+    DashGroup("♬","Spatial Presets","Sonido envolvente y amplio",ZG,sp,Modifier.weight(1f)){applyDashPreset(vm,p,2,it)}
+   }
+   Row(Modifier.weight(.92f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+    DashGroup("♨","Epicenter Bass Presets","Bajos profundos y controlados",ZOR,bass,Modifier.weight(1.05f)){applyDashPreset(vm,p,3,it)}
+    PreampDash(vm,Modifier.weight(1.65f))
+   }
   }
-  Row(Modifier.weight(.92f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
-   DashGroup("♨","Epicenter Bass Presets","Bajos profundos y controlados",ZOR,listOf(
-    DashPreset("Deep Bass","Subgrave total","🔊"),DashPreset("Punch","Golpe potente","✊"),DashPreset("Rumble","Vibración real","〰"),DashPreset("Bass Boost","Más graves","📊"),DashPreset("Boom","Impacto extremo","🚘"),DashPreset("Subsonic","Ultra profundo","🌊")),Modifier.weight(1.05f)){applyDashPreset(vm,p,3,it)}
-   PreampDash(vm,Modifier.weight(1.65f))
+ }else{
+  Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(4.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   DashGroup("◇","HiRes Presets","Máxima fidelidad y detalle",ZCY,hi,Modifier.fillMaxWidth().height(265.dp)){applyDashPreset(vm,p,0,it)}
+   DashGroup("∿","Híbrido Presets","Equilibrio perfecto",ZP,hy,Modifier.fillMaxWidth().height(265.dp)){applyDashPreset(vm,p,1,it)}
+   DashGroup("♬","Spatial Presets","Sonido envolvente y amplio",ZG,sp,Modifier.fillMaxWidth().height(265.dp)){applyDashPreset(vm,p,2,it)}
+   DashGroup("♨","Epicenter Bass Presets","Bajos profundos y controlados",ZOR,bass,Modifier.fillMaxWidth().height(265.dp)){applyDashPreset(vm,p,3,it)}
+   PreampDash(vm,Modifier.fillMaxWidth().height(285.dp))
   }
  }
 }
