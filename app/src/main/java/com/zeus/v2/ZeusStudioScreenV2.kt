@@ -218,7 +218,7 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             Card("PREAMP GENERAL"){
                 Row(verticalAlignment=Alignment.CenterVertically){
                     Text("PREAMP",color=ZT,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
-                    Text(fmt(vm.preamp)+" dB",color=ZPK,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                    EditableBox("PREAMP",vm.preamp,"dB",-30f,12f,Modifier.width(104.dp)){vm.preamp=it}
                 }
                 Slider(value=vm.preamp.coerceIn(-30f,12f),onValueChange={vm.preamp=it},valueRange=-30f..12f,modifier=Modifier.fillMaxWidth().height(28.dp),colors=SliderDefaults.colors(thumbColor=ZP,activeTrackColor=ZP,inactiveTrackColor=ZGRID))
             }
