@@ -13,7 +13,9 @@ import kotlin.math.abs
  * detección/seguimiento de tono.
  */
 class SubHarmonic(private val sampleRate: Int) {
-    private val safeSampleRate = sampleRate.coerceAtLeast(8000)
+    private val safeSampleRate = sampleRate.coerceIn(8000, 192000)
+    private val attackCoeff = (1.0 - kotlin.math.exp(-1.0 / (safeSampleRate * 0.0015))).toFloat()
+    private val releaseCoeff = (1.0 - kotlin.math.exp(-1.0 / (safeSampleRate * 0.020))).toFloat()
     private var lastSample = 0f
     private var flipFlopState = 1f
     private var envelope = 0f
@@ -21,17 +23,18 @@ class SubHarmonic(private val sampleRate: Int) {
     private val lowPassPurifier = Biquad(safeSampleRate)
 
     fun configure(targetFrequencyHz: Float) {
-        val cutoff = targetFrequencyHz.coerceIn(18f, 48f)
+        val requested = if (targetFrequencyHz.isFinite()) targetFrequencyHz else 32f
+        val cutoff = requested.coerceIn(18f, 48f)
             .coerceAtMost(safeSampleRate * 0.45f)
         lowPassPurifier.lowPass(cutoff, 1.0f)
     }
 
     fun process(inputSample: Float): Float {
-        val input = inputSample.coerceIn(-1f, 1f)
+        val input = if (inputSample.isFinite()) inputSample.coerceIn(-1f, 1f) else 0f
 
         // Ataque rápido y liberación más suave para conservar el impacto
         // sin hacer que el nivel siga cada muestra de la forma de onda.
-        val envCoeff = if (abs(input) > envelope) 0.008f else 0.0012f
+        val envCoeff = if (abs(input) > envelope) attackCoeff else releaseCoeff
         envelope += envCoeff * (abs(input) - envelope)
 
         // Un cambio de estado por cruce ascendente con pequeña histéresis.
