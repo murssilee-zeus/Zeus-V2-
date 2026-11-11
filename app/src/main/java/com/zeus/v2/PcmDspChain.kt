@@ -16,8 +16,8 @@ class PcmDspChain(sampleRate: Int = 48000) {
     private var sr = sampleRate.coerceIn(8000, 192000)
     private val bass = BassEngine(sr.toFloat())
     private var eq = emptyList<PcmBiquad>()
-    private val crossL = Array(6) { PcmBiquad(1000f, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat()) }
-    private val crossR = Array(6) { PcmBiquad(1000f, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat()) }
+    private var crossL = createCrossFilters()
+    private var crossR = createCrossFilters()
     private val env = FloatArray(4)
     private val compGain = floatArrayOf(1f, 1f, 1f, 1f)
     private val attackCoeff = FloatArray(4)
@@ -47,8 +47,9 @@ class PcmDspChain(sampleRate: Int = 48000) {
         if (newSr != sr) {
             sr = newSr
             bass.reset()
-            var n = 0
-            while (n < 6) { crossL[n].reset(); crossR[n].reset(); n++ }
+            // Los filtros dependen del sample rate: recrearlos evita conservar coeficientes antiguos.
+            crossL = createCrossFilters()
+            crossR = createCrossFilters()
             env.fill(0f)
             compGain[0] = 1f; compGain[1] = 1f; compGain[2] = 1f; compGain[3] = 1f
             limiterGain = 1f
@@ -138,9 +139,15 @@ class PcmDspChain(sampleRate: Int = 48000) {
     }
 
     private fun configureDynamics(s: EqSettings) {
-        val c1 = s.cross1.coerceIn(40f, 1000f)
-        val c2 = s.cross2.coerceIn(c1 + 50f, 8000f)
-        val c3 = s.cross3.coerceIn(c2 + 50f, sr * 0.45f)
+        val maxHz = (sr * 0.45f).coerceAtLeast(120f)
+        val requestedC1 = finiteOr(s.cross1, 180f)
+        val requestedC2 = finiteOr(s.cross2, 1800f)
+        val requestedC3 = finiteOr(s.cross3, 8000f)
+        val c1Max = minOf(1000f, maxHz - 100f).coerceAtLeast(40f)
+        val c1 = requestedC1.coerceIn(40f, c1Max)
+        val c2Max = minOf(8000f, maxHz - 50f).coerceAtLeast(c1 + 50f)
+        val c2 = requestedC2.coerceIn(c1 + 50f, c2Max)
+        val c3 = requestedC3.coerceIn(c2 + 50f, maxHz)
         configureCrossPair(crossL, c1, c2, c3)
         configureCrossPair(crossR, c1, c2, c3)
 
@@ -169,6 +176,12 @@ class PcmDspChain(sampleRate: Int = 48000) {
         limiterAttackCoeff = timeCoeff(limiterAttackMs)
         limiterReleaseCoeff = timeCoeff(limiterReleaseMs)
     }
+
+    private fun createCrossFilters(): Array<PcmBiquad> = Array(6) {
+        PcmBiquad(1000f, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat())
+    }
+
+    private fun finiteOr(value: Float, fallback: Float): Float = if (value.isFinite()) value else fallback
 
     private fun configureCrossPair(filters: Array<PcmBiquad>, c1: Float, c2: Float, c3: Float) {
         filters[0].configure(c1, 0f, 0.707f, PcmBiquad.Type.LOW_PASS, sr.toFloat())
@@ -258,7 +271,7 @@ class PcmDspChain(sampleRate: Int = 48000) {
         private var b0 = 1.0; private var b1 = 0.0; private var b2 = 0.0; private var a1 = 0.0; private var a2 = 0.0; private var z1 = 0.0; private var z2 = 0.0
         init { configure(frequency, gainDb, q, type, sampleRate) }
         fun configure(frequency: Float, gainDb: Float, q: Float, type: Type, sampleRate: Float) {
-            val srD = sampleRate.coerceIn(8000f, 192000f).toDouble(); val fc = frequency.coerceIn(1f, sampleRate * 0.49f).toDouble(); val omega = 2.0 * Math.PI * fc / srD
+            val srD = sampleRate.coerceIn(8000f, 192000f).toDouble(); val safeFrequency = if (frequency.isFinite()) frequency else 1000f; val fc = safeFrequency.coerceIn(1f, (srD * 0.45).toFloat()).toDouble(); val omega = 2.0 * Math.PI * fc / srD
             val sn = kotlin.math.sin(omega); val cs = kotlin.math.cos(omega); val qv = q.coerceIn(0.1f, 40f).toDouble(); val alpha = sn / (2.0 * qv); val A = 10.0.pow(gainDb.coerceIn(-60f, 60f) / 40.0); val sqrtA = sqrt(A); val S = qv.coerceIn(0.1, 10.0); val sa = sn / 2.0 * sqrt((A + 1.0 / A) * (1.0 / S - 1.0) + 2.0); val two = 2.0 * sqrtA * sa
             when (type) {
                 Type.PEAK -> { b0=1.0+alpha*A; b1=-2.0*cs; b2=1.0-alpha*A; val a0=1.0+alpha/A; a1=-2.0*cs; a2=1.0-alpha/A; norm(a0) }
