@@ -35,6 +35,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  val zeusLogo=remember{runCatching{context.assets.open("ui_reference/render.png").use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()}
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
+ var showPresetDashboard by remember{mutableStateOf(true)}
  Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=6.dp,vertical=4.dp)){
   Row(Modifier.fillMaxWidth().height(58.dp).background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZEDGE,RoundedCornerShape(7.dp)).padding(horizontal=2.dp),verticalAlignment=Alignment.CenterVertically){
    Text("☰",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showMenu=true})
@@ -47,12 +48,10 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=6.sp,fontWeight=FontWeight.Bold)
    }
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
-    Text("HI-RES",color=if(vm.hiResEnabled) ZCY else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold)
-    Switch(checked=vm.hiResEnabled,onCheckedChange={enabled->vm.hiResEnabled=enabled;if(enabled)vm.spatialEnabled=false},modifier=Modifier.height(30.dp))
-    Text("EPIC",color=if(vm.hiResEpicenterEnabled) ZPK else ZM,fontSize=7.sp,fontWeight=FontWeight.ExtraBold)
-    Switch(checked=vm.hiResEpicenterEnabled,onCheckedChange={vm.hiResEpicenterEnabled=it},modifier=Modifier.height(30.dp))
-    Text("SPATIAL",color=if(vm.spatialEnabled) ZP else ZM,fontSize=8.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=5.dp))
-    Switch(checked=vm.spatialEnabled,onCheckedChange={enabled->vm.spatialEnabled=enabled;if(enabled)vm.hiResEnabled=false},modifier=Modifier.height(30.dp))
+    ModeChip("◇","HiRes",vm.hiResEnabled,ZCY){vm.hiResEnabled=true;vm.hiResEpicenterEnabled=false;vm.spatialEnabled=false}
+    ModeChip("∿","Híbrido",vm.hiResEnabled&&vm.hiResEpicenterEnabled,ZP){vm.hiResEnabled=true;vm.hiResEpicenterEnabled=true;vm.spatialEnabled=false}
+    ModeChip("♬","Spatial",vm.spatialEnabled,ZG){vm.spatialEnabled=true;vm.hiResEnabled=false;vm.hiResEpicenterEnabled=false}
+    ModeChip("◉","Epicenter",!vm.hiResEnabled&&!vm.spatialEnabled,ZOR){vm.hiResEnabled=false;vm.spatialEnabled=false;vm.hiResEpicenterEnabled=false}
    }
    Text("⚙",color=ZT,fontSize=22.sp,modifier=Modifier.padding(horizontal=8.dp).clickable{showSettings=true})
   }
@@ -64,14 +63,13 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
    }
   }
   Box(Modifier.weight(1f).fillMaxWidth()){
-   if(cfg.screenWidthDp > cfg.screenHeightDp){
-    ZeusConsoleLandscape(vm,punch)
-   } else {
-    when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm)}
-   }
+   if(showPresetDashboard) ZeusPresetDashboard(vm,punch)
+   else if(cfg.screenWidthDp > cfg.screenHeightDp) ZeusConsoleLandscape(vm,punch)
+   else when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm)}
   }
   Row(Modifier.fillMaxWidth().padding(top=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{onToggleEngine()})
+   Text(if(showPresetDashboard)"ABRIR ESTUDIO" else "VOLVER A PRESETS",color=ZCY,fontSize=8.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(end=8.dp).clickable{showPresetDashboard=!showPresetDashboard}.padding(6.dp))
    Text("GUARDAR",color=Color.White,fontSize=9.sp,modifier=Modifier.background(Color(0xFF0E4D3A),RoundedCornerShape(7.dp)).border(1.dp,ZG,RoundedCornerShape(7.dp)).clickable{onSave()}.padding(horizontal=12.dp,vertical=6.dp))
   }
   if(showMenu){
@@ -94,6 +92,107 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
    }},confirmButton={TextButton(onClick={showSettings=false}){Text("Cerrar")}})
   }
+ }
+}
+
+@Composable
+private fun ModeChip(icon:String,label:String,active:Boolean,accent:Color,onClick:()->Unit){
+ Column(Modifier.padding(horizontal=2.dp).clip(RoundedCornerShape(8.dp)).background(if(active)accent.copy(alpha=.16f) else ZSUR).border(1.dp,if(active)accent else ZBR,RoundedCornerShape(8.dp)).clickable{onClick()}.padding(horizontal=7.dp,vertical=4.dp),horizontalAlignment=Alignment.CenterHorizontally){
+  Text(icon,color=accent,fontSize=14.sp,fontWeight=FontWeight.Bold)
+  Text(label,color=if(active)ZT else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold)
+ }
+}
+private data class DashPreset(val name:String,val desc:String,val art:String)
+
+@Composable
+private fun ZeusPresetDashboard(vm:EqViewModel,p:PunchViewModel){
+ Column(Modifier.fillMaxSize().padding(4.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
+  Row(Modifier.weight(1.08f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+   DashGroup("◇","HiRes Presets","Máxima fidelidad y detalle",ZCY,listOf(
+    DashPreset("HiFi Studio","Sonido puro","🎙"),DashPreset("Audiófilo","Máxima resolución","🔊"),DashPreset("Clásico","Balance natural","🎻"),DashPreset("Jazz","Suave y relajado","🎷"),DashPreset("Rock HiRes","Potencia clara","🎸"),DashPreset("Vocal","Voces cristalinas","🎤")),Modifier.weight(1f)){applyDashPreset(vm,p,0,it)}
+   DashGroup("∿","Híbrido Presets","Equilibrio perfecto",ZP,listOf(
+    DashPreset("Balanced","Equilibrio ideal","⚖"),DashPreset("Dynamic","Más impacto","🥁"),DashPreset("Warm","Sonido cálido","🎹"),DashPreset("Punchy","Más pegada","🔊"),DashPreset("Clear","Claridad superior","〰"),DashPreset("Versatile","Todo terreno","🎧")),Modifier.weight(1f)){applyDashPreset(vm,p,1,it)}
+   DashGroup("♬","Spatial Presets","Sonido envolvente y amplio",ZG,listOf(
+    DashPreset("Wide","Gran escenario","🎆"),DashPreset("3D Surround","Imagen 3D","🌀"),DashPreset("Cinematic","Cine en casa","🎬"),DashPreset("Immersive","Total inmersión","🎼"),DashPreset("Ambient","Espacio natural","🌲"),DashPreset("Live Room","Acústica real","🎙")),Modifier.weight(1f)){applyDashPreset(vm,p,2,it)}
+  }
+  Row(Modifier.weight(.92f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+   DashGroup("♨","Epicenter Bass Presets","Bajos profundos y controlados",ZOR,listOf(
+    DashPreset("Deep Bass","Subgrave total","🔊"),DashPreset("Punch","Golpe potente","✊"),DashPreset("Rumble","Vibración real","〰"),DashPreset("Bass Boost","Más graves","📊"),DashPreset("Boom","Impacto extremo","🚘"),DashPreset("Subsonic","Ultra profundo","🌊")),Modifier.weight(1.05f)){applyDashPreset(vm,p,3,it)}
+   PreampDash(vm,Modifier.weight(1.65f))
+  }
+ }
+}
+
+@Composable
+private fun DashGroup(icon:String,title:String,subtitle:String,accent:Color,items:List<DashPreset>,modifier:Modifier,onPick:(Int)->Unit){
+ Column(modifier.fillMaxHeight().background(Color(0xFF070D18),RoundedCornerShape(11.dp)).border(1.dp,accent,RoundedCornerShape(11.dp)).padding(5.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
+  Row(verticalAlignment=Alignment.CenterVertically){
+   Text(icon,color=accent,fontSize=23.sp,modifier=Modifier.padding(horizontal=4.dp))
+   Column(Modifier.weight(1f)){Text(title,color=accent,fontSize=if(title.length>20)11.sp else 13.sp,fontWeight=FontWeight.ExtraBold,maxLines=1);Text(subtitle,color=ZT.copy(alpha=.75f),fontSize=8.sp,maxLines=1)}
+  }
+  for(r in 0..1) Row(Modifier.weight(1f).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(4.dp)){
+   for(c in 0..2){
+    val i=r*3+c;val item=items[i]
+    Column(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(7.dp)).background(Color(0xFF050A13)).border(1.dp,accent.copy(alpha=.8f),RoundedCornerShape(7.dp)).clickable{onPick(i)}.padding(3.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center){
+     Box(Modifier.weight(1f).fillMaxWidth().background(accent.copy(alpha=.10f),RoundedCornerShape(5.dp)),contentAlignment=Alignment.Center){Text(item.art,fontSize=24.sp)}
+     Text(item.name,color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,maxLines=1,textAlign=TextAlign.Center)
+     Text(item.desc,color=ZT.copy(alpha=.8f),fontSize=7.sp,maxLines=1,textAlign=TextAlign.Center)
+    }
+   }
+  }
+ }
+}
+
+@Composable
+private fun PreampDash(vm:EqViewModel,modifier:Modifier){
+ var edit by remember{mutableStateOf(false)}
+ Column(modifier.fillMaxHeight().background(Color(0xFF080817),RoundedCornerShape(25.dp)).border(1.dp,ZP,RoundedCornerShape(25.dp)).padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
+  Row(verticalAlignment=Alignment.CenterVertically){Text("♛",color=ZP,fontSize=25.sp);Text("Pre-amp General",color=Color(0xFFE5C8FF),fontSize=17.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.padding(start=8.dp).weight(1f));Text("ZEUS v2.0",color=ZP,fontSize=9.sp)}
+  Row(Modifier.weight(1f).fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceEvenly){
+   Column(horizontalAlignment=Alignment.CenterHorizontally){
+    Box(Modifier.size(142.dp).clip(RoundedCornerShape(100)).background(Color(0xFF111020)).border(5.dp,ZP,RoundedCornerShape(100)).border(2.dp,ZPK.copy(alpha=.55f),RoundedCornerShape(100)).clickable{edit=true},contentAlignment=Alignment.Center){
+     Column(horizontalAlignment=Alignment.CenterHorizontally){Text(String.format(java.util.Locale.US,"%.1f",vm.preamp),color=Color.White,fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("dB",color=ZT,fontSize=13.sp);Text("TOCAR PARA EDITAR",color=ZCY,fontSize=6.sp)}
+    }
+    Row(Modifier.width(175.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("−24 dB",color=ZT,fontSize=9.sp);Text("+24 dB",color=ZT,fontSize=9.sp)}
+    Slider(value=vm.preamp.coerceIn(-24f,24f),onValueChange={vm.preamp=it},valueRange=-24f..24f,modifier=Modifier.width(175.dp).height(25.dp),colors=SliderDefaults.colors(thumbColor=ZPK,activeTrackColor=ZP,inactiveTrackColor=ZGRID))
+   }
+   Column(Modifier.widthIn(min=100.dp,max=180.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+    DashStatus("∿","Modo actual",when{vm.spatialEnabled->"Spatial";vm.hiResEnabled&&vm.hiResEpicenterEnabled->"Híbrido";vm.hiResEnabled->"HiRes";else->"Epicenter Bass"},ZCY)
+    DashStatus("⏻","Estado",if(vm.isEngineRunning)"Activo" else "En espera",if(vm.isEngineRunning)ZG:ZM)
+   }
+  }
+  Text("Ganancia general de toda la cadena de procesamiento.",color=ZM,fontSize=8.sp)
+ }
+ if(edit) NumberDialog("Pre-amp General",vm.preamp,-24f,24f,"dB",{vm.preamp=it;edit=false},{edit=false})
+}
+@Composable
+private fun DashStatus(icon:String,label:String,value:String,accent:Color){
+ Row(Modifier.fillMaxWidth().background(Color(0xFF090D1A),RoundedCornerShape(8.dp)).border(1.dp,accent.copy(alpha=.35f),RoundedCornerShape(8.dp)).padding(7.dp),verticalAlignment=Alignment.CenterVertically){
+  Text(icon,color=accent,fontSize=21.sp);Column(Modifier.padding(start=7.dp)){Text(label,color=ZM,fontSize=8.sp);Text(value,color=accent,fontSize=12.sp,fontWeight=FontWeight.Bold)}
+ }
+}
+private fun applyDashPreset(vm:EqViewModel,p:PunchViewModel,group:Int,index:Int){
+ val gains=listOf(
+  listOf(0f,.2f,0f,0f,.3f,.4f,.5f,.7f,.8f,.7f),
+  listOf(1f,1.3f,.8f,.2f,.5f,.9f,.6f,.2f,0f,-.2f),
+  listOf(0f,.4f,.7f,.4f,0f,.8f,1.2f,1.5f,1.8f,1.5f),
+  listOf(1.5f,2f,1.2f,0f,0f,.5f,1f,1.2f,1f,.8f),
+  listOf(0f,.5f,.2f,-.2f,0f,.5f,.5f,.6f,.8f,.8f),
+  listOf(.8f,1f,.5f,0f,.2f,.8f,1f,1.4f,1.5f,1.3f))
+ val base=vm.bands.toList()
+ if(base.isNotEmpty()){vm.bands.clear();vm.bands.addAll(base.mapIndexed{i,b->b.copy(gain=(gains[index][i%10]*when(group){0->1f;1->1.6f;2->1.8f;else->2f}).coerceIn(-4f,4f),enabled=true)});vm.selectBand(0)}
+ vm.preamp=when(group){0->-2.5f-(index%3)*.35f;1->-4f;2->-3.5f;else->-5.5f}
+ vm.subBoost=when(group){3->(4f+index*1.2f).coerceAtMost(10f);1->2f;else->0f}
+ vm.spatialEnabled=group==2;vm.hiResEnabled=group==0||group==1;vm.hiResEpicenterEnabled=group==1
+ vm.spatialWidth=if(group==2)(58f+index*6f).coerceAtMost(95f) else 35f
+ vm.compressorMultibandEnabled=group!=0||index>1;vm.limiterEnabled=true;vm.limiterThreshold=if(group==3)-1.2f else -2f
+ when(group){
+  0->{p.updateBassAmount(0f);p.updateEpicenterAmount(0f)}
+  1->{p.updateBassAmount(25f+index*5f);p.updateBassHarmonics(15f+index*8f);p.updateEpicenterAmount(2f+index*.6f);p.updateEpicenterDrive(28f+index*7f);p.updateEpicenterDepth(38f+index*6f);p.updateEpicenterHarmonics(20f+index*8f)}
+  2->{p.updateBassAmount(0f);p.updateEpicenterAmount(0f)}
+  3->{p.updateBassAmount(45f+index*8f);p.updateBassFrequency(listOf(38f,48f,32f,55f,42f,24f)[index]);p.updateBassHarmonics(28f+index*9f)
+   p.updateEpicenterAmount(listOf(9.5f,8f,10f,7f,11f,9f)[index]);p.updateEpicenterDrive(70f+index*4f);p.updateEpicenterDepth(78f+index*3f);p.updateEpicenterHarmonics(48f+index*7f)
+   p.updateEpicenterFrequency(listOf(28f,42f,20f,36f,32f,18f)[index]);p.updateEpicenterSweep(if(index==2)58f else if(index==5)50f else 78f)}
  }
 }
 
