@@ -169,7 +169,7 @@ private fun PreampDash(vm:EqViewModel,modifier:Modifier){
    }
    Column(Modifier.widthIn(min=100.dp,max=180.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
     DashStatus("∿","Modo actual",when{vm.spatialEnabled->"Spatial";vm.hiResEnabled&&vm.hiResEpicenterEnabled->"Híbrido";vm.hiResEnabled->"HiRes";else->"Epicenter Bass"},ZCY)
-    DashStatus("⏻","Estado",if(vm.isEngineRunning)"Activo" else "En espera",if(vm.isEngineRunning)ZG:ZM)
+    DashStatus("⏻","Estado",if(vm.isEngineRunning)"Activo" else "En espera",if(vm.isEngineRunning) ZG else ZM)
    }
   }
   Text("Ganancia general de toda la cadena de procesamiento.",color=ZM,fontSize=8.sp)
