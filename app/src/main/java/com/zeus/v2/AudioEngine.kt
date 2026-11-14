@@ -1267,20 +1267,29 @@ class AudioEngine(private val context: Context) {
                 pipelineEnabled &&
                 !hiResEnabled
 
+        val epicenterBassActive = settings.epicenterAmount > 0.01f &&
+            pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
+        // Preserve the low-frequency transient and sustain when the independent
+        // Epicenter generator is active. The other three compressor bands remain user-controlled.
+        val bassThreshold = if (epicenterBassActive) maxOf(settings.compThLow, -10f) else settings.compThLow
+        val bassRatio = if (epicenterBassActive) minOf(settings.compRatioLow, 2f) else settings.compRatioLow
+        val bassAttack = if (epicenterBassActive) maxOf(settings.compAttackLow, 25f) else settings.compAttackLow
+        val bassRelease = if (epicenterBassActive) maxOf(settings.compReleaseLow, 280f) else settings.compReleaseLow
+
         mbc.configure(
             settings.cross1,
             settings.cross2,
             settings.cross3,
 
             floatArrayOf(
-                settings.compThLow,
+                bassThreshold,
                 settings.compThLoMid,
                 settings.compThHiMid,
                 settings.compThHigh
             ),
 
             floatArrayOf(
-                settings.compRatioLow,
+                bassRatio,
                 settings.compRatioLoMid,
                 settings.compRatioHiMid,
                 settings.compRatioHigh
@@ -1294,14 +1303,14 @@ class AudioEngine(private val context: Context) {
             ),
 
             floatArrayOf(
-                settings.compAttackLow,
+                bassAttack,
                 settings.compAttackLoMid,
                 settings.compAttackHiMid,
                 settings.compAttackHigh
             ),
 
             floatArrayOf(
-                settings.compReleaseLow,
+                bassRelease,
                 settings.compReleaseLoMid,
                 settings.compReleaseHiMid,
                 settings.compReleaseHigh
