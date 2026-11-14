@@ -131,12 +131,12 @@ class ZeusEpicenter(private val sampleRate: Int) {
 
             // Small even-harmonic texture gives the sub a physical speaker-like
             // edge without turning it into a mid-bass boost.
-            val texture = (sub * abs(sub) * harmonics * 0.22f)
+            val texture = sub * abs(sub) * harmonics * 0.22f
+            // Saturate only the generated sub. Never compress the complete music mix.
             val add = tanh((sub + texture).toDouble()).toFloat()
-            val outL = left + add
-            val outR = right + add
-            pcm[i] = toShort(tanh(outL.toDouble()).toFloat())
-            pcm[i + 1] = toShort(tanh(outR.toDouble()).toFloat())
+            val safeAdd = limitCenteredSubToHeadroom(left, right, add)
+            pcm[i] = toShort(left + safeAdd)
+            pcm[i + 1] = toShort(right + safeAdd)
             previousMono = mono
         }
         lastSubRmsDbfs = if (count > 0 && energy > 0.0)
@@ -197,14 +197,24 @@ class ZeusEpicenter(private val sampleRate: Int) {
             count++
 
             val texture = sub * abs(sub) * harmonics * 0.22f
+            // Saturate only the generated sub. The original stereo program stays intact.
             val add = tanh((sub + texture).toDouble()).toFloat()
-            pcm[i] = tanh((left + add).toDouble()).toFloat()
-            pcm[i + 1] = tanh((right + add).toDouble()).toFloat()
+            val safeAdd = limitCenteredSubToHeadroom(left, right, add)
+            pcm[i] = (left + safeAdd).coerceIn(-1f, 1f)
+            pcm[i + 1] = (right + safeAdd).coerceIn(-1f, 1f)
             previousMono = mono
         }
         lastSubRmsDbfs = if (count > 0 && energy > 0.0)
             (20.0 * log10(sqrt(energy / count))).toFloat().coerceIn(-120f, 0f)
         else -120f
+    }
+
+    private fun limitCenteredSubToHeadroom(left: Float, right: Float, addition: Float): Float {
+        // One shared mono-sub gain keeps the center stable and prevents the
+        // synthesized bass from forcing a full-band limiter to duck the music.
+        val positiveHeadroom = minOf(0.995f - left, 0.995f - right).coerceAtLeast(0f)
+        val negativeHeadroom = maxOf(-0.995f - left, -0.995f - right).coerceAtMost(0f)
+        return addition.coerceIn(negativeHeadroom, positiveHeadroom)
     }
 
     fun reset() {
