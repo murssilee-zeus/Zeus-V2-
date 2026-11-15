@@ -48,6 +48,8 @@ class ZeusEpicenter(private val sampleRate: Int) {
     private var env110 = 0f
     private var subEnvelope = 0f
     private var holdSamples = 0
+    // Smoothed hold gate: avoids the abrupt 1.0 -> 0.68 envelope step that can sound like pumping.
+    private var holdEnvelope = 0f
     private var phase = 0.0
     private var oscillator = 0f
     private var previousMono = 0f
@@ -89,6 +91,8 @@ class ZeusEpicenter(private val sampleRate: Int) {
         val subRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.24 + depth * 0.30)))).toFloat()
         val voiceCoeff = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.045))).toFloat()
         val holdLength = (sr * (0.045 + depth * 0.11)).toInt()
+        val holdAttack = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.012))).toFloat()
+        val holdRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.18 + depth * 0.10)))).toFloat()
         val gain = (0.62f + amount * 1.18f + drive * 0.62f) *
             (if (headphoneMode) 0.52f else 1f)
 
@@ -109,9 +113,11 @@ class ZeusEpicenter(private val sampleRate: Int) {
             if (detector > 0.00035f) holdSamples = holdLength
             else if (holdSamples > 0) holdSamples--
 
-            val hold = if (holdSamples > 0) 1f else 0.68f
+            val holdTarget = if (holdSamples > 0) 1f else 0.68f
+            holdEnvelope += (if (holdTarget > holdEnvelope) holdAttack else holdRelease) *
+                (holdTarget - holdEnvelope)
             val detectorDrive = (detector * (22.0f + drive * 30.0f)).coerceIn(0f, 1f)
-            val targetEnvelope = detectorDrive * hold
+            val targetEnvelope = detectorDrive * holdEnvelope
             subEnvelope += (if (targetEnvelope > subEnvelope) attack else subRelease) *
                 (targetEnvelope - subEnvelope)
 
@@ -228,6 +234,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
         env110 = 0f
         subEnvelope = 0f
         holdSamples = 0
+        holdEnvelope = 0f
         phase = 0.0
         oscillator = 0f
         previousMono = 0f
