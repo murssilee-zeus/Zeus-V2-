@@ -307,6 +307,7 @@ class AudioEngine(private val context: Context) {
         // evolution, impact, sub/sismo, spatial widening or general clipping.
         if (!hiResEnabled && !settings.spatialEnabled) {
             // ZEUS BASS: Epicenter detects the unmodified incoming program first.
+            // This keeps Epicenter excitation independent of the Sub/Sismi amount control.
             // Its detector must not depend on the level chosen for Sub/Sismi.
             zeusEpicenter?.let {
                 it.enabled = isEpicenterActive()
