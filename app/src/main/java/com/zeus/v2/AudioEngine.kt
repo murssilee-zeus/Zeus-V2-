@@ -306,18 +306,18 @@ class AudioEngine(private val context: Context) {
         // independent Epicenter low-frequency excitation. No MBC, bass
         // evolution, impact, sub/sismo, spatial widening or general clipping.
         if (!hiResEnabled && !settings.spatialEnabled) {
-            // ZEUS BASS: Rumble/Punch contour, dynamics and independent Epicenter.
+            // ZEUS BASS: Epicenter detects the unmodified incoming program first.
+            // Its detector must not depend on the level chosen for Sub/Sismi.
+            zeusEpicenter?.let {
+                it.enabled = isEpicenterActive()
+                applyEpicenter(it)
+                it.processStereo(buffer, n)
+            }
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
             zeusMbc?.processStereo(buffer, n)
             if (pipelineEnabled) {
                 zeusHiResImpact?.processStereo(buffer, n)
                 zeusSubSismi?.processStereo(buffer, n)
-            }
-
-            zeusEpicenter?.let {
-                it.enabled = isEpicenterActive()
-                applyEpicenter(it)
-                it.processStereo(buffer, n)
             }
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: preserve the PCM signal path and add
@@ -367,16 +367,18 @@ class AudioEngine(private val context: Context) {
         if (n < 2) return 0
 
         if (!hiResEnabled && !settings.spatialEnabled) {
+            // Keep the Float32 route behavior identical: Epicenter sees source bass
+            // before Sub/Sismi gain can influence its detector.
+            zeusEpicenter?.let {
+                it.enabled = isEpicenterActive()
+                applyEpicenter(it)
+                it.processStereo(buffer, n)
+            }
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
             zeusMbc?.processStereo(buffer, n)
             if (pipelineEnabled) {
                 zeusHiResImpact?.processStereo(buffer, n)
                 zeusSubSismi?.processStereo(buffer, n)
-            }
-            zeusEpicenter?.let {
-                it.enabled = isEpicenterActive()
-                applyEpicenter(it)
-                it.processStereo(buffer, n)
             }
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: no MBC, bass evolution, impact or
