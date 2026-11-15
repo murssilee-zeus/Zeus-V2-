@@ -70,9 +70,10 @@ class ZeusEpicenter(private val sampleRate: Int) {
         targetHz = frequencyHz.coerceIn(27f, 63f)
         this.sweepHz = sweepHz.coerceIn(50f, 140f)
 
-        detector55.bandPass(60f, 0.85f)
-        detector80.bandPass(82f, 0.9f)
-        detector110.bandPass(108f, 0.8f)
+        // Wider/lower detector centers catch deep bass fundamentals and their body.
+        detector55.bandPass(48f, 0.72f)
+        detector80.bandPass(72f, 0.82f)
+        detector110.bandPass(100f, 0.78f)
         subLowPass.lowPass((targetHz * 1.65f).coerceIn(48f, 105f), 0.707f)
         subHighPass.highPass(18f, 0.707f)
     }
@@ -93,7 +94,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
         val holdLength = (sr * (0.045 + depth * 0.11)).toInt()
         val holdAttack = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.012))).toFloat()
         val holdRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.18 + depth * 0.10)))).toFloat()
-        val gain = (0.62f + amount * 1.18f + drive * 0.62f) *
+        val gain = (0.70f + amount * 1.28f + drive * 0.68f) *
             (if (headphoneMode) 0.52f else 1f)
 
         for (i in 0 until n step 2) {
@@ -164,6 +165,8 @@ class ZeusEpicenter(private val sampleRate: Int) {
         val subRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.24 + depth * 0.30)))).toFloat()
         val voiceCoeff = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.045))).toFloat()
         val holdLength = (sr * (0.045 + depth * 0.11)).toInt()
+        val holdAttack = (1.0 - kotlin.math.exp(-1.0 / (sr * 0.012))).toFloat()
+        val holdRelease = (1.0 - kotlin.math.exp(-1.0 / (sr * (0.18 + depth * 0.10)))).toFloat()
         val gain = (0.62f + amount * 1.18f + drive * 0.62f) *
             (if (headphoneMode) 0.52f else 1f)
 
@@ -184,9 +187,11 @@ class ZeusEpicenter(private val sampleRate: Int) {
             if (detector > 0.00035f) holdSamples = holdLength
             else if (holdSamples > 0) holdSamples--
 
-            val hold = if (holdSamples > 0) 1f else 0.68f
+            val holdTarget = if (holdSamples > 0) 1f else 0.68f
+            holdEnvelope += (if (holdTarget > holdEnvelope) holdAttack else holdRelease) *
+                (holdTarget - holdEnvelope)
             val detectorDrive = (detector * (22.0f + drive * 30.0f)).coerceIn(0f, 1f)
-            val targetEnvelope = detectorDrive * hold
+            val targetEnvelope = detectorDrive * holdEnvelope
             subEnvelope += (if (targetEnvelope > subEnvelope) attack else subRelease) *
                 (targetEnvelope - subEnvelope)
 
