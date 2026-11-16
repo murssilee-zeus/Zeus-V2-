@@ -132,7 +132,6 @@ private fun ZeusPresetDashboard(vm:EqViewModel,p:PunchViewModel){
    PreampDash(vm,Modifier.fillMaxWidth().height(285.dp))
   }
  }
- SavedPresetsCard(vm,p)
 }
 
 @Composable
@@ -161,10 +160,13 @@ private fun SpectrumDash(vm:EqViewModel, modifier:Modifier=Modifier){
   Text("LIVE SPECTRUM",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
   Row(Modifier.fillMaxWidth().weight(1f),horizontalArrangement=Arrangement.spacedBy(2.dp),verticalAlignment=Alignment.CenterVertically){
    for(i in 0 until 24){
-    val raw=vm.spectrum.getOrElse((i*vm.spectrum.size/24).coerceIn(0,(vm.spectrum.size-1).coerceAtLeast(0))){0f}
-    val level=if(raw>1f)(raw/100f).coerceIn(0f,1f) else raw.coerceIn(0f,1f)
+    // AudioEngine entrega magnitud FFT en dBFS (-80 a +6), no en escala 0..1.
+    // Abrimos el rango útil y aplicamos una curva raíz para responder mejor a volumen moderado.
+    val rawDb=vm.spectrum.getOrElse((i*vm.spectrum.size/24).coerceIn(0,(vm.spectrum.size-1).coerceAtLeast(0))){-80f}
+    val normalized=((rawDb+78f)/66f).coerceIn(0f,1f)
+    val level=kotlin.math.sqrt(normalized)
     val accent=when(i){in 0..7->ZCY;in 8..16->Color(0xFF4B8DFF);else->ZP}
-    Box(Modifier.weight(1f).height((4f+level*31f).dp).background(accent.copy(alpha=.45f+level*.55f),RoundedCornerShape(3.dp)))
+    Box(Modifier.weight(1f).height((3f+level*29f).dp).background(accent.copy(alpha=.55f+level*.45f),RoundedCornerShape(3.dp)))
    }
   }
  }
