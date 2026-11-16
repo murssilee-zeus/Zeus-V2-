@@ -156,6 +156,21 @@ private fun DashGroup(icon:String,title:String,subtitle:String,accent:Color,item
 }
 
 @Composable
+private fun SpectrumDash(vm:EqViewModel, modifier:Modifier=Modifier){
+ Column(modifier.background(Color(0xFF050B15),RoundedCornerShape(8.dp)).border(1.dp,ZCY.copy(alpha=.55f),RoundedCornerShape(8.dp)).padding(horizontal=5.dp,vertical=4.dp),verticalArrangement=Arrangement.spacedBy(3.dp)){
+  Text("LIVE SPECTRUM",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
+  Row(Modifier.fillMaxWidth().weight(1f),horizontalArrangement=Arrangement.spacedBy(2.dp),verticalAlignment=Alignment.CenterVertically){
+   for(i in 0 until 24){
+    val raw=vm.spectrum.getOrElse((i*vm.spectrum.size/24).coerceIn(0,(vm.spectrum.size-1).coerceAtLeast(0))){0f}
+    val level=if(raw>1f)(raw/100f).coerceIn(0f,1f) else raw.coerceIn(0f,1f)
+    val accent=when(i){in 0..7->ZCY;in 8..16->Color(0xFF4B8DFF);else->ZP}
+    Box(Modifier.weight(1f).height((4f+level*31f).dp).background(accent.copy(alpha=.45f+level*.55f),RoundedCornerShape(3.dp)))
+   }
+  }
+ }
+}
+
+@Composable
 private fun PreampDash(vm:EqViewModel,modifier:Modifier){
  var edit by remember{mutableStateOf(false)}
  Column(modifier.fillMaxHeight().background(Color(0xFF080817),RoundedCornerShape(25.dp)).border(1.dp,ZP,RoundedCornerShape(25.dp)).padding(10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){
@@ -168,7 +183,8 @@ private fun PreampDash(vm:EqViewModel,modifier:Modifier){
     Row(Modifier.width(175.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("−24 dB",color=ZT,fontSize=9.sp);Text("+24 dB",color=ZT,fontSize=9.sp)}
     Slider(value=vm.preamp.coerceIn(-24f,24f),onValueChange={vm.preamp=it},valueRange=-24f..24f,modifier=Modifier.width(175.dp).height(25.dp),colors=SliderDefaults.colors(thumbColor=ZPK,activeTrackColor=ZP,inactiveTrackColor=ZGRID))
    }
-   Column(Modifier.widthIn(min=100.dp,max=180.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   Column(Modifier.widthIn(min=100.dp,max=180.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
+    SpectrumDash(vm,Modifier.fillMaxWidth().height(54.dp))
     DashStatus("∿","Modo actual",when{vm.spatialEnabled->"Spatial";vm.hiResEnabled&&vm.hiResEpicenterEnabled->"Híbrido";vm.hiResEnabled->"HiRes";else->"Epicenter Bass"},ZCY)
     DashStatus("⏻","Estado",if(vm.isEngineRunning)"Activo" else "En espera",if(vm.isEngineRunning) ZG else ZM)
    }
@@ -541,6 +557,8 @@ private fun HarmanTargetsCard(vm:EqViewModel){
     }
    }
   }
+  // Las configuraciones personales quedan justo debajo de Targets y separadas de los presets de fábrica.
+  SavedPresetsCard(vm,punch)
   Card("MODELOS AUTOEQ"){
    Row(verticalAlignment=Alignment.CenterVertically){
     Text("Resultados",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
@@ -781,7 +799,6 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){
    listOf("Flat" to {vm.applyPresetFlat()},"Zeus" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal Clear" to {vm.applyPresetVocalClear()},"Jazz" to {vm.applyPresetJazz()},"Bass-Treble" to {vm.applyPresetBassTreble()},"Acoustic" to {vm.applyPresetAcoustic()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}
   }
-  SavedPresetsCard(vm, punch)
  }
 }
 @Composable private fun Bands(vm:EqViewModel){
