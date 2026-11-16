@@ -12,6 +12,10 @@ data class EqSettings(
     var bassAmount: Float = 0f,
     var bassPunch: Float = 0f,
     var bassHarmonics: Float = 0f,
+    var bassFrequency: Float = 45f,
+    var punchAmount: Float = 0f,
+    var punchCenterHz: Float = 49.6f,
+    var punchQ: Float = 1.2f,
     var bands: List<EqBand> = defaultBands(),
     var limiterEnabled: Boolean = true,
     var limiterThreshold: Float = -2.5f,
@@ -67,13 +71,14 @@ data class EqSettings(
     var epicenterDepth: Float = 0f,
     var epicenterHarmonics: Float = 0f,
     var epicenterFrequency: Float = 36f,
-    var epicenterSweep: Float = 72f
+    var epicenterSweep: Float = 72f,
+    var epicenterHeadphoneMode: Boolean = false
 ) {
     fun toJson(): String {
         val o = JSONObject()
-        o.put("version", 9)
+        o.put("version", 10)
         o.put("preGain", preGain.toDouble()); o.put("subBoost", subBoost.toDouble())
-        o.put("bassMono", bassMono); o.put("bassAmount", bassAmount.toDouble()); o.put("bassPunch", bassPunch.toDouble()); o.put("bassHarmonics", bassHarmonics.toDouble())
+        o.put("bassMono", bassMono); o.put("bassAmount", bassAmount.toDouble()); o.put("bassPunch", bassPunch.toDouble()); o.put("bassHarmonics", bassHarmonics.toDouble()); o.put("bassFrequency", bassFrequency.toDouble()); o.put("punchAmount", punchAmount.toDouble()); o.put("punchCenterHz", punchCenterHz.toDouble()); o.put("punchQ", punchQ.toDouble())
         val bArr = JSONArray()
         bands.forEach { b ->
             val jo = JSONObject(); jo.put("id", b.id); jo.put("f", b.frequency.toDouble()); jo.put("g", b.gain.toDouble()); jo.put("q", b.q.toDouble()); jo.put("e", b.enabled); jo.put("t", b.filterType.ordinal); bArr.put(jo)
@@ -90,7 +95,7 @@ data class EqSettings(
         o.put("compPreGainLow", compPreGainLow.toDouble()); o.put("compPreGainLoMid", compPreGainLoMid.toDouble()); o.put("compPreGainHiMid", compPreGainHiMid.toDouble()); o.put("compPreGainHigh", compPreGainHigh.toDouble())
         o.put("pipelineEnabled", pipelineEnabled); o.put("lowShelfEnabled", lowShelfEnabled); o.put("peakEnabled", peakEnabled); o.put("highShelfEnabled", highShelfEnabled)
         o.put("audioSessionEnabled", audioSessionEnabled); o.put("selectedAudioSession", selectedAudioSession); o.put("hiResEnabled", hiResEnabled); o.put("hiResEpicenterEnabled", hiResEpicenterEnabled); o.put("spatialEnabled", spatialEnabled); o.put("spatialWidth", spatialWidth.toDouble())
-        o.put("epicenterAmount", epicenterAmount.toDouble()); o.put("epicenterDrive", epicenterDrive.toDouble()); o.put("epicenterDepth", epicenterDepth.toDouble()); o.put("epicenterHarmonics", epicenterHarmonics.toDouble()); o.put("epicenterFrequency", epicenterFrequency.toDouble()); o.put("epicenterSweep", epicenterSweep.toDouble())
+        o.put("epicenterAmount", epicenterAmount.toDouble()); o.put("epicenterDrive", epicenterDrive.toDouble()); o.put("epicenterDepth", epicenterDepth.toDouble()); o.put("epicenterHarmonics", epicenterHarmonics.toDouble()); o.put("epicenterFrequency", epicenterFrequency.toDouble()); o.put("epicenterSweep", epicenterSweep.toDouble()); o.put("epicenterHeadphoneMode", epicenterHeadphoneMode)
         return o.toString()
     }
 
@@ -99,7 +104,7 @@ data class EqSettings(
             val s = EqSettings()
             try {
                 val o = JSONObject(json)
-                s.preGain=o.optDouble("preGain",-6.0).toFloat(); s.subBoost=o.optDouble("subBoost",0.0).toFloat(); s.bassMono=o.optBoolean("bassMono",true); s.bassAmount=o.optDouble("bassAmount",0.0).toFloat(); s.bassPunch=o.optDouble("bassPunch",0.0).toFloat(); s.bassHarmonics=o.optDouble("bassHarmonics",0.0).toFloat()
+                s.preGain=o.optDouble("preGain",-6.0).toFloat(); s.subBoost=o.optDouble("subBoost",0.0).toFloat(); s.bassMono=o.optBoolean("bassMono",true); s.bassAmount=o.optDouble("bassAmount",0.0).toFloat(); s.bassPunch=o.optDouble("bassPunch",0.0).toFloat(); s.bassHarmonics=o.optDouble("bassHarmonics",0.0).toFloat(); s.bassFrequency=o.optDouble("bassFrequency",45.0).toFloat().coerceIn(25f,120f); s.punchAmount=o.optDouble("punchAmount",0.0).toFloat().coerceIn(0f,100f); s.punchCenterHz=o.optDouble("punchCenterHz",49.6).toFloat().coerceIn(35f,65f); s.punchQ=o.optDouble("punchQ",1.2).toFloat().coerceIn(.5f,3f)
                 val bArr=o.optJSONArray("bands")
                 if(bArr!=null&&bArr.length()>0){val list=mutableListOf<EqBand>();for(i in 0 until bArr.length()){val jo=bArr.getJSONObject(i);val typeOrd=jo.optInt("t",EqBand.FilterType.PEAK.ordinal);val type=EqBand.FilterType.values().getOrElse(typeOrd){EqBand.FilterType.PEAK};val id=jo.optInt("id",i);list.add(EqBand(id,jo.optDouble("f",1000.0).toFloat(),jo.optDouble("g",0.0).toFloat(),jo.optDouble("q",1.0).toFloat(),jo.optBoolean("e",true),type,bandColor(id)))};s.bands=list}
                 s.limiterEnabled=o.optBoolean("limiterEnabled",true);s.limiterThreshold=o.optDouble("limiterThreshold",-2.5).toFloat();s.limiterAttack=o.optDouble("limiterAttack",0.5).toFloat().coerceIn(.01f,100f);s.limiterRelease=o.optDouble("limiterRelease",120.0).toFloat();s.limiterRatio=o.optDouble("limiterRatio",20.0).toFloat();s.limiterPostGain=o.optDouble("limiterPostGain",0.0).toFloat()
@@ -112,7 +117,7 @@ data class EqSettings(
                 s.compReleaseLow=o.optDouble("compReleaseLow",legacyRelease).toFloat();s.compReleaseLoMid=o.optDouble("compReleaseLoMid",legacyRelease).toFloat();s.compReleaseHiMid=o.optDouble("compReleaseHiMid",legacyRelease).toFloat();s.compReleaseHigh=o.optDouble("compReleaseHigh",legacyRelease).toFloat()
                 s.compPostGainLow=o.optDouble("compPostGainLow",legacyPost).toFloat();s.compPostGainLoMid=o.optDouble("compPostGainLoMid",legacyPost).toFloat();s.compPostGainHiMid=o.optDouble("compPostGainHiMid",legacyPost).toFloat();s.compPostGainHigh=o.optDouble("compPostGainHigh",legacyPost).toFloat()
                 s.compPreGainLow=o.optDouble("compPreGainLow",0.0).toFloat();s.compPreGainLoMid=o.optDouble("compPreGainLoMid",0.0).toFloat();s.compPreGainHiMid=o.optDouble("compPreGainHiMid",0.0).toFloat();s.compPreGainHigh=o.optDouble("compPreGainHigh",0.0).toFloat()
-                s.pipelineEnabled=o.optBoolean("pipelineEnabled",true);s.lowShelfEnabled=o.optBoolean("lowShelfEnabled",true);s.peakEnabled=o.optBoolean("peakEnabled",true);s.highShelfEnabled=o.optBoolean("highShelfEnabled",true);s.audioSessionEnabled=o.optBoolean("audioSessionEnabled",false);s.selectedAudioSession=o.optString("selectedAudioSession","0: LOAD - Audio TX Output (Float)");s.hiResEnabled=o.optBoolean("hiResEnabled",false);s.hiResEpicenterEnabled=o.optBoolean("hiResEpicenterEnabled",true);s.spatialEnabled=o.optBoolean("spatialEnabled",false);s.spatialWidth=o.optDouble("spatialWidth",35.0).toFloat().coerceIn(0f,100f);val storedEpicenterAmount=o.optDouble("epicenterAmount",0.0).toFloat(); val settingsVersion=o.optInt("version",0); s.epicenterAmount=if(settingsVersion < 8) (storedEpicenterAmount.coerceIn(0f,100f)*0.12f).coerceIn(0f,12f) else storedEpicenterAmount.coerceIn(0f,12f);s.epicenterDrive=o.optDouble("epicenterDrive",0.0).toFloat().coerceIn(0f,100f);s.epicenterDepth=o.optDouble("epicenterDepth",0.0).toFloat().coerceIn(0f,100f);s.epicenterHarmonics=o.optDouble("epicenterHarmonics",0.0).toFloat().coerceIn(0f,100f);s.epicenterFrequency=o.optDouble("epicenterFrequency",36.0).toFloat().coerceIn(18f,65f);s.epicenterSweep=o.optDouble("epicenterSweep",72.0).toFloat().coerceIn(40f,140f)
+                s.pipelineEnabled=o.optBoolean("pipelineEnabled",true);s.lowShelfEnabled=o.optBoolean("lowShelfEnabled",true);s.peakEnabled=o.optBoolean("peakEnabled",true);s.highShelfEnabled=o.optBoolean("highShelfEnabled",true);s.audioSessionEnabled=o.optBoolean("audioSessionEnabled",false);s.selectedAudioSession=o.optString("selectedAudioSession","0: LOAD - Audio TX Output (Float)");s.hiResEnabled=o.optBoolean("hiResEnabled",false);s.hiResEpicenterEnabled=o.optBoolean("hiResEpicenterEnabled",true);s.spatialEnabled=o.optBoolean("spatialEnabled",false);s.spatialWidth=o.optDouble("spatialWidth",35.0).toFloat().coerceIn(0f,100f);val storedEpicenterAmount=o.optDouble("epicenterAmount",0.0).toFloat(); val settingsVersion=o.optInt("version",0); s.epicenterAmount=if(settingsVersion < 8) (storedEpicenterAmount.coerceIn(0f,100f)*0.12f).coerceIn(0f,12f) else storedEpicenterAmount.coerceIn(0f,12f);s.epicenterDrive=o.optDouble("epicenterDrive",0.0).toFloat().coerceIn(0f,100f);s.epicenterDepth=o.optDouble("epicenterDepth",0.0).toFloat().coerceIn(0f,100f);s.epicenterHarmonics=o.optDouble("epicenterHarmonics",0.0).toFloat().coerceIn(0f,100f);s.epicenterFrequency=o.optDouble("epicenterFrequency",36.0).toFloat().coerceIn(18f,65f);s.epicenterSweep=o.optDouble("epicenterSweep",72.0).toFloat().coerceIn(40f,140f); s.epicenterHeadphoneMode=o.optBoolean("epicenterHeadphoneMode",false)
             }catch(_:Exception){}
             return s
         }
