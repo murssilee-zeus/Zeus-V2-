@@ -190,8 +190,21 @@ private fun applyDashPreset(vm:EqViewModel,p:PunchViewModel,group:Int,index:Int)
   listOf(1.5f,2f,1.2f,0f,0f,.5f,1f,1.2f,1f,.8f),
   listOf(0f,.5f,.2f,-.2f,0f,.5f,.5f,.6f,.8f,.8f),
   listOf(.8f,1f,.5f,0f,.2f,.8f,1f,1.4f,1.5f,1.3f))
- val base=vm.bands.toList()
- if(base.isNotEmpty()){vm.bands.clear();vm.bands.addAll(base.mapIndexed{i,b->b.copy(gain=(gains[index][i%10]*when(group){0->1f;1->1.6f;2->1.8f;else->2f}).coerceIn(-4f,4f),enabled=true)});vm.selectBand(0)}
+ val base=createDefaultBands()
+ if(base.isNotEmpty()){
+  val source=gains[index]
+  val scale=when(group){0->1f;1->1.6f;2->1.8f;else->2f}
+  vm.bands.clear()
+  vm.bands.addAll(base.mapIndexed{i,b->
+   val pos=if(base.size<=1)0f else i.toFloat()*source.lastIndex/(base.lastIndex)
+   val lo=kotlin.math.floor(pos).toInt().coerceIn(0,source.lastIndex)
+   val hi=(lo+1).coerceAtMost(source.lastIndex)
+   val t=pos-lo
+   val interpolated=source[lo]+(source[hi]-source[lo])*t
+   b.copy(gain=(interpolated*scale).coerceIn(-4f,4f),enabled=true)
+  })
+  vm.selectBand(0)
+ }
  vm.preamp=when(group){0->-2.5f-(index%3)*.35f;1->-4f;2->-3.5f;else->-5.5f}
  vm.subBoost=when(group){3->(4f+index*1.2f).coerceAtMost(10f);1->2f;else->0f}
  vm.spatialEnabled=group==2;vm.hiResEnabled=group==0||group==1;vm.hiResEpicenterEnabled=group==1
