@@ -218,7 +218,7 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toSettings(punch: PunchViewModel? = null): EqSettings = EqSettings(
-        preGain = preamp, subBoost = subBoost, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
+        preGain = preamp, subBoost = subBoost, bassMono = punch?.bassMono ?: true, bassAmount = punch?.bassAmount ?: 0f, bassPunch = punch?.amount ?: 0f, bassHarmonics = punch?.bassHarmonics ?: 0f, bassFrequency = punch?.bassFrequencyHz ?: 45f, punchAmount = punch?.amount ?: 0f, punchCenterHz = punch?.centerHz ?: 49.6f, punchQ = punch?.q ?: 1.2f, bands = bands.toList(), limiterEnabled = limiterEnabled, limiterThreshold = limiterThreshold,
         limiterAttack = limiterAttack, limiterRelease = limiterRelease, limiterRatio = limiterRatio, limiterPostGain = limiterPostGain,
         compEnabled = compressorMultibandEnabled, cross1 = crossoverFrequencies.getOrElse(0) { 180f }, cross2 = crossoverFrequencies.getOrElse(1) { 1800f }, cross3 = crossoverFrequencies.getOrElse(2) { 8000f }, cross4 = crossoverFrequencies.getOrElse(3) { 20000f },
         compThLow = compMbThLow, compThLoMid = compMbThLoMid, compThHiMid = compMbThHiMid, compThHigh = compMbThHigh,
@@ -235,11 +235,12 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         epicenterDepth = punch?.epicenterDepth ?: 0f,
         epicenterHarmonics = punch?.epicenterHarmonics ?: 0f,
         epicenterFrequency = punch?.epicenterFrequencyHz ?: 36f,
-        epicenterSweep = punch?.epicenterSweepHz ?: 72f
+        epicenterSweep = punch?.epicenterSweepHz ?: 72f,
+        epicenterHeadphoneMode = punch?.epicenterHeadphoneMode ?: false
     )
 
-    fun loadFrom(s: EqSettings) {
-        preamp = s.preGain; subBoost = s.subBoost; bands.clear(); bands.addAll(s.bands); limiterEnabled = s.limiterEnabled; limiterThreshold = s.limiterThreshold; limiterAttack = s.limiterAttack; limiterRelease = s.limiterRelease; limiterRatio = s.limiterRatio; limiterPostGain = s.limiterPostGain; compressorMultibandEnabled = s.compEnabled
+    fun loadFrom(s: EqSettings, punch: PunchViewModel? = null) {
+        preamp = s.preGain; subBoost = s.subBoost; punch?.let { it.updateBassMono(s.bassMono); it.updateBassAmount(s.bassAmount); it.updateBassFrequency(s.bassFrequency); it.updateBassHarmonics(s.bassHarmonics); it.updatePunchAmount(s.punchAmount); it.updatePunchCenter(s.punchCenterHz); it.updatePunchQ(s.punchQ); it.updateEpicenterAmount(s.epicenterAmount); it.updateEpicenterDrive(s.epicenterDrive); it.updateEpicenterDepth(s.epicenterDepth); it.updateEpicenterHarmonics(s.epicenterHarmonics); it.updateEpicenterFrequency(s.epicenterFrequency); it.updateEpicenterSweep(s.epicenterSweep); it.updateEpicenterHeadphoneMode(s.epicenterHeadphoneMode) }; bands.clear(); bands.addAll(s.bands); limiterEnabled = s.limiterEnabled; limiterThreshold = s.limiterThreshold; limiterAttack = s.limiterAttack; limiterRelease = s.limiterRelease; limiterRatio = s.limiterRatio; limiterPostGain = s.limiterPostGain; compressorMultibandEnabled = s.compEnabled
         crossoverFrequencies[0] = s.cross1
         crossoverFrequencies[1] = s.cross2
         crossoverFrequencies[2] = s.cross3
@@ -247,13 +248,13 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         compMbThLow = s.compThLow; compMbThLoMid = s.compThLoMid; compMbThHiMid = s.compThHiMid; compMbThHigh = s.compThHigh; compMbRatioLow = s.compRatioLow; compMbRatioLoMid = s.compRatioLoMid; compMbRatioHiMid = s.compRatioHiMid; compMbRatioHigh = s.compRatioHigh; compMbKneeLow = s.compKneeLow; compMbKneeLoMid = s.compKneeLoMid; compMbKneeHiMid = s.compKneeHiMid; compMbKneeHigh = s.compKneeHigh; compMbAttackLow = s.compAttackLow; compMbAttackLoMid = s.compAttackLoMid; compMbAttackHiMid = s.compAttackHiMid; compMbAttackHigh = s.compAttackHigh; compMbReleaseLow = s.compReleaseLow; compMbReleaseLoMid = s.compReleaseLoMid; compMbReleaseHiMid = s.compReleaseHiMid; compMbReleaseHigh = s.compReleaseHigh; compMbPostGainLow = s.compPostGainLow; compMbPostGainLoMid = s.compPostGainLoMid; compMbPostGainHiMid = s.compPostGainHiMid; compMbPostGainHigh = s.compPostGainHigh; compMbPreGainLow = s.compPreGainLow; compMbPreGainLoMid = s.compPreGainLoMid; compMbPreGainHiMid = s.compPreGainHiMid; compMbPreGainHigh = s.compPreGainHigh; pipelineEnabled = s.pipelineEnabled; lowShelfEnabled = s.lowShelfEnabled; peakBandsEnabled = s.peakEnabled; highShelfEnabled = s.highShelfEnabled; audioSessionEnabled = s.audioSessionEnabled; selectedAudioSession = s.selectedAudioSession; hiResEpicenterEnabled = s.hiResEpicenterEnabled; spatialEnabled = s.spatialEnabled; spatialWidth = s.spatialWidth
     }
 
-    fun saveNamedPreset(name: String) { val clean = name.trim(); if (clean.isNotEmpty()) { val settings=toSettings(); EqPrefs.saveNamed(getApplication(), clean, settings); ConfigFileRepository.saveNamed(getApplication(), clean, settings) } }
-    fun loadNamedPreset(name: String) { EqPrefs.loadNamed(getApplication(), name)?.let { loadFrom(it) } }
+    fun saveNamedPreset(name: String, punch: PunchViewModel? = null) { val clean = name.trim(); if (clean.isNotEmpty()) { val settings=toSettings(punch); EqPrefs.saveNamed(getApplication(), clean, settings); ConfigFileRepository.saveNamed(getApplication(), clean, settings) } }
+    fun loadNamedPreset(name: String, punch: PunchViewModel? = null) { EqPrefs.loadNamed(getApplication(), name)?.let { loadFrom(it, punch) } }
     fun deleteNamedPreset(name: String) { EqPrefs.deleteNamed(getApplication(), name) }
     fun namedPresetNames(): List<String> = EqPrefs.listNamed(getApplication())
     fun selectTarget(context: android.content.Context, target: TargetModel) { selectedTargetName = target.name; targetCurve = AutoEqRepository.loadTarget(context, target) }
     fun applyAutoEqProfile(profile: AutoEqProfile) { preamp = profile.preamp; bands.clear(); profile.filters.take(MAX_BANDS).forEachIndexed { i, f -> bands.add(createNewBand(i, f.frequency).copy(gain=f.gain, q=f.q, filterType=f.type, enabled=true)) }; if (bands.isEmpty()) bands.add(createNewBand(0, 1000f)); selectedBandIndex = 0; limiterEnabled = true }
-    fun saveSettings() { val settings=toSettings(); EqPrefs.save(getApplication(), settings); ConfigFileRepository.saveLatest(getApplication(), settings) }
+    fun saveSettings(punch: PunchViewModel? = null) { val settings=toSettings(punch); EqPrefs.save(getApplication(), settings); ConfigFileRepository.saveLatest(getApplication(), settings) }
     fun loadSavedIfAny() { EqPrefs.load(getApplication())?.let { loadFrom(it) } }
     fun selectBand(index: Int) { if (index in bands.indices) selectedBandIndex = index }
     fun updateSelectedBand(frequency: Float? = null, gain: Float? = null, q: Float? = null, enabled: Boolean? = null, filterType: EqBand.FilterType? = null) { val idx = selectedBandIndex; if (idx !in bands.indices) return; val current = bands[idx]; bands[idx] = current.copy(frequency = frequency?.coerceIn(1f, 30000f) ?: current.frequency, gain = gain?.coerceIn(-30f, 30f) ?: current.gain, q = q?.coerceIn(0.1f, 40f) ?: current.q, enabled = enabled ?: current.enabled, filterType = filterType ?: current.filterType) }
