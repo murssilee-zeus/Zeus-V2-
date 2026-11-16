@@ -114,6 +114,21 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Keeps the user's reference bass anchor consistent across built-in EQ presets.
+     * Sub-bass bands remain separate so they can add depth without replacing the 105 Hz shelf.
+     */
+    private fun enforceReferenceLowShelf(defaultGain: Float = 0f) {
+        val shelfIndex = bands.indexOfFirst { it.filterType == EqBand.FilterType.LOW_SHELF }
+        if (shelfIndex >= 0) {
+            val shelf = bands[shelfIndex]
+            bands[shelfIndex] = shelf.copy(frequency = 105f)
+        } else if (bands.size < MAX_BANDS) {
+            bands.add(createNewBand((bands.maxOfOrNull { it.id } ?: -1) + 1, 105f)
+                .copy(gain = defaultGain, q = 0.75f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
+        }
+    }
+
     // ===================== PRESETS =====================
 
     fun applyPresetFlat() {
@@ -136,17 +151,19 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
         subBoost = 6f
 
         bands.clear()
-        bands.add(createNewBand(0, 18f).copy(gain = 9f, q = 0.75f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
+        bands.add(createNewBand(0, 18f).copy(gain = 9f, q = 0.75f, filterType = EqBand.FilterType.PEAK, enabled = true))
         bands.add(createNewBand(1, 33f).copy(gain = 3.5f, q = 1.1f, filterType = EqBand.FilterType.PEAK, enabled = true))
         bands.add(createNewBand(2, 48f).copy(gain = 2.5f, q = 2.2f, filterType = EqBand.FilterType.PEAK, enabled = true))
-        bands.add(createNewBand(3, 90f).copy(gain = 1.5f, q = 0.9f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
+        bands.add(createNewBand(3, 90f).copy(gain = 1.5f, q = 0.9f, filterType = EqBand.FilterType.PEAK, enabled = true))
+        bands.add(createNewBand(10, 105f).copy(gain = 1.5f, q = 0.75f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
         bands.add(createNewBand(4, 250f).copy(gain = 0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(5, 500f).copy(gain = 0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(6, 1000f).copy(gain = 0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(7, 2500f).copy(gain = 0.5f, q = 1.2f, enabled = true))
         bands.add(createNewBand(8, 6000f).copy(gain = 1.0f, q = 1.0f, enabled = true))
         bands.add(createNewBand(9, 12000f).copy(gain = 1.0f, q = 0.8f, filterType = EqBand.FilterType.HIGH_SHELF, enabled = true))
-        selectedBandIndex = 0
+        enforceReferenceLowShelf()
+        selectedBandIndex = bands.indexOfFirst { it.frequency == 105f && it.filterType == EqBand.FilterType.LOW_SHELF }.coerceAtLeast(0)
         compressorMultibandEnabled = true
         crossoverFrequencies[0] = 120f
         crossoverFrequencies[1] = 2500f
@@ -162,36 +179,41 @@ class EqViewModel(application: Application) : AndroidViewModel(application) {
     fun applyPresetBassBoost() {
         applyPresetZeusInfrabass()
         preamp = -4.8f; subBoost = 3f
-        if (bands.isNotEmpty()) bands[0] = bands[0].copy(frequency = 40f, gain = 5.5f, q = 0.85f, filterType = EqBand.FilterType.LOW_SHELF)
-        if (bands.size > 1) bands[1] = bands[1].copy(frequency = 55f, gain = 2.5f, q = 1.0f)
+        if (bands.isNotEmpty()) bands[0] = bands[0].copy(frequency = 40f, gain = 5.5f, q = 0.85f, filterType = EqBand.FilterType.PEAK)
+        if (bands.size > 1) bands[1] = bands[1].copy(frequency = 55f, gain = 2.5f, q = 1.0f, filterType = EqBand.FilterType.PEAK)
+        enforceReferenceLowShelf(3.5f)
     }
 
     fun applyPresetVocalClear() {
         preamp = -3f; subBoost = 0f; bands.clear()
-        bands.add(createNewBand(0, 60f).copy(gain = -1.5f, q = 0.9f, filterType = EqBand.FilterType.LOW_SHELF, enabled = true))
+        bands.add(createNewBand(0, 60f).copy(gain = -1.5f, q = 0.9f, filterType = EqBand.FilterType.PEAK, enabled = true))
         bands.add(createNewBand(1, 200f).copy(gain = -1f, q = 1.2f, enabled = true))
         bands.add(createNewBand(2, 1000f).copy(gain = 1.5f, q = 1.0f, enabled = true))
         bands.add(createNewBand(3, 3000f).copy(gain = 2.5f, q = 1.3f, enabled = true))
         bands.add(createNewBand(4, 6000f).copy(gain = 1.5f, q = 1.0f, enabled = true))
         bands.add(createNewBand(5, 12000f).copy(gain = 1f, q = 0.8f, filterType = EqBand.FilterType.HIGH_SHELF, enabled = true))
+        enforceReferenceLowShelf(-1.5f)
         selectedBandIndex = 2; compressorMultibandEnabled = true; limiterEnabled = true; limiterThreshold = -2f; limiterRatio = 8f; limiterAttack = 1f; limiterRelease = 100f
     }
 
     fun applyPresetJazz() {
         preamp = -4f; subBoost = 0.5f; bands.clear()
         listOf(60f to -1.0f, 120f to 0.5f, 250f to -0.5f, 500f to 0.0f, 1000f to 1.0f, 2200f to 1.5f, 4500f to 1.0f, 8000f to 0.5f, 12000f to 1.0f).forEachIndexed { i, (freq, gain) -> bands.add(createNewBand(i, freq).copy(gain = gain, q = if (freq in 1800f..5000f) 1.15f else 1.0f, enabled = true)) }
+        enforceReferenceLowShelf(-0.5f)
         selectedBandIndex = 4; compressorMultibandEnabled = true; limiterEnabled = true; limiterThreshold = -2f; limiterRatio = 5f; limiterAttack = 8f; limiterRelease = 120f
     }
 
     fun applyPresetBassTreble() {
         preamp = -5f; subBoost = 2f; bands.clear()
-        listOf(45f to 3.5f, 100f to 2.5f, 250f to 0f, 500f to -0.5f, 1000f to 0f, 2500f to -0.5f, 5000f to 2.0f, 10000f to 3.0f, 16000f to 3.5f).forEachIndexed { i, (freq, gain) -> val type = when (i) { 0 -> EqBand.FilterType.LOW_SHELF; 8 -> EqBand.FilterType.HIGH_SHELF; else -> EqBand.FilterType.PEAK }; bands.add(createNewBand(i, freq).copy(gain = gain, q = 0.95f, filterType = type, enabled = true)) }
+        listOf(45f to 3.5f, 100f to 2.5f, 250f to 0f, 500f to -0.5f, 1000f to 0f, 2500f to -0.5f, 5000f to 2.0f, 10000f to 3.0f, 16000f to 3.5f).forEachIndexed { i, (freq, gain) -> val type = when (i) { 0 -> EqBand.FilterType.PEAK; 8 -> EqBand.FilterType.HIGH_SHELF; else -> EqBand.FilterType.PEAK }; bands.add(createNewBand(i, freq).copy(gain = gain, q = 0.95f, filterType = type, enabled = true)) }
+        enforceReferenceLowShelf(2.5f)
         selectedBandIndex = 0; compressorMultibandEnabled = true; limiterEnabled = true; limiterThreshold = -1.5f; limiterRatio = 6f; limiterAttack = 2f; limiterRelease = 110f
     }
 
     fun applyPresetAcoustic() {
         preamp = -5.5f; subBoost = 2.5f; bands.clear()
-        listOf(32f to 2.8f, 70f to 3.2f, 140f to 1.2f, 280f to -0.8f, 900f to 0.8f, 1800f to 1.8f, 3200f to 2.2f, 6500f to 1.5f, 10000f to 1.8f, 14500f to 1.2f, 18000f to 0.8f).forEachIndexed { i, (freq, gain) -> val type = when { i == 0 -> EqBand.FilterType.LOW_SHELF; i == 10 -> EqBand.FilterType.HIGH_SHELF; else -> EqBand.FilterType.PEAK }; val q = when { freq in 1500f..4000f -> 1.05f; freq >= 6000f -> 0.8f; else -> 1.0f }; bands.add(createNewBand(i, freq).copy(gain = gain, q = q, filterType = type, enabled = true)) }
+        listOf(32f to 2.8f, 70f to 3.2f, 140f to 1.2f, 280f to -0.8f, 900f to 0.8f, 1800f to 1.8f, 3200f to 2.2f, 6500f to 1.5f, 10000f to 1.8f, 14500f to 1.2f, 18000f to 0.8f).forEachIndexed { i, (freq, gain) -> val type = when { i == 0 -> EqBand.FilterType.PEAK; i == 10 -> EqBand.FilterType.HIGH_SHELF; else -> EqBand.FilterType.PEAK }; val q = when { freq in 1500f..4000f -> 1.05f; freq >= 6000f -> 0.8f; else -> 1.0f }; bands.add(createNewBand(i, freq).copy(gain = gain, q = q, filterType = type, enabled = true)) }
+        enforceReferenceLowShelf(2.8f)
         selectedBandIndex = 5; compressorMultibandEnabled = true; limiterEnabled = true; limiterThreshold = -1.8f; limiterRatio = 5f; limiterAttack = 3f; limiterRelease = 120f
     }
 
