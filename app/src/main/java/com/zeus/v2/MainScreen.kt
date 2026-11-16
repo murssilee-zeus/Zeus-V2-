@@ -273,12 +273,22 @@ private fun AutoEqScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) 
             }
             if (targets.isEmpty()) Text("No se encontraron targets en assets/targets", color = Color(0xFFFF6B6B), fontSize = 9.sp)
         }
+        // Módulo compacto colocado debajo de Targets para no cubrir ni desplazar los presets.
+        SectionCard("MIS CONFIGURACIONES") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Guarda y recupera tu configuración personalizada.", color = TXT_MUTED, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                Text("Guardar ↑", color = PINK_ACCENT, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
         SectionCard("PRESETS") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 presets.forEach { (name, action) -> Box(Modifier.clip(RoundedCornerShape(9.dp)).background(SURFACE).border(1.dp, CARD_BORDER, RoundedCornerShape(9.dp)).clickable { action() }.padding(horizontal = 11.dp, vertical = 9.dp)) { Text(name, color = TXT_PRIMARY, fontSize = 10.sp, fontWeight = FontWeight.SemiBold) } }
             }
         }
-        SectionCard("MIS CONFIGURACIONES") { Text("Usa Guardar para conservar la configuración actual.", color = TXT_MUTED, fontSize = 10.sp) }
     }
 }
 
