@@ -65,7 +65,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   Box(Modifier.weight(1f).fillMaxWidth()){
    if(showPresetDashboard) ZeusPresetDashboard(vm,punch)
    else if(cfg.screenWidthDp > cfg.screenHeightDp) ZeusConsoleLandscape(vm,punch)
-   else when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm)}
+   else when(page){0->EqPage(vm,punch,{page=1});1->DynPage(vm);2->AutoEqPage(vm,punch)}
   }
   Row(Modifier.fillMaxWidth().padding(top=4.dp),verticalAlignment=Alignment.CenterVertically){
    Text(if(vm.isEngineRunning)"● ACTIVO" else "○ DETENIDO",color=if(vm.isEngineRunning)ZG else ZM,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{onToggleEngine()})
@@ -485,7 +485,7 @@ private fun HarmanTargetsCard(vm:EqViewModel){
  }
 }
 
-@Composable private fun AutoEqPage(vm:EqViewModel, embedded:Boolean = false){
+@Composable private fun AutoEqPage(vm:EqViewModel, punch:PunchViewModel? = null, embedded:Boolean = false){
  val ctx=LocalContext.current
  val scope=rememberCoroutineScope()
  var query by remember{mutableStateOf("")}
@@ -570,7 +570,7 @@ private fun HarmanTargetsCard(vm:EqViewModel){
    }
    if(status.isNotBlank()) Text(status,color=ZG,fontSize=9.sp)
   }
-  Presets(vm)
+  Presets(vm,punch)
  }
 }
 @Composable
@@ -811,7 +811,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
   names.forEach { preset ->
    Row(verticalAlignment=Alignment.CenterVertically){
     Text(preset,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{vm.loadNamedPreset(preset, punch)})
-    Text("CARGAR",color=ZP,fontSize=8.sp,modifier=Modifier.clickable{vm.loadNamedPreset(preset)}.padding(4.dp))
+    Text("CARGAR",color=ZP,fontSize=8.sp,modifier=Modifier.clickable{vm.loadNamedPreset(preset, punch)}.padding(4.dp))
     Text("×",color=ZPK,fontSize=14.sp,modifier=Modifier.clickable{vm.deleteNamedPreset(preset);names=vm.namedPresetNames()}.padding(4.dp))
    }
   }
