@@ -132,6 +132,7 @@ private fun ZeusPresetDashboard(vm:EqViewModel,p:PunchViewModel){
    PreampDash(vm,Modifier.fillMaxWidth().height(285.dp))
   }
  }
+ SavedPresetsCard(vm,p)
 }
 
 @Composable
@@ -323,7 +324,7 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
     Text("+ BANDA",color=Color.White,fontSize=8.sp,modifier=Modifier.background(ZP,RoundedCornerShape(5.dp)).clickable{vm.addBand()}.padding(horizontal=8.dp,vertical=5.dp))
    }
    EqGraph(vm.bands,vm.selectedBandIndex,vm.spectrum,vm.targetCurve,{vm.selectBand(it)},{i,f,g->vm.selectBand(i);vm.updateSelectedBand(frequency=f,gain=g)},Modifier.fillMaxWidth().height(390.dp))
-   Filters(vm); BandEdit(vm); Presets(vm); Bands(vm)
+   Filters(vm); BandEdit(vm); Presets(vm,punch); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
    SubSismoCard(vm); PunchCard(punch,vm); EpicenterCard(punch)
@@ -775,12 +776,12 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
     AlertDialog(onDismissRequest=onCancel,title={Text(title)},text={OutlinedTextField(value=text,onValueChange={text=it},singleLine=true,label={Text(if(unit.isEmpty())"Valor" else unit)})},confirmButton={TextButton(onClick={text.toFloatOrNull()?.let{onConfirm(it.coerceIn(min,max))}}){Text("OK")}},dismissButton={TextButton(onClick=onCancel){Text("Cancelar")}})
 }
 
-@Composable private fun Presets(vm:EqViewModel){
+@Composable private fun Presets(vm:EqViewModel, punch:PunchViewModel? = null){
  Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){
    listOf("Flat" to {vm.applyPresetFlat()},"Zeus" to {vm.applyPresetZeusInfrabass()},"Bass Boost" to {vm.applyPresetBassBoost()},"Vocal Clear" to {vm.applyPresetVocalClear()},"Jazz" to {vm.applyPresetJazz()},"Bass-Treble" to {vm.applyPresetBassTreble()},"Acoustic" to {vm.applyPresetAcoustic()}).forEach{(n,a)->Text(n,color=if(n=="Infrabass")ZP else ZT,fontSize=9.sp,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).clickable{a()}.padding(horizontal=9.dp,vertical=6.dp))}
   }
-  SavedPresetsCard(vm)
+  SavedPresetsCard(vm, punch)
  }
 }
 @Composable private fun Bands(vm:EqViewModel){
@@ -796,7 +797,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
  }
 }
 
-@Composable private fun SavedPresetsCard(vm:EqViewModel){
+@Composable private fun SavedPresetsCard(vm:EqViewModel, punch:PunchViewModel? = null){
   val autoEqContext = LocalContext.current
   val scope = rememberCoroutineScope()
  var names by remember { mutableStateOf(vm.namedPresetNames()) }
@@ -809,7 +810,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
   }
   names.forEach { preset ->
    Row(verticalAlignment=Alignment.CenterVertically){
-    Text(preset,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{vm.loadNamedPreset(preset)})
+    Text(preset,color=ZT,fontSize=9.sp,modifier=Modifier.weight(1f).clickable{vm.loadNamedPreset(preset, punch)})
     Text("CARGAR",color=ZP,fontSize=8.sp,modifier=Modifier.clickable{vm.loadNamedPreset(preset)}.padding(4.dp))
     Text("×",color=ZPK,fontSize=14.sp,modifier=Modifier.clickable{vm.deleteNamedPreset(preset);names=vm.namedPresetNames()}.padding(4.dp))
    }
@@ -818,7 +819,7 @@ private fun NumberDialog(title:String,value:Float,min:Float,max:Float,unit:Strin
  }
  if(showSave){
   AlertDialog(onDismissRequest={showSave=false},title={Text("Guardar configuración")},text={OutlinedTextField(value=name,onValueChange={name=it},singleLine=true,label={Text("Nombre")})},
-   confirmButton={TextButton(onClick={if(name.trim().isNotEmpty()){vm.saveNamedPreset(name);names=vm.namedPresetNames();name="";showSave=false}}){Text("Guardar")}},
+   confirmButton={TextButton(onClick={if(name.trim().isNotEmpty()){vm.saveNamedPreset(name, punch);names=vm.namedPresetNames();name="";showSave=false}}){Text("Guardar")}},
    dismissButton={TextButton(onClick={showSave=false}){Text("Cancelar")}})
  }
 }
