@@ -273,15 +273,90 @@ private fun AutoEqScreen(viewModel: EqViewModel, modifier: Modifier = Modifier) 
             }
             if (targets.isEmpty()) Text("No se encontraron targets en assets/targets", color = Color(0xFFFF6B6B), fontSize = 9.sp)
         }
-        // Módulo compacto colocado debajo de Targets para no cubrir ni desplazar los presets.
+        // Presets personales persistentes: se guardan en las preferencias locales de Zeus.
+        var customName by remember { mutableStateOf("") }
+        var namedPresets by remember { mutableStateOf(viewModel.namedPresetNames()) }
         SectionCard("MIS CONFIGURACIONES") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Text("Guarda y recupera tu configuración personalizada.", color = TXT_MUTED, fontSize = 10.sp, modifier = Modifier.weight(1f))
-                Text("Guardar ↑", color = PINK_ACCENT, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = customName,
+                    onValueChange = { customName = it },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    placeholder = { Text("Nombre del preset...", color = TXT_MUTED, fontSize = 11.sp) },
+                    textStyle = LocalTextStyle.current.copy(color = TXT_PRIMARY, fontSize = 12.sp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = PINK_ACCENT,
+                        unfocusedBorderColor = CARD_BORDER,
+                        focusedTextColor = TXT_PRIMARY,
+                        unfocusedTextColor = TXT_PRIMARY,
+                        cursorColor = PINK_ACCENT
+                    )
+                )
+                Text(
+                    "+ GUARDAR",
+                    color = Color.Black,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
+                        .background(PINK_ACCENT)
+                        .clickable {
+                            val clean = customName.trim()
+                            if (clean.isNotEmpty()) {
+                                viewModel.saveNamedPreset(clean)
+                                namedPresets = viewModel.namedPresetNames()
+                                customName = ""
+                            }
+                        }
+                        .padding(horizontal = 11.dp, vertical = 11.dp)
+                )
+            }
+            if (namedPresets.isEmpty()) {
+                Text("Todavía no hay configuraciones guardadas.", color = TXT_MUTED, fontSize = 10.sp)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    namedPresets.forEach { presetName ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF19191F))
+                                .border(1.dp, CARD_BORDER, RoundedCornerShape(8.dp))
+                                .padding(start = 9.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                presetName,
+                                color = TXT_PRIMARY,
+                                fontSize = 11.sp,
+                                modifier = Modifier.weight(1f).clickable {
+                                    viewModel.loadNamedPreset(presetName)
+                                }.padding(vertical = 5.dp)
+                            )
+                            Text(
+                                "CARGAR",
+                                color = Color(0xFF65D6A0),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable {
+                                    viewModel.loadNamedPreset(presetName)
+                                }.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                            Text(
+                                "×",
+                                color = Color(0xFFFF7777),
+                                fontSize = 17.sp,
+                                modifier = Modifier.clickable {
+                                    viewModel.deleteNamedPreset(presetName)
+                                    namedPresets = viewModel.namedPresetNames()
+                                }.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
         SectionCard("PRESETS") {
@@ -585,23 +660,66 @@ private fun PreampRow(viewModel: EqViewModel) {
             .clip(RoundedCornerShape(10.dp))
             .background(SURFACE)
             .border(1.dp, CARD_BORDER, RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Text("Preamp", color = TXT_MUTED, fontSize = 13.sp, modifier = Modifier.width(60.dp))
-        Slider(
-            value = viewModel.preamp,
-            onValueChange = { viewModel.preamp = it },
-            valueRange = -30f..12f,
-            modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("PREAMP GENERAL", color = TXT_MUTED, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(String.format("%.1f dB", viewModel.preamp), color = PINK_ACCENT, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Slider(
+                value = viewModel.preamp,
+                onValueChange = { viewModel.preamp = it },
+                valueRange = -30f..12f,
+                modifier = Modifier.fillMaxWidth().height(28.dp),
+                colors = SliderDefaults.colors(thumbColor = PINK_ACCENT, activeTrackColor = PINK_ACCENT)
+            )
+        }
+        SpectrumMiniVisualizer(
+            spectrum = viewModel.spectrum,
+            modifier = Modifier.width(116.dp).height(48.dp)
         )
-        Text(
-            String.format("%.1f dB", viewModel.preamp),
-            color = TXT_PRIMARY,
-            fontSize = 13.sp,
-            modifier = Modifier.width(64.dp)
-        )
+    }
+}
+
+@Composable
+private fun SpectrumMiniVisualizer(
+    spectrum: FloatArray,
+    modifier: Modifier = Modifier
+) {
+    Canvas(
+        modifier = modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(Color(0xFF090D16))
+            .border(1.dp, Color(0xFF26344C), RoundedCornerShape(7.dp))
+            .padding(4.dp)
+    ) {
+        val values = if (spectrum.isEmpty()) listOf(0f) else spectrum.toList()
+        val count = 28
+        val gap = size.width * 0.012f
+        val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+        val step = (values.size.toFloat() / count).coerceAtLeast(1f)
+        for (i in 0 until count) {
+            val index = (i * step).toInt().coerceIn(0, values.lastIndex)
+            val raw = values[index].takeIf { it.isFinite() } ?: 0f
+            val normalized = if (raw > 1f) (raw / 100f).coerceIn(0f, 1f) else raw.coerceIn(0f, 1f)
+            val h = (size.height * (0.08f + normalized * 0.88f)).coerceIn(2f, size.height)
+            val x = i * (barWidth + gap)
+            val y = (size.height - h) / 2f
+            val color = when {
+                i < 9 -> Color(0xFF27D7E8)
+                i < 19 -> Color(0xFF4B8DFF)
+                else -> Color(0xFFB36BFF)
+            }
+            drawRoundRect(
+                color = color.copy(alpha = 0.45f + normalized * 0.55f),
+                topLeft = Offset(x, y),
+                size = Size(barWidth, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
+            )
+        }
     }
 }
 
