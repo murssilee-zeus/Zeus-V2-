@@ -307,6 +307,8 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             LimCard(vm); SpatialCard(vm)
             AutoEqSafeCard(vm)
             HarmanTargetsCard(vm)
+            // Mis configuraciones dentro del flujo de página 3, debajo de Harman Targets.
+            SavedPresetsCard(vm,punch)
             Card("ENGINE STATUS"){
                 Text(if(vm.isEngineRunning)"ZEUS ENGINE ACTIVE" else "ZEUS ENGINE READY",color=if(vm.isEngineRunning)ZG else ZM,fontSize=12.sp,fontWeight=FontWeight.Bold)
                 Spacer(Modifier.height(6.dp)); Text("EQ Graph integrado en esta prueba.",color=ZM,fontSize=9.sp)
@@ -559,8 +561,6 @@ private fun HarmanTargetsCard(vm:EqViewModel){
     }
    }
   }
-  // Las configuraciones personales quedan justo debajo de Targets y separadas de los presets de fábrica.
-  SavedPresetsCard(vm,punch)
   Card("MODELOS AUTOEQ"){
    Row(verticalAlignment=Alignment.CenterVertically){
     Text("Resultados",color=ZT,fontSize=10.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f))
