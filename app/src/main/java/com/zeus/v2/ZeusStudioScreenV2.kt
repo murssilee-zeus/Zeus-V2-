@@ -163,7 +163,7 @@ private fun SpectrumDash(vm:EqViewModel, modifier:Modifier=Modifier){
     // FFT en dBFS: elevamos la zona baja para que la animación sea visible también a volumen moderado.
     val rawDb=vm.spectrum.getOrElse((i*vm.spectrum.size/24).coerceIn(0,(vm.spectrum.size-1).coerceAtLeast(0))){-80f}
     val normalized=((rawDb+82f)/88f).coerceIn(0f,1f)
-    val level=kotlin.math.pow(normalized,.38f)
+    val level=kotlin.math.sqrt(kotlin.math.sqrt(normalized))
     val accent=when(i){in 0..7->ZCY;in 8..16->Color(0xFF4B8DFF);else->ZP}
     Box(Modifier.weight(1f).height((2f+level*34f).dp).background(accent.copy(alpha=.62f+level*.38f),RoundedCornerShape(3.dp)))
    }
