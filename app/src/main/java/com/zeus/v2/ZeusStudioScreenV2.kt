@@ -160,13 +160,12 @@ private fun SpectrumDash(vm:EqViewModel, modifier:Modifier=Modifier){
   Text("LIVE SPECTRUM",color=ZCY,fontSize=7.sp,fontWeight=FontWeight.Bold)
   Row(Modifier.fillMaxWidth().weight(1f),horizontalArrangement=Arrangement.spacedBy(2.dp),verticalAlignment=Alignment.CenterVertically){
    for(i in 0 until 24){
-    // AudioEngine entrega magnitud FFT en dBFS (-80 a +6), no en escala 0..1.
-    // Abrimos el rango útil y aplicamos una curva raíz para responder mejor a volumen moderado.
+    // FFT en dBFS: elevamos la zona baja para que la animación sea visible también a volumen moderado.
     val rawDb=vm.spectrum.getOrElse((i*vm.spectrum.size/24).coerceIn(0,(vm.spectrum.size-1).coerceAtLeast(0))){-80f}
-    val normalized=((rawDb+78f)/66f).coerceIn(0f,1f)
-    val level=kotlin.math.sqrt(normalized)
+    val normalized=((rawDb+82f)/88f).coerceIn(0f,1f)
+    val level=kotlin.math.pow(normalized,.38f)
     val accent=when(i){in 0..7->ZCY;in 8..16->Color(0xFF4B8DFF);else->ZP}
-    Box(Modifier.weight(1f).height((3f+level*29f).dp).background(accent.copy(alpha=.55f+level*.45f),RoundedCornerShape(3.dp)))
+    Box(Modifier.weight(1f).height((2f+level*34f).dp).background(accent.copy(alpha=.62f+level*.38f),RoundedCornerShape(3.dp)))
    }
   }
  }
