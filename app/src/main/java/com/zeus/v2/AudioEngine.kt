@@ -1600,8 +1600,10 @@ class AudioEngine(private val context: Context) {
                                     (1f - mix) +
                                     raw[hi] * mix
 
-                            val rise = .62f
-                            val fall = .10f
+                            // Ataque y caída más rápidos para que el visualizador siga los golpes musicales.
+                            // Solo afecta la lectura FFT de pantalla, nunca el audio procesado.
+                            val rise = .88f
+                            val fall = .22f
 
                             envelope[i] =
                                 if (
