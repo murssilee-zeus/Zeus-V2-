@@ -3,7 +3,7 @@ name: Build Zeus-V2 APK
 # Build normal APKs; publish a downloadable prerelease for Bass Evolution only.
 on:
   push:
-    branches: [ main, master, fix/punch-v2, fix/cross4-controls-v2, feature/zeus-bass-evolution ]
+    branches: [ main, master, fix/punch-v2, fix/cross4-controls-v2, feature/zeus-bass-evolution, feature/zeus-ai-core ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
