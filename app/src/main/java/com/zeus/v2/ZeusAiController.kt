@@ -73,7 +73,7 @@ class ZeusAiController {
             epicenterTarget -= 0.30f * risk
             punchTarget -= 0.18f * risk
             harmonicTarget -= 0.12f * risk
-            compressorTarget += 0.15f * risk
+            if (userCompressor > 0.01f) compressorTarget += 0.15f * risk
         }
 
         // Small sub-bass compensation, gated by the user's Epicenter setting.
@@ -89,7 +89,7 @@ class ZeusAiController {
                 ((crest - 14f) / 20f).coerceIn(0f, 1f)
             )
             punchTarget -= 0.12f * activityRisk
-            compressorTarget += 0.08f * activityRisk
+            if (userCompressor > 0.01f) compressorTarget += 0.08f * activityRisk
         }
 
         // Gently suggest harmonics when bass content is weak, if user allows it.
