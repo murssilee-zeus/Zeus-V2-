@@ -572,7 +572,7 @@ class AudioEngine(private val context: Context) {
 
     fun setEnabled(enabled: Boolean) {
         try {
-            dynamicsProcessing?.enabled = enabled && !hiResEnabled
+            dynamicsProcessing?.enabled = enabled && !hiResEnabled && !pcmAtmosEnabled
             isEnabled = enabled
         } catch (e: Exception) {
             Log.e(
@@ -916,7 +916,7 @@ class AudioEngine(private val context: Context) {
 
         // The Android DynamicsProcessing effect itself must be bypassed in
         // Hi-Res; otherwise EQ/limiter stages can still alter the PCM output.
-        dynamicsProcessing?.enabled = !hiResEnabled
+        dynamicsProcessing?.enabled = !hiResEnabled && !pcmAtmosEnabled
     }
 
     // ---------------------------------------------------------
