@@ -1438,13 +1438,27 @@ class AudioEngine(private val context: Context) {
         target.configureEq(settings.bands)
         target.configureBassMono(settings.bassMono, 120f)
         target.configureCrossover(floatArrayOf(180f, 2400f, 7200f, 18300f))
+        val epicenterBassActive = settings.epicenterAmount > 0.01f &&
+            pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
         target.configureDynamics(
             enabled = settings.compEnabled && pipelineEnabled && !hiResEnabled && !settings.spatialEnabled,
-            thresholdDb = floatArrayOf(settings.compThLow, settings.compThLoMid, settings.compThHiMid, settings.compThHigh, 0f),
-            ratio = floatArrayOf(settings.compRatioLow, settings.compRatioLoMid, settings.compRatioHiMid, settings.compRatioHigh, 1f),
+            thresholdDb = floatArrayOf(
+                if (epicenterBassActive) maxOf(settings.compThLow, -10f) else settings.compThLow,
+                settings.compThLoMid, settings.compThHiMid, settings.compThHigh, 0f
+            ),
+            ratio = floatArrayOf(
+                if (epicenterBassActive) minOf(settings.compRatioLow, 2f) else settings.compRatioLow,
+                settings.compRatioLoMid, settings.compRatioHiMid, settings.compRatioHigh, 1f
+            ),
             kneeDb = floatArrayOf(settings.compKneeLow, settings.compKneeLoMid, settings.compKneeHiMid, settings.compKneeHigh, 0f),
-            attackMs = floatArrayOf(settings.compAttackLow, settings.compAttackLoMid, settings.compAttackHiMid, settings.compAttackHigh, 10f),
-            releaseMs = floatArrayOf(settings.compReleaseLow, settings.compReleaseLoMid, settings.compReleaseHiMid, settings.compReleaseHigh, 100f),
+            attackMs = floatArrayOf(
+                if (epicenterBassActive) maxOf(settings.compAttackLow, 25f) else settings.compAttackLow,
+                settings.compAttackLoMid, settings.compAttackHiMid, settings.compAttackHigh, 10f
+            ),
+            releaseMs = floatArrayOf(
+                if (epicenterBassActive) maxOf(settings.compReleaseLow, 280f) else settings.compReleaseLow,
+                settings.compReleaseLoMid, settings.compReleaseHiMid, settings.compReleaseHigh, 100f
+            ),
             preGainDb = floatArrayOf(settings.compPreGainLow, settings.compPreGainLoMid, settings.compPreGainHiMid, settings.compPreGainHigh, 0f),
             postGainDb = floatArrayOf(settings.compPostGainLow, settings.compPostGainLoMid, settings.compPostGainHiMid, settings.compPostGainHigh, 0f)
         )
