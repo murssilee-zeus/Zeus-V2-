@@ -131,9 +131,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         ceiling = 10f.pow(ceilingDbfs.coerceIn(-6f, -0.1f) / 20f)
     }
 
-    fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
+    fun processPre(pcm: FloatArray, size: Int = pcm.size) {
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
-        if (n < 2) return
         for (i in 0 until n step 2) {
             var l = finite(pcm[i])
             var r = finite(pcm[i + 1])
@@ -150,9 +149,17 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
                 l += center - lowL
                 r += center - lowR
             }
+            pcm[i] = l
+            pcm[i + 1] = r
+        }
+    }
 
-            splitInto(l, splitL, bandsScratchL)
-            splitInto(r, splitR, bandsScratchR)
+    fun processPost(pcm: FloatArray, size: Int = pcm.size) {
+        val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        if (n < 2) return
+        for (i in 0 until n step 2) {
+            splitInto(pcm[i], splitL, bandsScratchL)
+            splitInto(pcm[i + 1], splitR, bandsScratchR)
             var outL = 0f
             var outR = 0f
             for (b in 0..4) {
@@ -172,6 +179,11 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             pcm[i] = outL
             pcm[i + 1] = outR
         }
+    }
+
+    fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
+        processPre(pcm, size)
+        processPost(pcm, size)
     }
 
     private fun splitInto(input: Float, filters: Array<Pair<Biquad, Biquad>>, scratch: FloatArray) {
