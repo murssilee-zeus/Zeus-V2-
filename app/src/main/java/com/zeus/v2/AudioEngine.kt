@@ -266,6 +266,8 @@ class AudioEngine(private val context: Context) {
         pcmFloatBuffer = ZeusFloatPcmBuffer()
 
         pcmAtmosEnabled = true
+        // The custom PCM chain owns EQ, dynamics and limiting; prevent Android session DSP from stacking.
+        dynamicsProcessing?.enabled = false
         // When PCM spatial DSP is available, avoid stacking Android Virtualizer
         // on top of it. The session Virtualizer remains the fallback without PCM.
         spatialEngine?.setEnabled(false)
@@ -280,6 +282,7 @@ class AudioEngine(private val context: Context) {
 
         pcmAtmosEnabled = false
         pcmRouteSampleRateHz = null
+        dynamicsProcessing?.enabled = !hiResEnabled && !pcmAtmosEnabled
 
         atmosEngine?.reset()
         zeusMbc?.reset()
