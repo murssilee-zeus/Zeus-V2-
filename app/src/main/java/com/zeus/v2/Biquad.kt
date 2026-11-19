@@ -91,6 +91,39 @@ class Biquad(private val sampleRate: Int) {
         )
     }
 
+    fun highShelf(frequencyHz: Float, gainDb: Float) {
+        val w = omega(frequencyHz)
+        val cs = cos(w)
+        val sn = sin(w)
+        val safeGainDb = (if (gainDb.isFinite()) gainDb else 0f).coerceIn(-24f, 24f)
+        val a = 10.0.pow(safeGainDb / 40.0)
+        val alpha = sn / 2.0 * sqrt(2.0)
+        val two = 2.0 * sqrt(a) * alpha
+        publish(
+            a * ((a + 1.0) + (a - 1.0) * cs + two),
+            -2.0 * a * ((a - 1.0) + (a + 1.0) * cs),
+            a * ((a + 1.0) + (a - 1.0) * cs - two),
+            (a + 1.0) - (a - 1.0) * cs + two,
+            2.0 * ((a - 1.0) - (a + 1.0) * cs),
+            (a + 1.0) - (a - 1.0) * cs - two
+        )
+    }
+
+    fun notch(frequencyHz: Float, q: Float) {
+        val w = omega(frequencyHz)
+        val cs = cos(w)
+        val alpha = sin(w) / (2.0 * quality(q))
+        publish(
+            1.0, -2.0 * cs, 1.0,
+            1.0 + alpha, -2.0 * cs, 1.0 - alpha
+        )
+    }
+
+    fun resetCoefficientsToIdentity() {
+        c = identity
+        reset()
+    }
+
     fun process(input: Float): Float {
         val k = c // una sola lectura por muestra
         val x = input.toDouble()
