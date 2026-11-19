@@ -36,6 +36,7 @@ class AudioEngine(private val context: Context) {
     private var zeusHiResImpact: ZeusHiResImpact? = null
     private var zeusSubSismi: ZeusSubSismi? = null
     private var zeusAiAnalyzer: ZeusAiAnalyzer? = null
+    private val zeusAiController = ZeusAiController()
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
@@ -75,6 +76,8 @@ class AudioEngine(private val context: Context) {
     @Volatile var splEpicenterRmsDbfs: Float = -120f
         private set
     @Volatile var zeusAiMetrics: ZeusAiAnalyzer.Metrics = ZeusAiAnalyzer.Metrics()
+        private set
+    @Volatile var zeusAiAdjustments: ZeusAiController.Adjustments = ZeusAiController.Adjustments()
         private set
     private var meterSubL: Biquad? = null
     private var meterSubR: Biquad? = null
@@ -284,6 +287,8 @@ class AudioEngine(private val context: Context) {
         zeusSubSismi?.reset()
         zeusAiAnalyzer?.reset()
         zeusAiMetrics = zeusAiAnalyzer?.metrics ?: ZeusAiAnalyzer.Metrics()
+        zeusAiController.reset()
+        zeusAiAdjustments = zeusAiController.adjustments
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
@@ -417,6 +422,31 @@ class AudioEngine(private val context: Context) {
     fun readProcessedPcm(output: FloatArray, size: Int = output.size): Int =
         pcmFloatBuffer?.read(output, 0, size) ?: 0
 
+    /**
+     * Evaluate AI recommendations from the latest source metrics.
+     * Call from a control/UI/service thread, not the real-time audio callback.
+     * Results are advisory only; DSP parameters are not changed by this method.
+     */
+    fun evaluateZeusAiController(enabled: Boolean = true): ZeusAiController.Adjustments {
+        val mode = when {
+            !pcmAtmosEnabled || !pipelineEnabled -> ZeusAiController.Mode.INACTIVE
+            hiResEnabled -> ZeusAiController.Mode.HI_RES
+            settings.spatialEnabled -> ZeusAiController.Mode.SPATIAL
+            else -> ZeusAiController.Mode.BASS
+        }
+        zeusAiAdjustments = zeusAiController.evaluate(
+            metrics = zeusAiMetrics,
+            mode = mode,
+            userBassAmount = settings.bassAmount,
+            userPunch = settings.bassPunch,
+            userHarmonics = settings.bassHarmonics,
+            userEpicenter = settings.epicenterAmount,
+            userCompressor = if (settings.compEnabled) 1f else 0f,
+            enabled = enabled
+        )
+        return zeusAiAdjustments
+    }
+
     private fun publishPcmMeters(buffer: ShortArray, size: Int) {
         var energy = 0.0
         var subEnergy = 0.0
@@ -486,6 +516,8 @@ class AudioEngine(private val context: Context) {
         zeusSubSismi?.reset()
         zeusAiAnalyzer?.reset()
         zeusAiMetrics = zeusAiAnalyzer?.metrics ?: ZeusAiAnalyzer.Metrics()
+        zeusAiController.reset()
+        zeusAiAdjustments = zeusAiController.adjustments
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
