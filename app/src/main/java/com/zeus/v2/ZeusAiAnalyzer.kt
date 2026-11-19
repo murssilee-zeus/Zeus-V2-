@@ -28,7 +28,7 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
         val framesAnalyzed: Int = 0
     )
 
-    private var sr = sampleRate.coerceIn(8000, 192000).toFloat()
+    private val sr = sampleRate.coerceIn(8000, 192000).toFloat()
     private var lp60L = 0f
     private var lp60R = 0f
     private var lp150L = 0f
@@ -37,7 +37,6 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
     private var lp2000R = 0f
     private var fastEnvelope = 0f
     private var slowEnvelope = 0f
-    private var transientHold = 0f
 
     private val a60 = coefficient(60f)
     private val a150 = coefficient(150f)
@@ -54,7 +53,7 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
         lp60L = 0f; lp60R = 0f
         lp150L = 0f; lp150R = 0f
         lp2000L = 0f; lp2000R = 0f
-        fastEnvelope = 0f; slowEnvelope = 0f; transientHold = 0f
+        fastEnvelope = 0f; slowEnvelope = 0f
         metrics = Metrics()
     }
 
@@ -72,6 +71,7 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
         var midEnergy = 0.0
         var highEnergy = 0.0
         var totalEnergy = 0.0
+        var centerEnergy = 0.0
         var sideEnergy = 0.0
         var sumLL = 0.0
         var sumRR = 0.0
@@ -94,16 +94,21 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
             lp2000L += a2000 * (l - lp2000L)
             lp2000R += a2000 * (r - lp2000R)
 
-            val sub = (lp60L + lp60R) * 0.5f
-            val bass = ((lp150L + lp150R) * 0.5f) - sub
-            val mid = ((lp2000L + lp2000R) * 0.5f) - ((lp150L + lp150R) * 0.5f)
-            val high = mono - ((lp2000L + lp2000R) * 0.5f)
+            val subL = lp60L
+            val subR = lp60R
+            val bassL = lp150L - lp60L
+            val bassR = lp150R - lp60R
+            val midL = lp2000L - lp150L
+            val midR = lp2000R - lp150R
+            val highL = l - lp2000L
+            val highR = r - lp2000R
 
-            subEnergy += sub.toDouble() * sub
-            bassEnergy += bass.toDouble() * bass
-            midEnergy += mid.toDouble() * mid
-            highEnergy += high.toDouble() * high
-            totalEnergy += mono.toDouble() * mono
+            subEnergy += (subL.toDouble() * subL + subR.toDouble() * subR) * 0.5
+            bassEnergy += (bassL.toDouble() * bassL + bassR.toDouble() * bassR) * 0.5
+            midEnergy += (midL.toDouble() * midL + midR.toDouble() * midR) * 0.5
+            highEnergy += (highL.toDouble() * highL + highR.toDouble() * highR) * 0.5
+            totalEnergy += (l.toDouble() * l + r.toDouble() * r) * 0.5
+            centerEnergy += mono.toDouble() * mono
             sideEnergy += side.toDouble() * side
 
             sumLL += l.toDouble() * l
@@ -116,10 +121,7 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
             slowEnvelope += slowA * (absMono - slowEnvelope)
             val transientRatio = (fastEnvelope - slowEnvelope) / (slowEnvelope + 1e-5f)
             if (transientRatio > 1.15f && absMono > 0.003f) {
-                transientHold = 1f
                 transientSamples++
-            } else {
-                transientHold *= 0.9975f
             }
             i += 2
         }
@@ -133,7 +135,7 @@ class ZeusAiAnalyzer(sampleRate: Int = 48000) {
         val peakDb = amplitudeDb(peak)
         val corrDenom = sqrt(max(1e-20, sumLL * sumRR))
         val corr = (sumLR / corrDenom).toFloat().coerceIn(-1f, 1f)
-        val sidePct = (sideEnergy / (sideEnergy + totalEnergy + 1e-20) * 100.0).toFloat().coerceIn(0f, 100f)
+        val sidePct = (sideEnergy / (sideEnergy + centerEnergy + 1e-20) * 100.0).toFloat().coerceIn(0f, 100f)
         val crest = (peakDb - broadbandDb).coerceIn(0f, 60f)
         val activity = (transientSamples.toFloat() / safeFrames * 100f).coerceIn(0f, 100f)
 
