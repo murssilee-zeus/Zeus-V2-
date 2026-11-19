@@ -35,6 +35,7 @@ class AudioEngine(private val context: Context) {
     private var zeusBassEvolution: ZeusBassEvolution? = null
     private var zeusHiResImpact: ZeusHiResImpact? = null
     private var zeusSubSismi: ZeusSubSismi? = null
+    private var zeusAiAnalyzer: ZeusAiAnalyzer? = null
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
@@ -72,6 +73,8 @@ class AudioEngine(private val context: Context) {
     @Volatile var splSubRmsDbfs: Float = -120f
         private set
     @Volatile var splEpicenterRmsDbfs: Float = -120f
+        private set
+    @Volatile var zeusAiMetrics: ZeusAiAnalyzer.Metrics = ZeusAiAnalyzer.Metrics()
         private set
     private var meterSubL: Biquad? = null
     private var meterSubR: Biquad? = null
@@ -248,6 +251,10 @@ class AudioEngine(private val context: Context) {
             }
 
         zeusDynamicEpicenter = ZeusDynamicEpicenter(sampleRate).also { applyDynamicEpicenter(it) }
+        zeusAiAnalyzer = ZeusAiAnalyzer(sampleRate).also { analyzer ->
+            analyzer.reset()
+            zeusAiMetrics = analyzer.metrics
+        }
 
         pcmBuffer = ZeusPcmBuffer()
         pcmFloatBuffer = ZeusFloatPcmBuffer()
@@ -275,6 +282,8 @@ class AudioEngine(private val context: Context) {
         zeusBassEvolution?.reset()
         zeusHiResImpact?.reset()
         zeusSubSismi?.reset()
+        zeusAiAnalyzer?.reset()
+        zeusAiMetrics = zeusAiAnalyzer?.metrics ?: ZeusAiAnalyzer.Metrics()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
@@ -366,6 +375,12 @@ class AudioEngine(private val context: Context) {
         if (!pcmAtmosEnabled) return 0
         val n = size.coerceIn(0, buffer.size - (buffer.size % 2))
         if (n < 2) return 0
+
+        // AI observation only: analyze source PCM before any DSP changes it.
+        // No controller decisions or DSP parameter writes occur on this thread.
+        zeusAiAnalyzer?.let { analyzer ->
+            zeusAiMetrics = analyzer.analyze(buffer, 0, n / 2)
+        }
 
         if (!hiResEnabled && !settings.spatialEnabled) {
             // Keep the Float32 route behavior identical: Epicenter sees source bass
@@ -469,6 +484,8 @@ class AudioEngine(private val context: Context) {
         zeusEpicenter?.reset()
         zeusHiResImpact?.reset()
         zeusSubSismi?.reset()
+        zeusAiAnalyzer?.reset()
+        zeusAiMetrics = zeusAiAnalyzer?.metrics ?: ZeusAiAnalyzer.Metrics()
         pcmBuffer?.clear()
         pcmFloatBuffer?.clear()
 
@@ -480,6 +497,7 @@ class AudioEngine(private val context: Context) {
         zeusBassEvolution = null
         zeusHiResImpact = null
         zeusSubSismi = null
+        zeusAiAnalyzer = null
         pcmBuffer = null
         pcmFloatBuffer = null
 
