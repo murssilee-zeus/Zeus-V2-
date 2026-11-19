@@ -41,6 +41,7 @@ class AudioEngine(private val context: Context) {
     @Volatile private var epicenterHeadphoneMode = false
     private var pcmBuffer: ZeusPcmBuffer? = null
     private var pcmFloatBuffer: ZeusFloatPcmBuffer? = null
+    private var pcmShortScratch = FloatArray(8192)
 
     @Volatile
     private var pcmAtmosEnabled = false
@@ -323,16 +324,22 @@ class AudioEngine(private val context: Context) {
         // independent Epicenter low-frequency excitation. No MBC, bass
         // evolution, impact, sub/sismo, spatial widening or general clipping.
         if (!hiResEnabled && !settings.spatialEnabled) {
-            // ZEUS BASS: Epicenter detects the unmodified incoming program first.
-            // This keeps Epicenter excitation independent of the Sub/Sismi amount control.
-            // Its detector must not depend on the level chosen for Sub/Sismi.
+            // HPF/EQ/BassMono -> Bass contour -> Epicenter -> crossover/dynamics/limiter.
+            if (pcmShortScratch.size < n) pcmShortScratch = FloatArray(n)
+            for (i in 0 until n) pcmShortScratch[i] = buffer[i] / 32768f
+            if (pipelineEnabled) {
+                zeusBassDspPipeline?.processPre(pcmShortScratch, n)
+                zeusBassEvolution?.processStereo(pcmShortScratch, n)
+            }
             zeusEpicenter?.let {
                 it.enabled = isEpicenterActive()
                 applyEpicenter(it)
-                it.processStereo(buffer, n)
+                it.processStereo(pcmShortScratch, n)
             }
-            if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
-            if (pipelineEnabled) zeusBassDspPipeline?.processStereo(buffer, n)
+            if (pipelineEnabled) zeusBassDspPipeline?.processPost(pcmShortScratch, n)
+            for (i in 0 until n) {
+                buffer[i] = (pcmShortScratch[i].coerceIn(-1f, 0.999969f) * 32768f).toInt().toShort()
+            }
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: preserve the PCM signal path and add
             // only the independent low-frequency Epicenter stage.
@@ -387,15 +394,17 @@ class AudioEngine(private val context: Context) {
         }
 
         if (!hiResEnabled && !settings.spatialEnabled) {
-            // Keep the Float32 route behavior identical: Epicenter sees source bass
-            // before Sub/Sismi gain can influence its detector.
+            // Ordered Float32 route; Epicenter synthesis occurs after the subsonic filter.
+            if (pipelineEnabled) {
+                zeusBassDspPipeline?.processPre(buffer, n)
+                zeusBassEvolution?.processStereo(buffer, n)
+            }
             zeusEpicenter?.let {
                 it.enabled = isEpicenterActive()
                 applyEpicenter(it)
                 it.processStereo(buffer, n)
             }
-            if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
-            if (pipelineEnabled) zeusBassDspPipeline?.processStereo(buffer, n)
+            if (pipelineEnabled) zeusBassDspPipeline?.processPost(buffer, n)
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: no MBC, bass evolution, impact or
             // sub/sismo processing. Epicenter is the only added DSP stage.
