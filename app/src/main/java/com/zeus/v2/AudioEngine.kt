@@ -35,6 +35,7 @@ class AudioEngine(private val context: Context) {
     private var zeusBassEvolution: ZeusBassEvolution? = null
     private var zeusHiResImpact: ZeusHiResImpact? = null
     private var zeusSubSismi: ZeusSubSismi? = null
+    private var zeusBassDspPipeline: ZeusBassDspPipeline? = null
     private var zeusAiAnalyzer: ZeusAiAnalyzer? = null
     private val zeusAiController = ZeusAiController()
     @Volatile private var epicenterHeadphoneMode = false
@@ -243,6 +244,7 @@ class AudioEngine(private val context: Context) {
         zeusBassEvolution = ZeusBassEvolution(sampleRate).also { applyBassEvolution(it) }
         zeusHiResImpact = ZeusHiResImpact(sampleRate)
         zeusSubSismi = ZeusSubSismi(sampleRate)
+        zeusBassDspPipeline = ZeusBassDspPipeline(sampleRate).also { configureZeusBassPipeline(it) }
         applyHiResBassStages()
 
         zeusEpicenter =
@@ -285,6 +287,7 @@ class AudioEngine(private val context: Context) {
         zeusBassEvolution?.reset()
         zeusHiResImpact?.reset()
         zeusSubSismi?.reset()
+        zeusBassDspPipeline?.reset()
         zeusAiAnalyzer?.reset()
         zeusAiMetrics = zeusAiAnalyzer?.metrics ?: ZeusAiAnalyzer.Metrics()
         zeusAiController.reset()
@@ -329,11 +332,7 @@ class AudioEngine(private val context: Context) {
                 it.processStereo(buffer, n)
             }
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
-            zeusMbc?.processStereo(buffer, n)
-            if (pipelineEnabled) {
-                zeusHiResImpact?.processStereo(buffer, n)
-                zeusSubSismi?.processStereo(buffer, n)
-            }
+            if (pipelineEnabled) zeusBassDspPipeline?.processStereo(buffer, n)
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: preserve the PCM signal path and add
             // only the independent low-frequency Epicenter stage.
@@ -396,11 +395,7 @@ class AudioEngine(private val context: Context) {
                 it.processStereo(buffer, n)
             }
             if (pipelineEnabled) zeusBassEvolution?.processStereo(buffer, n)
-            zeusMbc?.processStereo(buffer, n)
-            if (pipelineEnabled) {
-                zeusHiResImpact?.processStereo(buffer, n)
-                zeusSubSismi?.processStereo(buffer, n)
-            }
+            if (pipelineEnabled) zeusBassDspPipeline?.processStereo(buffer, n)
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: no MBC, bass evolution, impact or
             // sub/sismo processing. Epicenter is the only added DSP stage.
@@ -529,6 +524,7 @@ class AudioEngine(private val context: Context) {
         zeusBassEvolution = null
         zeusHiResImpact = null
         zeusSubSismi = null
+        zeusBassDspPipeline = null
         zeusAiAnalyzer = null
         pcmBuffer = null
         pcmFloatBuffer = null
@@ -891,6 +887,7 @@ class AudioEngine(private val context: Context) {
         applyPostEq()
         applyLimiter()
         applyZeusMbc()
+        zeusBassDspPipeline?.let { configureZeusBassPipeline(it) }
 
         zeusEpicenter?.let {
             it.enabled = isEpicenterActive()
@@ -1425,6 +1422,26 @@ class AudioEngine(private val context: Context) {
             settings.epicenterFrequency,
             settings.epicenterSweep
         )
+    }
+
+    private fun configureZeusBassPipeline(target: ZeusBassDspPipeline) {
+        target.configureSubsonic(30f)
+        target.configureEq(settings.bands)
+        target.configureBassMono(settings.bassMono, 120f)
+        target.configureCrossover(floatArrayOf(180f, 2400f, 7200f, 18300f))
+        target.configureDynamics(
+            enabled = settings.compEnabled && pipelineEnabled && !hiResEnabled && !settings.spatialEnabled,
+            thresholdDb = floatArrayOf(settings.compThLow, settings.compThLoMid, settings.compThHiMid, settings.compThHigh, 0f),
+            ratio = floatArrayOf(settings.compRatioLow, settings.compRatioLoMid, settings.compRatioHiMid, settings.compRatioHigh, 1f),
+            kneeDb = floatArrayOf(settings.compKneeLow, settings.compKneeLoMid, settings.compKneeHiMid, settings.compKneeHigh, 0f),
+            attackMs = floatArrayOf(settings.compAttackLow, settings.compAttackLoMid, settings.compAttackHiMid, settings.compAttackHigh, 10f),
+            releaseMs = floatArrayOf(settings.compReleaseLow, settings.compReleaseLoMid, settings.compReleaseHiMid, settings.compReleaseHigh, 100f),
+            preGainDb = floatArrayOf(settings.compPreGainLow, settings.compPreGainLoMid, settings.compPreGainHiMid, settings.compPreGainHigh, 0f),
+            postGainDb = floatArrayOf(settings.compPostGainLow, settings.compPostGainLoMid, settings.compPostGainHiMid, settings.compPostGainHigh, 0f)
+        )
+        // The PCM chain owns its final ceiling. Avoid applying preGain twice:
+        // Android's capture/session input gain remains the existing input stage.
+        target.configureOutput(0f, settings.limiterEnabled, -1f)
     }
 
     // ---------------------------------------------------------
