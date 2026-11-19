@@ -42,6 +42,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private var compEnabled = true
     private var limiterEnabled = true
     private var ceiling = 10f.pow(-1f / 20f)
+    private var limiterGain = 1f
+    private val limiterReleaseCoeff = 1f - exp(-1f / (0.050f * sampleRate.coerceAtLeast(8000)))
 
     init {
         configureCrossover(cutoffs)
@@ -170,9 +172,15 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             outL *= outputGain
             outR *= outputGain
             if (limiterEnabled) {
-                outL = outL.coerceIn(-ceiling, ceiling)
-                outR = outR.coerceIn(-ceiling, ceiling)
+                val peak = max(abs(outL), abs(outR))
+                val targetGain = if (peak > ceiling) ceiling / peak else 1f
+                // Instant attack, smoothed 50 ms release, stereo-linked.
+                limiterGain = if (targetGain < limiterGain) targetGain
+                    else limiterGain + limiterReleaseCoeff * (targetGain - limiterGain)
+                outL = (outL * limiterGain).coerceIn(-ceiling, ceiling)
+                outR = (outR * limiterGain).coerceIn(-ceiling, ceiling)
             } else {
+                limiterGain = 1f
                 outL = outL.coerceIn(-1f, 1f)
                 outR = outR.coerceIn(-1f, 1f)
             }
@@ -227,6 +235,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         splitL.forEach { it.first.reset(); it.second.reset() }
         splitR.forEach { it.first.reset(); it.second.reset() }
         grDb.fill(0f)
+        limiterGain = 1f
     }
 
     private fun finite(v: Float) = if (v.isFinite()) v.coerceIn(-2f, 2f) else 0f
