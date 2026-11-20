@@ -62,7 +62,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private val limiterReleaseCoeff = 1f - exp(-1f / (0.080f * sampleRate.coerceAtLeast(8000)))
 
     init {
-        configureSubsonic(30f)
+        configureSubsonic(20f)
+        configureSubBranchProtection(30f)
         configureBassMono(true)
         configureCrossover(180f, 2400f, 7200f, 20000f)
         configureHighLimit(20000f)
