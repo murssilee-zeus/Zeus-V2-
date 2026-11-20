@@ -707,6 +707,7 @@ class AudioEngine(private val context: Context) {
         settings.epicenterFrequency = frequency.coerceIn(18f, 65f)
         settings.epicenterSweep = sweep.coerceIn(40f, 140f)
         zeusEpicenter?.let { applyEpicenter(it) }
+        zeusBassDspPipeline?.let { configureZeusBassPipeline(it) }
     }
 
     fun setBassControls(
