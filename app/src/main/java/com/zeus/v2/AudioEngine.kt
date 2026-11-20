@@ -245,16 +245,20 @@ class AudioEngine(private val context: Context) {
         zeusBassEvolution = ZeusBassEvolution(sampleRate).also { applyBassEvolution(it) }
         zeusHiResImpact = ZeusHiResImpact(sampleRate)
         zeusSubSismi = ZeusSubSismi(sampleRate)
-        zeusBassDspPipeline = ZeusBassDspPipeline(sampleRate).also { configureZeusBassPipeline(it) }
-        applyHiResBassStages()
 
         zeusEpicenter =
             ZeusEpicenter(sampleRate).also {
-                // Hybrid Hi-Res + Epicenter: only the independent low-frequency
-                // exciter is allowed to touch the Hi-Res PCM route.
+                // Hi-Res keeps its separate optional hybrid path. In Zeus Bass
+                // this same processor is attached only to the SUB crossover branch.
                 it.enabled = isEpicenterActive()
                 applyEpicenter(it)
             }
+
+        zeusBassDspPipeline = ZeusBassDspPipeline(sampleRate).also {
+            it.setBassBranchProcessors(zeusEpicenter, zeusSubSismi)
+            configureZeusBassPipeline(it)
+        }
+        applyHiResBassStages()
 
         zeusDynamicEpicenter = ZeusDynamicEpicenter(sampleRate).also { applyDynamicEpicenter(it) }
         zeusAiAnalyzer = ZeusAiAnalyzer(sampleRate).also { analyzer ->
@@ -327,19 +331,15 @@ class AudioEngine(private val context: Context) {
         // independent Epicenter low-frequency excitation. No MBC, bass
         // evolution, impact, sub/sismo, spatial widening or general clipping.
         if (!hiResEnabled && !settings.spatialEnabled) {
-            // HPF/EQ/BassMono -> Bass contour -> Epicenter -> crossover/dynamics/limiter.
+            // EQ/BassMono -> Bass contour -> four-way crossover.
+            // Epicenter -> Sub/Sismo -> subsonic protection happen inside SUB only.
             if (pcmShortScratch.size < n) pcmShortScratch = FloatArray(n)
             for (i in 0 until n) pcmShortScratch[i] = buffer[i] / 32768f
             if (pipelineEnabled) {
                 zeusBassDspPipeline?.processPre(pcmShortScratch, n)
                 zeusBassEvolution?.processStereo(pcmShortScratch, n)
+                zeusBassDspPipeline?.processPost(pcmShortScratch, n)
             }
-            zeusEpicenter?.let {
-                it.enabled = isEpicenterActive()
-                applyEpicenter(it)
-                it.processStereo(pcmShortScratch, n)
-            }
-            if (pipelineEnabled) zeusBassDspPipeline?.processPost(pcmShortScratch, n)
             for (i in 0 until n) {
                 buffer[i] = (pcmShortScratch[i].coerceIn(-1f, 0.999969f) * 32768f).toInt().toShort()
             }
@@ -397,17 +397,13 @@ class AudioEngine(private val context: Context) {
         }
 
         if (!hiResEnabled && !settings.spatialEnabled) {
-            // Ordered Float32 route; Epicenter synthesis occurs after the subsonic filter.
+            // Ordered Float32 route. Epicenter and Sub/Sismo are processed
+            // sequentially inside the SUB branch, never on the full-range mix.
             if (pipelineEnabled) {
                 zeusBassDspPipeline?.processPre(buffer, n)
                 zeusBassEvolution?.processStereo(buffer, n)
+                zeusBassDspPipeline?.processPost(buffer, n)
             }
-            zeusEpicenter?.let {
-                it.enabled = isEpicenterActive()
-                applyEpicenter(it)
-                it.processStereo(buffer, n)
-            }
-            if (pipelineEnabled) zeusBassDspPipeline?.processPost(buffer, n)
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: no MBC, bass evolution, impact or
             // sub/sismo processing. Epicenter is the only added DSP stage.
@@ -1437,37 +1433,42 @@ class AudioEngine(private val context: Context) {
     }
 
     private fun configureZeusBassPipeline(target: ZeusBassDspPipeline) {
-        target.configureSubsonic(30f)
+        target.configureSubsonic(20f)
         target.configureEq(settings.bands)
         target.configureBassMono(settings.bassMono, 120f)
-        target.configureCrossover(floatArrayOf(180f, 2400f, 7200f, 18300f))
-        val epicenterBassActive = settings.epicenterAmount > 0.01f &&
-            pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
+        target.configureCrossover(
+            settings.cross1.coerceIn(80f, 500f),
+            settings.cross2.coerceIn(600f, 6000f),
+            settings.cross3.coerceIn(2400f, 12000f),
+            settings.cross4.coerceIn(7300f, 20000f)
+        )
+        target.configureHeadroom(settings.bands, settings.epicenterDrive)
         target.configureDynamics(
             enabled = settings.compEnabled && pipelineEnabled && !hiResEnabled && !settings.spatialEnabled,
             thresholdDb = floatArrayOf(
-                if (epicenterBassActive) maxOf(settings.compThLow, -10f) else settings.compThLow,
-                settings.compThLoMid, settings.compThHiMid, settings.compThHigh, 0f
+                settings.compThLow, settings.compThLoMid, settings.compThHiMid, settings.compThHigh
             ),
             ratio = floatArrayOf(
-                if (epicenterBassActive) minOf(settings.compRatioLow, 2f) else settings.compRatioLow,
-                settings.compRatioLoMid, settings.compRatioHiMid, settings.compRatioHigh, 1f
+                settings.compRatioLow, settings.compRatioLoMid, settings.compRatioHiMid, settings.compRatioHigh
             ),
-            kneeDb = floatArrayOf(settings.compKneeLow, settings.compKneeLoMid, settings.compKneeHiMid, settings.compKneeHigh, 0f),
+            kneeDb = floatArrayOf(
+                settings.compKneeLow, settings.compKneeLoMid, settings.compKneeHiMid, settings.compKneeHigh
+            ),
             attackMs = floatArrayOf(
-                if (epicenterBassActive) maxOf(settings.compAttackLow, 25f) else settings.compAttackLow,
-                settings.compAttackLoMid, settings.compAttackHiMid, settings.compAttackHigh, 10f
+                settings.compAttackLow, settings.compAttackLoMid, settings.compAttackHiMid, settings.compAttackHigh
             ),
             releaseMs = floatArrayOf(
-                if (epicenterBassActive) maxOf(settings.compReleaseLow, 280f) else settings.compReleaseLow,
-                settings.compReleaseLoMid, settings.compReleaseHiMid, settings.compReleaseHigh, 100f
+                settings.compReleaseLow, settings.compReleaseLoMid, settings.compReleaseHiMid, settings.compReleaseHigh
             ),
-            preGainDb = floatArrayOf(settings.compPreGainLow, settings.compPreGainLoMid, settings.compPreGainHiMid, settings.compPreGainHigh, 0f),
-            postGainDb = floatArrayOf(settings.compPostGainLow, settings.compPostGainLoMid, settings.compPostGainHiMid, settings.compPostGainHigh, 0f)
+            preGainDb = floatArrayOf(
+                settings.compPreGainLow, settings.compPreGainLoMid, settings.compPreGainHiMid, settings.compPreGainHigh
+            ),
+            postGainDb = floatArrayOf(
+                settings.compPostGainLow, settings.compPostGainLoMid, settings.compPostGainHiMid, settings.compPostGainHigh
+            )
         )
-        // The PCM chain owns its final ceiling. Avoid applying preGain twice:
-        // Android's capture/session input gain remains the existing input stage.
-        target.configureOutput(0f, settings.limiterEnabled, -1f)
+        // Fixed final -1 dBFS ceiling. The user toggle cannot bypass the safety limiter.
+        target.configureOutput(0f, true, -1f)
     }
 
     // ---------------------------------------------------------
