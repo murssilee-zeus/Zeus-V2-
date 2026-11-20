@@ -152,7 +152,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
     }
 
     fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
-        if (!enabled || amount <= 0f) {
+        if (!enabled || amount <= 0f || (drive <= 0f && harmonics <= 0f)) {
             lastSubRmsDbfs = -120f
             return
         }
