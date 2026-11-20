@@ -32,7 +32,9 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private var crossover3 = 7200f
     private var highLimitHz = 20000f
 
-    private val splitScratchL = FloatArray(4)\n    private val splitScratchR = FloatArray(4)\n    private var branchLeft = Array(4) { FloatArray(2048) }
+    private val splitScratchL = FloatArray(4)
+    private val splitScratchR = FloatArray(4)
+    private var branchLeft = Array(4) { FloatArray(2048) }
     private var branchRight = Array(4) { FloatArray(2048) }
     private var bassEpicenter: ZeusEpicenter? = null
     private var bassSubSismi: ZeusSubSismi? = null
