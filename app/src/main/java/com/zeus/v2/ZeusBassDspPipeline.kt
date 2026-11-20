@@ -273,27 +273,40 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             outL *= outputGain
             outR *= outputGain
 
-            val peak = max(abs(outL), abs(outR))
-            val targetGain = if (peak > ceiling) ceiling / peak else 1f
-            if (targetGain < limiterGain) {
-                limiterGain = targetGain
-                limiterHoldFrames = lookaheadFrames
-            } else if (limiterHoldFrames > 0) {
-                limiterHoldFrames--
-            } else {
-                limiterGain += limiterReleaseCoeff * (targetGain - limiterGain)
-            }
-
-            val delayedL = delayL[delayWrite]
-            val delayedR = delayR[delayWrite]
-            delayL[delayWrite] = outL
-            delayR[delayWrite] = outR
-            pcm[i] = (delayedL * limiterGain).coerceIn(-ceiling, ceiling)
-            pcm[i + 1] = (delayedR * limiterGain).coerceIn(-ceiling, ceiling)
-            delayWrite++
-            if (delayWrite >= delayL.size) delayWrite = 0
+            limitAndDelay(pcm, i, outL, outR)
         }
-        delayIndex = delayWrite
+    }
+
+    /** Safety-only path used when the Bass DSP toggle is off. The final ceiling stays active. */
+    fun processLimiterOnly(pcm: FloatArray, size: Int = pcm.size) {
+        val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        for (i in 0 until n step 2) {
+            val l = finite(pcm[i]) * outputGain
+            val r = finite(pcm[i + 1]) * outputGain
+            limitAndDelay(pcm, i, l, r)
+        }
+    }
+
+    private fun limitAndDelay(pcm: FloatArray, index: Int, outL: Float, outR: Float) {
+        val peak = max(abs(outL), abs(outR))
+        val targetGain = if (peak > ceiling) ceiling / peak else 1f
+        if (targetGain < limiterGain) {
+            limiterGain = targetGain
+            limiterHoldFrames = lookaheadFrames
+        } else if (limiterHoldFrames > 0) {
+            limiterHoldFrames--
+        } else {
+            limiterGain += limiterReleaseCoeff * (targetGain - limiterGain)
+        }
+
+        val write = delayIndex
+        val delayedL = delayL[write]
+        val delayedR = delayR[write]
+        delayL[write] = outL
+        delayR[write] = outR
+        pcm[index] = (delayedL * limiterGain).coerceIn(-ceiling, ceiling)
+        pcm[index + 1] = (delayedR * limiterGain).coerceIn(-ceiling, ceiling)
+        delayIndex = if (write + 1 >= delayL.size) 0 else write + 1
     }
 
     private fun interleaveBranch(branch: Int, n: Int): FloatArray {
