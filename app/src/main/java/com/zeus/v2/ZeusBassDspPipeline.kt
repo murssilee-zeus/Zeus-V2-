@@ -125,7 +125,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         val c1 = c1Hz.coerceIn(80f, minOf(500f, nyquistSafe - 150f))
         val c2 = c2Hz.coerceIn(c1 + 100f, minOf(6000f, nyquistSafe - 100f))
         val c3 = c3Hz.coerceIn(c2 + 100f, nyquistSafe)
-        val topMax = minOf(20000f, nyquistSafe)\n        val top = upperHz.coerceIn(minOf(c3 + 100f, topMax), topMax)
+        val topMax = minOf(20000f, nyquistSafe)
+        val top = upperHz.coerceIn(minOf(c3 + 100f, topMax), topMax)
         if (abs(c1 - crossover1) > 0.01f || abs(c2 - crossover2) > 0.01f ||
             abs(c3 - crossover3) > 0.01f) {
             crossover1 = c1
@@ -139,7 +140,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     }
 
     private fun configureHighLimit(hz: Float) {
-        val maxAllowed = minOf(20000f, sampleRate * 0.45f).coerceAtLeast(7300f)\n        highLimitHz = hz.coerceIn(minOf(7300f, maxAllowed), maxAllowed)
+        val maxAllowed = minOf(20000f, sampleRate * 0.45f).coerceAtLeast(7300f)
+        highLimitHz = hz.coerceIn(minOf(7300f, maxAllowed), maxAllowed)
         highLimitL.lowPass(highLimitHz, 0.707f)
         highLimitR.lowPass(highLimitHz, 0.707f)
     }
