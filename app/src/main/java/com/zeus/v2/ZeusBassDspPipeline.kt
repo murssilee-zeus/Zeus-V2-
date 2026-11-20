@@ -265,8 +265,14 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
 
             val peak = max(abs(outL), abs(outR))
             val targetGain = if (peak > ceiling) ceiling / peak else 1f
-            limiterGain = if (targetGain < limiterGain) targetGain
-                else limiterGain + limiterReleaseCoeff * (targetGain - limiterGain)
+            if (targetGain < limiterGain) {
+                limiterGain = targetGain
+                limiterHoldFrames = lookaheadFrames
+            } else if (limiterHoldFrames > 0) {
+                limiterHoldFrames--
+            } else {
+                limiterGain += limiterReleaseCoeff * (targetGain - limiterGain)
+            }
 
             val delayedL = delayL[delayWrite]
             val delayedR = delayR[delayWrite]
