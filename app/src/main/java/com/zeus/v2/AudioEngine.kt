@@ -339,6 +339,8 @@ class AudioEngine(private val context: Context) {
                 zeusBassDspPipeline?.processPre(pcmShortScratch, n)
                 zeusBassEvolution?.processStereo(pcmShortScratch, n)
                 zeusBassDspPipeline?.processPost(pcmShortScratch, n)
+            } else {
+                zeusBassDspPipeline?.processLimiterOnly(pcmShortScratch, n)
             }
             for (i in 0 until n) {
                 buffer[i] = (pcmShortScratch[i].coerceIn(-1f, 0.999969f) * 32768f).toInt().toShort()
@@ -403,6 +405,8 @@ class AudioEngine(private val context: Context) {
                 zeusBassDspPipeline?.processPre(buffer, n)
                 zeusBassEvolution?.processStereo(buffer, n)
                 zeusBassDspPipeline?.processPost(buffer, n)
+            } else {
+                zeusBassDspPipeline?.processLimiterOnly(buffer, n)
             }
         } else if (hiResEnabled && !settings.spatialEnabled) {
             // HI-RES + EPICENTER HYBRID: no MBC, bass evolution, impact or
