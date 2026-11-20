@@ -7,60 +7,89 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * Float PCM Zeus Bass chain. Processing order:
- * subsonic -> parametric EQ -> bass mono -> crossover -> linked band dynamics
- * -> output gain -> peak ceiling.
- * Bass/Epicenter generators are deliberately upstream in AudioEngine.
+ * Four-branch Zeus Bass PCM chain.
+ * Input cleanup/EQ/mono -> LR4 crossover -> SUB Epicenter -> SUB/Sismo
+ * -> subsonic protection -> four linked compressors -> sum -> output gain
+ * -> mandatory linked-stereo lookahead limiter.
  */
 class ZeusBassDspPipeline(private val sampleRate: Int) {
     private val hpfL = Biquad(sampleRate)
     private val hpfR = Biquad(sampleRate)
     private val monoLpL = Biquad(sampleRate)
     private val monoLpR = Biquad(sampleRate)
+    private val subProtectL = Biquad(sampleRate)
+    private val subProtectR = Biquad(sampleRate)
+    private val highLimitL = Biquad(sampleRate)
+    private val highLimitR = Biquad(sampleRate)
     private val eqL = Array(16) { Biquad(sampleRate) }
     private val eqR = Array(16) { Biquad(sampleRate) }
     private var eqCount = 0
 
-    private val splitL = Array(4) { Pair(Biquad(sampleRate), Biquad(sampleRate)) }
-    private val splitR = Array(4) { Pair(Biquad(sampleRate), Biquad(sampleRate)) }
-    private val cutoffs = floatArrayOf(180f, 2400f, 7200f, 18300f)
-    private val configured = FloatArray(4) { -1f }
-    private val bandsScratchL = FloatArray(5)
-    private val bandsScratchR = FloatArray(5)
+    @Volatile private var splitterL = ZeusLr4BandSplitter(sampleRate, 180f, 2400f, 7200f)
+    @Volatile private var splitterR = ZeusLr4BandSplitter(sampleRate, 180f, 2400f, 7200f)
+    private var crossover1 = 180f
+    private var crossover2 = 2400f
+    private var crossover3 = 7200f
+    private var highLimitHz = 20000f
 
-    private val thresholds = floatArrayOf(-18f, -14f, -12f, -14f, 0f)
-    private val ratios = floatArrayOf(4f, 3f, 2.5f, 3.5f, 1f)
-    private val knees = floatArrayOf(6f, 6f, 6f, 6f, 0f)
-    private val attacks = floatArrayOf(15f, 12f, 8f, 5f, 10f)
-    private val releases = floatArrayOf(180f, 120f, 90f, 60f, 100f)
-    private val preGains = FloatArray(5)
-    private val postGains = FloatArray(5)
-    private val grDb = FloatArray(5)
+    private var branchLeft = Array(4) { FloatArray(2048) }
+    private var branchRight = Array(4) { FloatArray(2048) }
+    private var bassEpicenter: ZeusEpicenter? = null
+    private var bassSubSismi: ZeusSubSismi? = null
+
+    private val thresholds = floatArrayOf(-18f, -20f, -22f, -24f)
+    private val ratios = floatArrayOf(2.5f, 2f, 2f, 1.5f)
+    private val knees = floatArrayOf(3f, 3f, 3f, 3f)
+    private val attacks = floatArrayOf(25f, 15f, 5f, 3f)
+    private val releases = floatArrayOf(180f, 120f, 80f, 60f)
+    private val preGains = FloatArray(4)
+    private val postGains = FloatArray(4)
+    private val grDb = FloatArray(4)
 
     private var bassMono = true
     private var outputGain = 1f
     private var compEnabled = true
-    private var limiterEnabled = true
-    private var ceiling = 10f.pow(-1f / 20f)
+    private var headroomGain = dbToLinear(-9f)
+
+    // Five milliseconds of stereo lookahead. The gain detector sees incoming
+    // peaks while the corresponding audio is still in the delay line.
+    private val lookaheadFrames = (sampleRate.coerceAtLeast(8000) * 0.005f).toInt().coerceAtLeast(1)
+    private val delayL = FloatArray(lookaheadFrames + 1)
+    private val delayR = FloatArray(lookaheadFrames + 1)
+    private var delayIndex = 0
     private var limiterGain = 1f
-    private val limiterReleaseCoeff = 1f - exp(-1f / (0.050f * sampleRate.coerceAtLeast(8000)))
+    private val ceiling = dbToLinear(-1f)
+    private val limiterReleaseCoeff = 1f - exp(-1f / (0.080f * sampleRate.coerceAtLeast(8000)))
 
     init {
-        configureCrossover(cutoffs)
         configureSubsonic(30f)
         configureBassMono(true)
+        configureCrossover(180f, 2400f, 7200f, 20000f)
+        configureHighLimit(20000f)
+    }
+
+    fun setBassBranchProcessors(epicenter: ZeusEpicenter?, subSismi: ZeusSubSismi?) {
+        bassEpicenter = epicenter
+        bassSubSismi = subSismi
     }
 
     fun configureSubsonic(hz: Float) {
-        val safe = hz.coerceIn(24f, 40f)
+        val safe = hz.coerceIn(20f, 32f)
         hpfL.highPass(safe, 0.707f)
         hpfR.highPass(safe, 0.707f)
     }
 
+    private fun configureSubBranchProtection(hz: Float = 30f) {
+        val safe = hz.coerceIn(28f, 32f)
+        subProtectL.highPass(safe, 0.707f)
+        subProtectR.highPass(safe, 0.707f)
+    }
+
     fun configureBassMono(enabled: Boolean, cutoffHz: Float = 120f) {
         bassMono = enabled
-        monoLpL.lowPass(cutoffHz.coerceIn(80f, 160f), 0.707f)
-        monoLpR.lowPass(cutoffHz.coerceIn(80f, 160f), 0.707f)
+        val cutoff = cutoffHz.coerceIn(80f, 160f)
+        monoLpL.lowPass(cutoff, 0.707f)
+        monoLpR.lowPass(cutoff, 0.707f)
     }
 
     fun configureEq(bands: List<EqBand>) {
@@ -90,19 +119,49 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         }
     }
 
-    fun configureCrossover(frequencies: FloatArray = cutoffs) {
-        for (i in 0..3) {
-            val safeMax = (sampleRate * 0.45f).coerceAtLeast(100f)
-            val f = frequencies.getOrElse(i) { cutoffs[i] }.coerceIn(30f, safeMax)
-            cutoffs[i] = f
-            if (abs(configured[i] - f) < 0.01f) continue
-            // LR4 = two cascaded Butterworth biquads in each branch.
-            splitL[i].first.lowPass(f, 0.707f)
-            splitL[i].second.lowPass(f, 0.707f)
-            splitR[i].first.lowPass(f, 0.707f)
-            splitR[i].second.lowPass(f, 0.707f)
-            configured[i] = f
+    /** Three crossover points define four branches; the top band ceiling is independent. */
+    fun configureCrossover(c1Hz: Float, c2Hz: Float, c3Hz: Float, upperHz: Float = 20000f) {
+        val nyquistSafe = (sampleRate * 0.45f).coerceAtLeast(100f)
+        val c1 = c1Hz.coerceIn(80f, minOf(500f, nyquistSafe - 150f))
+        val c2 = c2Hz.coerceIn(c1 + 100f, minOf(6000f, nyquistSafe - 100f))
+        val c3 = c3Hz.coerceIn(c2 + 100f, nyquistSafe)
+        val top = upperHz.coerceIn(c3 + 100f, minOf(20000f, nyquistSafe))
+        if (abs(c1 - crossover1) > 0.01f || abs(c2 - crossover2) > 0.01f ||
+            abs(c3 - crossover3) > 0.01f) {
+            crossover1 = c1
+            crossover2 = c2
+            crossover3 = c3
+            // Publish complete splitter instances instead of mutating filters on the audio thread.
+            splitterL = ZeusLr4BandSplitter(sampleRate, c1, c2, c3)
+            splitterR = ZeusLr4BandSplitter(sampleRate, c1, c2, c3)
         }
+        configureHighLimit(top)
+    }
+
+    private fun configureHighLimit(hz: Float) {
+        highLimitHz = hz.coerceIn(7300f, minOf(20000f, sampleRate * 0.45f))
+        highLimitL.lowPass(highLimitHz, 0.707f)
+        highLimitR.lowPass(highLimitHz, 0.707f)
+    }
+
+    /** Compatibility overload for older callers; the fourth value is the top-band ceiling. */
+    fun configureCrossover(frequencies: FloatArray) {
+        configureCrossover(
+            frequencies.getOrElse(0) { 180f },
+            frequencies.getOrElse(1) { 2400f },
+            frequencies.getOrElse(2) { 7200f },
+            frequencies.getOrElse(3) { 20000f }
+        )
+    }
+
+    fun configureHeadroom(bands: List<EqBand>, epicenterDrivePercent: Float) {
+        val positiveEqBoost = bands.filter { it.enabled && it.filterType != EqBand.FilterType.BYPASS }
+            .sumOf { it.gain.coerceAtLeast(0f).toDouble() }.toFloat()
+        val driveReserve = epicenterDrivePercent.coerceIn(0f, 100f) * 0.06f
+        // Keep at least the agreed 9 dB reserve; add further attenuation for
+        // unusually large EQ boosts or Epicenter drive, plus a 3 dB margin.
+        val attenuationDb = max(9f, positiveEqBoost + driveReserve + 3f).coerceAtMost(24f)
+        headroomGain = dbToLinear(-attenuationDb)
     }
 
     fun configureDynamics(
@@ -116,21 +175,20 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         postGainDb: FloatArray
     ) {
         compEnabled = enabled
-        for (i in 0..4) {
-            thresholds[i] = thresholdDb.getOrElse(i) { if (i == 4) 0f else -18f }.coerceIn(-60f, 0f)
-            ratios[i] = ratio.getOrElse(i) { 1f }.coerceIn(1f, 24f)
-            knees[i] = kneeDb.getOrElse(i) { 0f }.coerceIn(0f, 20f)
-            attacks[i] = attackMs.getOrElse(i) { 10f }.coerceIn(0.5f, 200f)
-            releases[i] = releaseMs.getOrElse(i) { 100f }.coerceIn(10f, 1000f)
+        for (i in 0..3) {
+            thresholds[i] = thresholdDb.getOrElse(i) { thresholds[i] }.coerceIn(-60f, 0f)
+            ratios[i] = ratio.getOrElse(i) { ratios[i] }.coerceIn(1f, 24f)
+            knees[i] = kneeDb.getOrElse(i) { knees[i] }.coerceIn(0f, 20f)
+            attacks[i] = attackMs.getOrElse(i) { attacks[i] }.coerceIn(0.5f, 200f)
+            releases[i] = releaseMs.getOrElse(i) { releases[i] }.coerceIn(10f, 1000f)
             preGains[i] = preGainDb.getOrElse(i) { 0f }.coerceIn(-12f, 12f)
             postGains[i] = postGainDb.getOrElse(i) { 0f }.coerceIn(-12f, 12f)
         }
     }
 
+    /** Output gain is before the fixed -1 dBFS final limiter. Limiter cannot be disabled. */
     fun configureOutput(gainDb: Float, limiter: Boolean = true, ceilingDbfs: Float = -1f) {
-        outputGain = 10f.pow(gainDb.coerceIn(-24f, 12f) / 20f)
-        limiterEnabled = limiter
-        ceiling = 10f.pow(ceilingDbfs.coerceIn(-6f, -0.1f) / 20f)
+        outputGain = dbToLinear(gainDb.coerceIn(-24f, 12f))
     }
 
     fun processPre(pcm: FloatArray, size: Int = pcm.size) {
@@ -151,57 +209,96 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
                 l += center - lowL
                 r += center - lowR
             }
-            pcm[i] = l
-            pcm[i + 1] = r
+            pcm[i] = l * headroomGain
+            pcm[i + 1] = r * headroomGain
         }
     }
 
     fun processPost(pcm: FloatArray, size: Int = pcm.size) {
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
         if (n < 2) return
+        ensureBranchCapacity(n)
+        val leftSplitter = splitterL
+        val rightSplitter = splitterR
+
         for (i in 0 until n step 2) {
-            splitInto(pcm[i], splitL, bandsScratchL)
-            splitInto(pcm[i + 1], splitR, bandsScratchR)
+            val lb = leftSplitter.process(pcm[i])
+            val rb = rightSplitter.process(pcm[i + 1])
+            branchLeft[0][i] = lb.low
+            branchRight[0][i] = rb.low
+            branchLeft[1][i] = lb.lowMid
+            branchRight[1][i] = rb.lowMid
+            branchLeft[2][i] = lb.highMid
+            branchRight[2][i] = rb.highMid
+            branchLeft[3][i] = highLimitL.process(lb.high)
+            branchRight[3][i] = highLimitR.process(rb.high)
+        }
+
+        // SUB-only order is intentional: Epicenter first, Sub/Sismo second,
+        // then the 28-32 Hz protective high-pass and B1 compressor.
+        val sub = interleaveBranch(0, n)
+        bassEpicenter?.let {
+            it.enabled = true
+            it.processStereo(sub, n)
+        }
+        bassSubSismi?.processStereo(sub, n)
+        for (i in 0 until n step 2) {
+            branchLeft[0][i] = sub[i]
+            branchRight[0][i] = sub[i + 1]
+            branchLeft[0][i] = subProtectL.process(branchLeft[0][i])
+            branchRight[0][i] = subProtectR.process(branchRight[0][i])
+        }
+
+        var delayWrite = delayIndex
+        for (i in 0 until n step 2) {
             var outL = 0f
             var outR = 0f
-            for (b in 0..4) {
-                val gain = bandGain(b, bandsScratchL[b], bandsScratchR[b])
-                outL += bandsScratchL[b] * gain
-                outR += bandsScratchR[b] * gain
+            for (b in 0..3) {
+                val l = if (b == 0) branchLeft[b][i] else branchLeft[b][i]
+                val r = if (b == 0) branchRight[b][i] else branchRight[b][i]
+                val gain = bandGain(b, l, r)
+                outL += l * gain
+                outR += r * gain
             }
             outL *= outputGain
             outR *= outputGain
-            if (limiterEnabled) {
-                val peak = max(abs(outL), abs(outR))
-                val targetGain = if (peak > ceiling) ceiling / peak else 1f
-                // Instant attack, smoothed 50 ms release, stereo-linked.
-                limiterGain = if (targetGain < limiterGain) targetGain
-                    else limiterGain + limiterReleaseCoeff * (targetGain - limiterGain)
-                outL = (outL * limiterGain).coerceIn(-ceiling, ceiling)
-                outR = (outR * limiterGain).coerceIn(-ceiling, ceiling)
-            } else {
-                limiterGain = 1f
-                outL = outL.coerceIn(-1f, 1f)
-                outR = outR.coerceIn(-1f, 1f)
-            }
-            pcm[i] = outL
-            pcm[i + 1] = outR
+
+            val peak = max(abs(outL), abs(outR))
+            val targetGain = if (peak > ceiling) ceiling / peak else 1f
+            limiterGain = if (targetGain < limiterGain) targetGain
+                else limiterGain + limiterReleaseCoeff * (targetGain - limiterGain)
+
+            val delayedL = delayL[delayWrite]
+            val delayedR = delayR[delayWrite]
+            delayL[delayWrite] = outL
+            delayR[delayWrite] = outR
+            pcm[i] = (delayedL * limiterGain).coerceIn(-ceiling, ceiling)
+            pcm[i + 1] = (delayedR * limiterGain).coerceIn(-ceiling, ceiling)
+            delayWrite++
+            if (delayWrite >= delayL.size) delayWrite = 0
         }
+        delayIndex = delayWrite
+    }
+
+    private fun interleaveBranch(branch: Int, n: Int): FloatArray {
+        // Reuse the left branch as a compact interleaved scratch buffer.
+        val target = branchLeft[branch]
+        for (i in 0 until n step 2) {
+            target[i + 1] = branchRight[branch][i]
+        }
+        return target
+    }
+
+    private fun ensureBranchCapacity(n: Int) {
+        if (branchLeft[0].size >= n) return
+        val capacity = n.coerceAtLeast(2048)
+        branchLeft = Array(4) { FloatArray(capacity) }
+        branchRight = Array(4) { FloatArray(capacity) }
     }
 
     fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
         processPre(pcm, size)
         processPost(pcm, size)
-    }
-
-    private fun splitInto(input: Float, filters: Array<Pair<Biquad, Biquad>>, scratch: FloatArray) {
-        var residual = input
-        for (i in 0..3) {
-            val lp = filters[i].second.process(filters[i].first.process(residual))
-            scratch[i] = lp
-            residual -= lp
-        }
-        scratch[4] = residual
     }
 
     private fun bandGain(band: Int, left: Float, right: Float): Float {
@@ -213,7 +310,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         val threshold = thresholds[band]
         val ratio = ratios[band]
         val knee = knees[band]
-        val target = if (db <= threshold - knee * 0.5f) 0f else if (knee <= 0.01f || db >= threshold + knee * 0.5f) {
+        val target = if (db <= threshold - knee * 0.5f) 0f
+        else if (knee <= 0.01f || db >= threshold + knee * 0.5f) {
             threshold + (db - threshold) / ratio - db
         } else {
             val x = db - (threshold - knee * 0.5f)
@@ -231,11 +329,16 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     fun reset() {
         hpfL.reset(); hpfR.reset()
         monoLpL.reset(); monoLpR.reset()
+        subProtectL.reset(); subProtectR.reset()
+        highLimitL.reset(); highLimitR.reset()
         eqL.forEach { it.reset() }; eqR.forEach { it.reset() }
-        splitL.forEach { it.first.reset(); it.second.reset() }
-        splitR.forEach { it.first.reset(); it.second.reset() }
+        splitterL.reset(); splitterR.reset()
         grDb.fill(0f)
+        delayL.fill(0f); delayR.fill(0f)
+        delayIndex = 0
         limiterGain = 1f
+        bassEpicenter?.reset()
+        bassSubSismi?.reset()
     }
 
     private fun finite(v: Float) = if (v.isFinite()) v.coerceIn(-2f, 2f) else 0f
