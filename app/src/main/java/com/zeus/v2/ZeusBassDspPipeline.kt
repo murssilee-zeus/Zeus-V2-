@@ -259,7 +259,6 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             branchRight[0][i] = subProtectR.process(branchRight[0][i])
         }
 
-        var delayWrite = delayIndex
         for (i in 0 until n step 2) {
             var outL = 0f
             var outR = 0f
@@ -366,6 +365,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         delayL.fill(0f); delayR.fill(0f)
         delayIndex = 0
         limiterGain = 1f
+        limiterHoldFrames = 0
         bassEpicenter?.reset()
         bassSubSismi?.reset()
     }
