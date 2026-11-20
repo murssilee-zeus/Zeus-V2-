@@ -25,8 +25,10 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private val eqR = Array(16) { Biquad(sampleRate) }
     private var eqCount = 0
 
-    @Volatile private var splitterL = ZeusLr4BandSplitter(sampleRate, 180f, 2400f, 7200f)
-    @Volatile private var splitterR = ZeusLr4BandSplitter(sampleRate, 180f, 2400f, 7200f)
+    @Volatile private var splitters = Pair(
+        ZeusLr4BandSplitter(sampleRate, 180f, 2400f, 7200f),
+        ZeusLr4BandSplitter(sampleRate, 180f, 2400f, 7200f)
+    )
     private var crossover1 = 180f
     private var crossover2 = 2400f
     private var crossover3 = 7200f
@@ -136,8 +138,10 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             crossover2 = c2
             crossover3 = c3
             // Publish complete splitter instances instead of mutating filters on the audio thread.
-            splitterL = ZeusLr4BandSplitter(sampleRate, c1, c2, c3)
-            splitterR = ZeusLr4BandSplitter(sampleRate, c1, c2, c3)
+            splitters = Pair(
+                ZeusLr4BandSplitter(sampleRate, c1, c2, c3),
+                ZeusLr4BandSplitter(sampleRate, c1, c2, c3)
+            )
         }
         configureHighLimit(top)
     }
@@ -223,8 +227,9 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         val n = size.coerceIn(0, pcm.size - pcm.size % 2)
         if (n < 2) return
         ensureBranchCapacity(n)
-        val leftSplitter = splitterL
-        val rightSplitter = splitterR
+        val currentSplitters = splitters
+        val leftSplitter = currentSplitters.first
+        val rightSplitter = currentSplitters.second
 
         for (i in 0 until n step 2) {
             leftSplitter.processInto(pcm[i], splitScratchL)
@@ -343,7 +348,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         subProtectL.reset(); subProtectR.reset()
         highLimitL.reset(); highLimitR.reset()
         eqL.forEach { it.reset() }; eqR.forEach { it.reset() }
-        splitterL.reset(); splitterR.reset()
+        splitters.first.reset(); splitters.second.reset()
         grDb.fill(0f)
         delayL.fill(0f); delayR.fill(0f)
         delayIndex = 0
