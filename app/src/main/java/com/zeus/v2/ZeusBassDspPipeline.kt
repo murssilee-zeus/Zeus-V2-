@@ -62,6 +62,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private val delayR = FloatArray(lookaheadFrames + 1)
     private var delayIndex = 0
     private var limiterGain = 1f
+    private var limiterHoldFrames = 0
     private val ceiling = dbToLinear(-1f)
     private val limiterReleaseCoeff = 1f - exp(-1f / (0.080f * sampleRate.coerceAtLeast(8000)))
 
