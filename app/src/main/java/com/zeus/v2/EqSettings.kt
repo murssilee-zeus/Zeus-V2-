@@ -25,28 +25,28 @@ data class EqSettings(
     var limiterPostGain: Float = 0f,
     var compEnabled: Boolean = true,
     var cross1: Float = 180f,
-    var cross2: Float = 1800f,
-    var cross3: Float = 8000f,
+    var cross2: Float = 2400f,
+    var cross3: Float = 7200f,
     var cross4: Float = 20000f,
     var compThLow: Float = -18f,
-    var compThLoMid: Float = -14f,
-    var compThHiMid: Float = -12f,
-    var compThHigh: Float = -14f,
-    var compRatioLow: Float = 4f,
-    var compRatioLoMid: Float = 3f,
-    var compRatioHiMid: Float = 2.5f,
-    var compRatioHigh: Float = 3.5f,
+    var compThLoMid: Float = -20f,
+    var compThHiMid: Float = -22f,
+    var compThHigh: Float = -24f,
+    var compRatioLow: Float = 2.5f,
+    var compRatioLoMid: Float = 2f,
+    var compRatioHiMid: Float = 2f,
+    var compRatioHigh: Float = 1.5f,
     var compKneeLow: Float = 6f,
     var compKneeLoMid: Float = 6f,
     var compKneeHiMid: Float = 6f,
     var compKneeHigh: Float = 6f,
-    var compAttackLow: Float = 15f,
-    var compAttackLoMid: Float = 12f,
-    var compAttackHiMid: Float = 8f,
-    var compAttackHigh: Float = 5f,
+    var compAttackLow: Float = 25f,
+    var compAttackLoMid: Float = 15f,
+    var compAttackHiMid: Float = 5f,
+    var compAttackHigh: Float = 3f,
     var compReleaseLow: Float = 180f,
     var compReleaseLoMid: Float = 120f,
-    var compReleaseHiMid: Float = 90f,
+    var compReleaseHiMid: Float = 80f,
     var compReleaseHigh: Float = 60f,
     var compPostGainLow: Float = 0f,
     var compPostGainLoMid: Float = 0f,
@@ -76,7 +76,7 @@ data class EqSettings(
 ) {
     fun toJson(): String {
         val o = JSONObject()
-        o.put("version", 10)
+        o.put("version", 11)
         o.put("preGain", preGain.toDouble()); o.put("subBoost", subBoost.toDouble())
         o.put("bassMono", bassMono); o.put("bassAmount", bassAmount.toDouble()); o.put("bassPunch", bassPunch.toDouble()); o.put("bassHarmonics", bassHarmonics.toDouble()); o.put("bassFrequency", bassFrequency.toDouble()); o.put("punchAmount", punchAmount.toDouble()); o.put("punchCenterHz", punchCenterHz.toDouble()); o.put("punchQ", punchQ.toDouble())
         val bArr = JSONArray()
@@ -108,7 +108,7 @@ data class EqSettings(
                 val bArr=o.optJSONArray("bands")
                 if(bArr!=null&&bArr.length()>0){val list=mutableListOf<EqBand>();for(i in 0 until bArr.length()){val jo=bArr.getJSONObject(i);val typeOrd=jo.optInt("t",EqBand.FilterType.PEAK.ordinal);val type=EqBand.FilterType.values().getOrElse(typeOrd){EqBand.FilterType.PEAK};val id=jo.optInt("id",i);list.add(EqBand(id,jo.optDouble("f",1000.0).toFloat(),jo.optDouble("g",0.0).toFloat(),jo.optDouble("q",1.0).toFloat(),jo.optBoolean("e",true),type,bandColor(id)))};s.bands=list}
                 s.limiterEnabled=o.optBoolean("limiterEnabled",true);s.limiterThreshold=o.optDouble("limiterThreshold",-2.5).toFloat();s.limiterAttack=o.optDouble("limiterAttack",0.5).toFloat().coerceIn(.01f,100f);s.limiterRelease=o.optDouble("limiterRelease",120.0).toFloat();s.limiterRatio=o.optDouble("limiterRatio",20.0).toFloat();s.limiterPostGain=o.optDouble("limiterPostGain",0.0).toFloat()
-                s.compEnabled=o.optBoolean("compEnabled",true);s.cross1=o.optDouble("cross1",180.0).toFloat();s.cross2=o.optDouble("cross2",1800.0).toFloat();s.cross3=o.optDouble("cross3",8000.0).toFloat();s.cross4=o.optDouble("cross4",20000.0).toFloat().coerceIn(s.cross3+50f,20000f)
+                s.compEnabled=o.optBoolean("compEnabled",true);s.cross1=o.optDouble("cross1",180.0).toFloat();s.cross2=o.optDouble("cross2",2400.0).toFloat();s.cross3=o.optDouble("cross3",7200.0).toFloat();if(o.optInt("version",0)<11){if(s.cross2==1800f)s.cross2=2400f;if(s.cross3==8000f)s.cross3=7200f};s.cross4=o.optDouble("cross4",20000.0).toFloat().coerceIn(s.cross3+50f,20000f)
                 val legacyRatio=o.optDouble("compRatio",4.0);val legacyKnee=o.optDouble("compKnee",6.0);val legacyAttack=o.optDouble("compAttack",10.0);val legacyRelease=o.optDouble("compRelease",100.0);val legacyPost=o.optDouble("compPostGain",0.0)
                 s.compThLow=o.optDouble("compThLow",-18.0).toFloat();s.compThLoMid=o.optDouble("compThLoMid",-14.0).toFloat();s.compThHiMid=o.optDouble("compThHiMid",-12.0).toFloat();s.compThHigh=o.optDouble("compThHigh",-14.0).toFloat()
                 s.compRatioLow=o.optDouble("compRatioLow",legacyRatio).toFloat();s.compRatioLoMid=o.optDouble("compRatioLoMid",legacyRatio).toFloat();s.compRatioHiMid=o.optDouble("compRatioHiMid",legacyRatio).toFloat();s.compRatioHigh=o.optDouble("compRatioHigh",legacyRatio).toFloat()
