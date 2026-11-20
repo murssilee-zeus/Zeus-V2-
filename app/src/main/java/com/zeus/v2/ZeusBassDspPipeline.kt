@@ -264,8 +264,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             var outL = 0f
             var outR = 0f
             for (b in 0..3) {
-                val l = if (b == 0) branchLeft[b][i] else branchLeft[b][i]
-                val r = if (b == 0) branchRight[b][i] else branchRight[b][i]
+                val l = branchLeft[b][i]
+                val r = branchRight[b][i]
                 val gain = bandGain(b, l, r)
                 outL += l * gain
                 outR += r * gain
