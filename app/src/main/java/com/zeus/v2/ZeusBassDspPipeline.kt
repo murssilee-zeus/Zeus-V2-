@@ -32,7 +32,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private var crossover3 = 7200f
     private var highLimitHz = 20000f
 
-    private var branchLeft = Array(4) { FloatArray(2048) }
+    private val splitScratchL = FloatArray(4)\n    private val splitScratchR = FloatArray(4)\n    private var branchLeft = Array(4) { FloatArray(2048) }
     private var branchRight = Array(4) { FloatArray(2048) }
     private var bassEpicenter: ZeusEpicenter? = null
     private var bassSubSismi: ZeusSubSismi? = null
@@ -225,16 +225,16 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         val rightSplitter = splitterR
 
         for (i in 0 until n step 2) {
-            val lb = leftSplitter.process(pcm[i])
-            val rb = rightSplitter.process(pcm[i + 1])
-            branchLeft[0][i] = lb.low
-            branchRight[0][i] = rb.low
-            branchLeft[1][i] = lb.lowMid
-            branchRight[1][i] = rb.lowMid
-            branchLeft[2][i] = lb.highMid
-            branchRight[2][i] = rb.highMid
-            branchLeft[3][i] = highLimitL.process(lb.high)
-            branchRight[3][i] = highLimitR.process(rb.high)
+            leftSplitter.processInto(pcm[i], splitScratchL)
+            rightSplitter.processInto(pcm[i + 1], splitScratchR)
+            branchLeft[0][i] = splitScratchL[0]
+            branchRight[0][i] = splitScratchR[0]
+            branchLeft[1][i] = splitScratchL[1]
+            branchRight[1][i] = splitScratchR[1]
+            branchLeft[2][i] = splitScratchL[2]
+            branchRight[2][i] = splitScratchR[2]
+            branchLeft[3][i] = highLimitL.process(splitScratchL[3])
+            branchRight[3][i] = highLimitR.process(splitScratchR[3])
         }
 
         // SUB-only order is intentional: Epicenter first, Sub/Sismo second,
