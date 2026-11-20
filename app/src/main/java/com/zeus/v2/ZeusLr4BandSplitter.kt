@@ -44,11 +44,17 @@ class ZeusLr4BandSplitter(
     )
 
     fun process(input: Float): Bands {
-        val l = low.process(input)
-        val lm = lowMidLp.process(lowMidHp.process(input))
-        val hm = highMidLp.process(highMidHp.process(input))
-        val h = high.process(input)
-        return Bands(l, lm, hm, h)
+        val values = FloatArray(4)
+        processInto(input, values)
+        return Bands(values[0], values[1], values[2], values[3])
+    }
+
+    /** Allocation-free real-time path. output[offset..offset+3] = four bands. */
+    fun processInto(input: Float, output: FloatArray, offset: Int = 0) {
+        output[offset] = low.process(input)
+        output[offset + 1] = lowMidLp.process(lowMidHp.process(input))
+        output[offset + 2] = highMidLp.process(highMidHp.process(input))
+        output[offset + 3] = high.process(input)
     }
 
     fun reset() {
