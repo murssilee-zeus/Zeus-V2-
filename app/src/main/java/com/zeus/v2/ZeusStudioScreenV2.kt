@@ -35,6 +35,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
  val zeusLogo=remember{runCatching{context.assets.open("ui_reference/render.png").use{BitmapFactory.decodeStream(it)?.asImageBitmap()}}.getOrNull()}
  var showMenu by remember{mutableStateOf(false)}
  var showSettings by remember{mutableStateOf(false)}
+ var showDspLab by remember{mutableStateOf(false)}
  var showPresetDashboard by remember{mutableStateOf(true)}
  Column(Modifier.fillMaxSize().background(ZBG).padding(horizontal=6.dp,vertical=4.dp)){
   Row(Modifier.fillMaxWidth().height(58.dp).background(ZSUR,RoundedCornerShape(7.dp)).border(1.dp,ZEDGE,RoundedCornerShape(7.dp)).padding(horizontal=2.dp),verticalAlignment=Alignment.CenterVertically){
@@ -87,11 +88,13 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     Text("EQ, FFT, Punch, Dynamics y Limiter mantienen sus parámetros actuales.",fontSize=10.sp,color=ZM)
     Text("Interfaz: consola horizontal / paneles deslizables",fontSize=10.sp,color=ZM)
     Text("Configuraciones: JSON compatible para exportación",fontSize=10.sp,color=ZM)
+    Text("ABRIR ZEUS DSP LAB",color=Color.White,fontSize=10.sp,fontWeight=FontWeight.ExtraBold,modifier=Modifier.fillMaxWidth().background(Color(0xFF172638),RoundedCornerShape(7.dp)).border(1.dp,ZCY,RoundedCornerShape(7.dp)).clickable{showSettings=false;showDspLab=true}.padding(10.dp))
     Text("EXPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onExport()}.padding(8.dp))
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
     Text("IMPORTAR JSON",color=Color.White,fontSize=9.sp,fontWeight=FontWeight.Bold,modifier=Modifier.background(ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZP,RoundedCornerShape(6.dp)).clickable{showSettings=false;onImport()}.padding(8.dp))
    }},confirmButton={TextButton(onClick={showSettings=false}){Text("Cerrar")}})
   }
+  if(showDspLab){ ZeusDspScriptLabDialog(punch,{showDspLab=false}) }
  }
 }
 
