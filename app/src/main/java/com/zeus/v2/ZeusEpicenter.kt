@@ -42,6 +42,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
     private var harmonics = 0f
     private var targetHz = 34f
     private var sweepHz = 80f
+    private var oscillatorHz = 34f
 
     private var env55 = 0f
     private var env80 = 0f
@@ -67,8 +68,9 @@ class ZeusEpicenter(private val sampleRate: Int) {
         drive = drivePercent.coerceIn(0f, 100f) / 100f
         depth = depthPercent.coerceIn(0f, 100f) / 100f
         harmonics = harmonicsPercent.coerceIn(0f, 100f) / 100f
-        targetHz = frequencyHz.coerceIn(27f, 63f)
-        this.sweepHz = sweepHz.coerceIn(50f, 140f)
+        targetHz = frequencyHz.coerceIn(18f, 63f)
+        this.sweepHz = sweepHz.coerceIn(targetHz, 140f)
+        oscillatorHz = targetHz
 
         // Wider/lower detector centers catch deep bass fundamentals and their body.
         detector55.bandPass(48f, 0.72f)
@@ -126,7 +128,9 @@ class ZeusEpicenter(private val sampleRate: Int) {
             // mostly by wide stereo content rather than bass energy.
             voiceEnvelope += voiceCoeff * (side - voiceEnvelope)
             val stereoGuard = (1f - (voiceEnvelope / (detector + 0.025f)).coerceIn(0f, 0.55f) * 0.16f)
-            phase += (2.0 * PI * targetHz / sr)
+            val sweepTargetHz = targetHz + (this.sweepHz - targetHz) * subEnvelope
+            oscillatorHz += 0.0025f * (sweepTargetHz - oscillatorHz)
+            phase += (2.0 * PI * oscillatorHz / sr)
             if (phase >= 2.0 * PI) phase -= 2.0 * PI
             oscillator = sin(phase).toFloat()
 
@@ -197,7 +201,9 @@ class ZeusEpicenter(private val sampleRate: Int) {
 
             voiceEnvelope += voiceCoeff * (side - voiceEnvelope)
             val stereoGuard = 1f - (voiceEnvelope / (detector + 0.025f)).coerceIn(0f, 0.55f) * 0.16f
-            phase += 2.0 * PI * targetHz / sr
+            val sweepTargetHz = targetHz + (this.sweepHz - targetHz) * subEnvelope
+            oscillatorHz += 0.0025f * (sweepTargetHz - oscillatorHz)
+            phase += 2.0 * PI * oscillatorHz / sr
             if (phase >= 2.0 * PI) phase -= 2.0 * PI
             oscillator = sin(phase).toFloat()
 
@@ -241,6 +247,7 @@ class ZeusEpicenter(private val sampleRate: Int) {
         holdSamples = 0
         holdEnvelope = 0f
         phase = 0.0
+        oscillatorHz = targetHz
         oscillator = 0f
         previousMono = 0f
         voiceEnvelope = 0f
