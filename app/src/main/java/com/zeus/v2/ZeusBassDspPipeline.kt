@@ -9,7 +9,7 @@ import kotlin.math.sqrt
 /**
  * Four-branch Zeus Bass PCM chain.
  * Input cleanup/EQ/mono -> LR4 crossover -> SUB Epicenter -> SUB/Sismo
- * -> subsonic protection -> four linked compressors -> sum -> output gain
+ * -> four linked compressors -> sum -> output gain
  * -> mandatory linked-stereo lookahead limiter.
  */
 class ZeusBassDspPipeline(private val sampleRate: Int) {
@@ -17,8 +17,6 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private val hpfR = Biquad(sampleRate)
     private val monoLpL = Biquad(sampleRate)
     private val monoLpR = Biquad(sampleRate)
-    private val subProtectL = Biquad(sampleRate)
-    private val subProtectR = Biquad(sampleRate)
     private val highLimitL = Biquad(sampleRate)
     private val highLimitR = Biquad(sampleRate)
     private val eqL = Array(16) { Biquad(sampleRate) }
@@ -68,7 +66,6 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
 
     init {
         configureSubsonic(20f)
-        configureSubBranchProtection(30f)
         configureBassMono(true)
         configureCrossover(180f, 2400f, 7200f, 20000f)
         configureHighLimit(20000f)
@@ -83,12 +80,6 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         val safe = hz.coerceIn(20f, 32f)
         hpfL.highPass(safe, 0.707f)
         hpfR.highPass(safe, 0.707f)
-    }
-
-    private fun configureSubBranchProtection(hz: Float = 30f) {
-        val safe = hz.coerceIn(28f, 32f)
-        subProtectL.highPass(safe, 0.707f)
-        subProtectR.highPass(safe, 0.707f)
     }
 
     fun configureBassMono(enabled: Boolean, cutoffHz: Float = 120f) {
@@ -246,7 +237,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         }
 
         // SUB-only order is intentional: Epicenter first, Sub/Sismo second,
-        // then the 28-32 Hz protective high-pass and B1 compressor.
+        // then the B1 compressor. No extra 28-32 Hz high-pass cuts the deep sub.
         val sub = interleaveBranch(0, n)
         bassEpicenter?.let {
             it.enabled = true
@@ -256,8 +247,6 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         for (i in 0 until n step 2) {
             branchLeft[0][i] = sub[i]
             branchRight[0][i] = sub[i + 1]
-            branchLeft[0][i] = subProtectL.process(branchLeft[0][i])
-            branchRight[0][i] = subProtectR.process(branchRight[0][i])
         }
 
         for (i in 0 until n step 2) {
@@ -358,7 +347,6 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     fun reset() {
         hpfL.reset(); hpfR.reset()
         monoLpL.reset(); monoLpR.reset()
-        subProtectL.reset(); subProtectR.reset()
         highLimitL.reset(); highLimitR.reset()
         eqL.forEach { it.reset() }; eqR.forEach { it.reset() }
         splitters.first.reset(); splitters.second.reset()
