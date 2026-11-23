@@ -351,6 +351,7 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
 
     fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
         processPre(pcm, size)
+        processEpicenterSource(pcm, size)
         processPost(pcm, size)
     }
 
