@@ -38,6 +38,9 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     private var branchRight = Array(4) { FloatArray(2048) }
     private var bassEpicenter: ZeusEpicenter? = null
     private var bassSubSismi: ZeusSubSismi? = null
+    // Independent Epicenter side-chain/output, captured before Bass Evolution and crossover.
+    private var epicenterSource = FloatArray(2048)
+    private var epicenterAdd = FloatArray(2048)
 
     private val thresholds = floatArrayOf(-18f, -20f, -22f, -24f)
     private val ratios = floatArrayOf(2.5f, 2f, 2f, 1.5f)
@@ -74,6 +77,28 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
     fun setBassBranchProcessors(epicenter: ZeusEpicenter?, subSismi: ZeusSubSismi?) {
         bassEpicenter = epicenter
         bassSubSismi = subSismi
+    }
+
+    /**
+     * Runs Epicenter from the pre-Bass-Evolution PCM feed. Its generated delta is
+     * stored separately and later summed only into the mono SUB branch.
+     * This method must be called after processPre() and before Bass Evolution.
+     */
+    fun processEpicenterSource(pcm: FloatArray, size: Int = pcm.size) {
+        val n = size.coerceIn(0, pcm.size - pcm.size % 2)
+        if (n < 2) return
+        ensureEpicenterCapacity(n)
+        val source = epicenterSource
+        val generated = epicenterAdd
+        for (i in 0 until n) {
+            source[i] = finite(pcm[i])
+            generated[i] = source[i]
+        }
+        bassEpicenter?.let { epic ->
+            epic.enabled = true
+            epic.processStereo(generated, n)
+        }
+        for (i in 0 until n) generated[i] -= source[i]
     }
 
     fun configureSubsonic(hz: Float) {
@@ -236,12 +261,15 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
             branchRight[3][i] = highLimitR.process(splitScratchR[3])
         }
 
-        // SUB-only order is intentional: Epicenter first, Sub/Sismo second,
-        // then the B1 compressor. No extra 28-32 Hz high-pass cuts the deep sub.
+        // Epicenter is synthesized independently from the pre-Bass-Evolution
+        // PCM tap. Sum only its generated mono delta into SUB, then run Sub/Sismo.
+        // Neither detector nor generator depends on the Sub/Sismo output.
         val sub = interleaveBranch(0, n)
-        bassEpicenter?.let {
-            it.enabled = true
-            it.processStereo(sub, n)
+        val generated = epicenterAdd
+        for (i in 0 until n step 2) {
+            val monoAdd = (generated[i] + generated[i + 1]) * 0.5f
+            sub[i] += monoAdd
+            sub[i + 1] += monoAdd
         }
         bassSubSismi?.processStereo(sub, n)
         for (i in 0 until n step 2) {
@@ -314,6 +342,13 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         branchRight = Array(4) { FloatArray(capacity) }
     }
 
+    private fun ensureEpicenterCapacity(n: Int) {
+        if (epicenterSource.size >= n) return
+        val capacity = n.coerceAtLeast(2048)
+        epicenterSource = FloatArray(capacity)
+        epicenterAdd = FloatArray(capacity)
+    }
+
     fun processStereo(pcm: FloatArray, size: Int = pcm.size) {
         processPre(pcm, size)
         processPost(pcm, size)
@@ -357,6 +392,8 @@ class ZeusBassDspPipeline(private val sampleRate: Int) {
         limiterHoldFrames = 0
         bassEpicenter?.reset()
         bassSubSismi?.reset()
+        epicenterSource.fill(0f)
+        epicenterAdd.fill(0f)
     }
 
     private fun finite(v: Float) = if (v.isFinite()) v.coerceIn(-2f, 2f) else 0f
