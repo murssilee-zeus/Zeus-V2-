@@ -337,6 +337,7 @@ class AudioEngine(private val context: Context) {
             for (i in 0 until n) pcmShortScratch[i] = buffer[i] / 32768f
             if (pipelineEnabled) {
                 zeusBassDspPipeline?.processPre(pcmShortScratch, n)
+                zeusBassDspPipeline?.processEpicenterSource(pcmShortScratch, n)
                 zeusBassEvolution?.processStereo(pcmShortScratch, n)
                 zeusBassDspPipeline?.processPost(pcmShortScratch, n)
             } else {
@@ -403,6 +404,7 @@ class AudioEngine(private val context: Context) {
             // sequentially inside the SUB branch, never on the full-range mix.
             if (pipelineEnabled) {
                 zeusBassDspPipeline?.processPre(buffer, n)
+                zeusBassDspPipeline?.processEpicenterSource(buffer, n)
                 zeusBassEvolution?.processStereo(buffer, n)
                 zeusBassDspPipeline?.processPost(buffer, n)
             } else {
