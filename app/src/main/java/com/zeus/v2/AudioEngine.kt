@@ -973,6 +973,8 @@ class AudioEngine(private val context: Context) {
 
     private fun applyEq() {
 
+        // Sub/Sismo remains hard-disabled even when settings are imported or restored.
+        settings.subBoost = 0f
         val dp = dynamicsProcessing ?: return
 
         if (!pipelineEnabled) return
@@ -1182,6 +1184,9 @@ class AudioEngine(private val context: Context) {
 
     private fun applyPostEq() {
 
+        // Bass Punch and Sub/Sismo are excluded from the active DSP path.
+        settings.bassPunch = 0f
+        settings.subBoost = 0f
         val dp = dynamicsProcessing ?: return
 
         try {
