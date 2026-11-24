@@ -46,7 +46,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
     } else {
      Text("ZEUS",color=ZT,fontSize=15.sp,fontWeight=FontWeight.ExtraBold)
     }
-    Text(if(page==0)"EQ / PUNCH" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=6.sp,fontWeight=FontWeight.Bold)
+    Text(if(page==0)"EQ / EPICENTER" else if(page==1)"DYNAMICS" else "AUTOEQ / PRESETS",color=ZCY,fontSize=6.sp,fontWeight=FontWeight.Bold)
    }
    Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.padding(horizontal=2.dp)){
     ModeChip("◇","HiRes",vm.hiResEnabled,ZCY){vm.hiResEnabled=true;vm.hiResEpicenterEnabled=false;vm.spatialEnabled=false}
@@ -58,7 +58,7 @@ fun ZeusStudioScreenV2(vm:EqViewModel,punch:PunchViewModel,onToggleEngine:()->Un
   }
   if(cfg.screenWidthDp <= cfg.screenHeightDp){
    Row(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)){
-    listOf("EQ / PUNCH","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
+    listOf("EQ / EPICENTER","DYNAMICS","AUTOEQ / PRESETS").forEachIndexed{i,label->
      Text(label,color=if(page==i)Color.Black else ZM,fontSize=7.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.weight(1f).background(if(page==i)ZP else ZSUR,RoundedCornerShape(5.dp)).border(1.dp,if(page==i)ZP else ZBR,RoundedCornerShape(5.dp)).clickable{page=i}.padding(vertical=6.dp))
     }
    }
@@ -282,7 +282,6 @@ private fun ZeusConsoleLandscape(vm:EqViewModel,punch:PunchViewModel){
             Bands(vm)
             // Controles de graves recuperados en la página principal.
             // Se reutilizan los componentes ya existentes para no tocar el motor.
-            SubSismoCard(vm)
             PunchCard(punch,vm)
             EpicenterCard(punch)
             SplMeterCard(punch)
@@ -349,7 +348,7 @@ private fun ModeTile(title:String,subtitle:String,accent:Color,active:Boolean,mo
    Filters(vm); BandEdit(vm); Presets(vm,punch); Bands(vm)
   }
   Column(Modifier.weight(.9f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(7.dp)){
-   SubSismoCard(vm); PunchCard(punch,vm); EpicenterCard(punch)
+   PunchCard(punch,vm); EpicenterCard(punch)
             SplMeterCard(punch); SpatialCard(vm); Pipe(vm)
   }
  }
@@ -714,10 +713,7 @@ private fun AutoEqSafeCard(vm:EqViewModel){
   }
   S("HARMONICS",p.bassHarmonics,0f..100f," %"){p.updateBassHarmonics(it)}
   Spacer(Modifier.height(2.dp))
-  Text("PUNCH",color=ZP,fontSize=11.sp,fontWeight=FontWeight.Bold)
-  S("Amount",p.amount,0f..100f," %"){p.updatePunchAmount(it)}
-  S("Center",p.centerHz,35f..65f," Hz"){p.updatePunchCenter(it)}
-  S("Q",p.q,.5f..3f){p.updatePunchQ(it)}
+  Text("BASS PUNCH · DESACTIVADO PARA PRUEBA AISLADA",color=ZM,fontSize=8.sp,fontWeight=FontWeight.Bold)
   S("Headroom trim",vm.headroomTrim,-12f..6f," dB"){vm.headroomTrim=it}
  }
 }
@@ -766,7 +762,7 @@ private fun AutoEqSafeCard(vm:EqViewModel){
 }
 
 @Composable private fun LimCard(vm:EqViewModel){Card("LIMITADOR"){S("Threshold",vm.limiterThreshold,-12f..0f," dB"){vm.limiterThreshold=it};S("Attack",vm.limiterAttack,.1f..20f," ms"){vm.limiterAttack=it};S("Release",vm.limiterRelease,20f..500f," ms"){vm.limiterRelease=it};S("Ratio",vm.limiterRatio,1f..50f," :1"){vm.limiterRatio=it};S("Post Gain",vm.limiterPostGain,-12f..12f," dB"){vm.limiterPostGain=it};Row(verticalAlignment=Alignment.CenterVertically){Text("Activado",color=ZM,fontSize=9.sp,modifier=Modifier.weight(1f));Switch(checked=vm.limiterEnabled,onCheckedChange={vm.limiterEnabled=it})}}}
-@Composable private fun Pipe(vm:EqViewModel){Card("AUDIO EFFECTS PIPELINE"){Text("1  MBC · Procesamiento multibanda",color=ZT,fontSize=10.sp);Text("2  PUNCH 35-65 Hz · Controlado de subgraves",color=ZT,fontSize=10.sp);Text("3  LIMITER · Protección final de picos",color=ZT,fontSize=10.sp);Text("DIRECT OUTPUT · ACTIVO",color=ZG,fontSize=10.sp,fontWeight=FontWeight.Bold)}}
+@Composable private fun Pipe(vm:EqViewModel){Card("AUDIO EFFECTS PIPELINE"){Text("1  MBC · Procesamiento multibanda",color=ZT,fontSize=10.sp);Text("2  EPICENTER · SUBGRAVE INDEPENDIENTE",color=ZPK,fontSize=10.sp);Text("3  LIMITER · Protección final de picos",color=ZT,fontSize=10.sp);Text("DIRECT OUTPUT · ACTIVO",color=ZG,fontSize=10.sp,fontWeight=FontWeight.Bold)}}
 
 @Composable private fun Filters(vm:EqViewModel){val b=vm.selectedBand();val t=listOf(EqBand.FilterType.PEAK to "PEAK",EqBand.FilterType.LOW_SHELF to "LOW",EqBand.FilterType.HIGH_SHELF to "HIGH",EqBand.FilterType.LOW_PASS to "LPF",EqBand.FilterType.HIGH_PASS to "HPF",EqBand.FilterType.BYPASS to "BYPASS");Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(3.dp)){t.forEach{(x,l)->Text(l,color=if(b?.filterType==x)Color.Black else ZT,fontSize=8.sp,modifier=Modifier.background(if(b?.filterType==x) ZPK else ZSUR,RoundedCornerShape(6.dp)).border(1.dp,ZBR,RoundedCornerShape(6.dp)).clickable{vm.updateSelectedBand(filterType=x)}.padding(horizontal=8.dp,vertical=6.dp))}}}
 @Composable
