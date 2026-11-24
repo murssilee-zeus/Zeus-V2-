@@ -255,7 +255,8 @@ class AudioEngine(private val context: Context) {
             }
 
         zeusBassDspPipeline = ZeusBassDspPipeline(sampleRate).also {
-            it.setBassBranchProcessors(zeusEpicenter, zeusSubSismi)
+            // Temporary isolation test: Epicenter remains connected; Punch and Sub/Sismo are disconnected.
+            it.setBassBranchProcessors(zeusEpicenter, null)
             configureZeusBassPipeline(it)
         }
         applyHiResBassStages()
@@ -662,7 +663,8 @@ class AudioEngine(private val context: Context) {
     }
 
     fun setSubBoost(v: Float) {
-        settings.subBoost = v
+        // Sub/Sismo is disabled for the isolated Epicenter test.
+        settings.subBoost = 0f
         applyEq()
         applyPostEq()
         zeusEpicenter?.let { applyEpicenter(it) }
@@ -679,10 +681,9 @@ class AudioEngine(private val context: Context) {
 
     fun setPunch(v: Float) {
 
-        punch =
-            v.coerceIn(0f, 100f)
-
-        settings.bassPunch = punch
+        // Bass Punch is disabled for the isolated Epicenter test.
+        punch = 0f
+        settings.bassPunch = 0f
 
         applyInputGain()
         applyPostEq()
@@ -895,6 +896,11 @@ class AudioEngine(private val context: Context) {
     }
 
     fun applyAll() {
+
+        // Ignore saved/imported values while the two modules are isolated for testing.
+        settings.bassPunch = 0f
+        settings.subBoost = 0f
+        punch = 0f
 
         applyInputGain()
         applyEq()
@@ -1400,16 +1406,16 @@ class AudioEngine(private val context: Context) {
     private fun applyBassEvolution(target: ZeusBassEvolution? = zeusBassEvolution) {
         target?.configure(
             rumblePercent = settings.bassAmount,
-            punchPercent = settings.bassPunch,
+            punchPercent = 0f,
             enabled = pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
         )
     }
 
     private fun applyHiResBassStages() {
         val active = pipelineEnabled && !hiResEnabled && !settings.spatialEnabled
-        zeusHiResImpact?.configure(if (active) settings.bassPunch else 0f)
+        zeusHiResImpact?.configure(0f)
         zeusSubSismi?.configure(
-            amountPercent = if (active) settings.bassAmount else 0f,
+            amountPercent = 0f,
             frequencyHz = bassFrequencyHz,
             mono = settings.bassMono
         )
