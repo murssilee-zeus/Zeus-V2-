@@ -459,9 +459,6 @@ private fun HarmanTargetsCard(vm:EqViewModel){
   Bands(vm)
 
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp),verticalAlignment=Alignment.Top){
-   Column(Modifier.weight(1f)){
-    SubSismoCard(vm)
-   }
    Column(Modifier.weight(1.15f)){ PunchCard(punch,vm); EpicenterCard(punch)
             SplMeterCard(punch); SpatialCard(vm) }
    Column(Modifier.weight(.9f)){ Card("HEADROOM") {
@@ -703,7 +700,7 @@ private fun AutoEqSafeCard(vm:EqViewModel){
 }
 
 @Composable private fun PunchCard(p:PunchViewModel,vm:EqViewModel){
- Card("BASS / PUNCH") {
+ Card("BASS CONTROLS") {
   Text("Bass controls · Audio Framework / DynamicsProcessing",color=ZM,fontSize=9.sp)
   S("BASS AMOUNT",p.bassAmount,0f..100f," %"){p.updateBassAmount(it)}
   S("BASS FREQ",p.bassFrequencyHz,25f..120f," Hz"){p.updateBassFrequency(it)}
